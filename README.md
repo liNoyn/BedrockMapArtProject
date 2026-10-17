@@ -100,3 +100,9 @@ dotnet test tests/BMAG.Tests
 - カスタムブロック（`minecraft:map_color`）の読み込み、TIFF / 動画フレーム
 - プレイヤーのインベントリへ直接地図を入れる方式（設計どおり、チェストと額縁の構造物を優先しています）
 - 英語 UI
+
+## ライセンス
+
+[MIT License](LICENSE)
+
+Minecraft は Mojang Studios / Microsoft の商標です。本プロジェクトは Mojang Studios / Microsoft とは関係ありません。
