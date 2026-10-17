@@ -86,6 +86,7 @@ public sealed partial class MainViewModel : ViewModelBase
         InitPalette();
         InitBuild();
         InitWorld();
+        Init3D();
         L.PropertyChanged += (_, _) => { RaiseLocalizedTexts(); RefreshPreview(); };
         Log(L.English ? "Bedrock Map Art Generator started. Open an image." : "Bedrock Map Art Generator を起動しました。画像を開いてください。");
         if (!Textures.IsAvailable && !_settings.TexturesAsked)
@@ -257,12 +258,15 @@ public sealed partial class MainViewModel : ViewModelBase
             Raise(nameof(IsBuildView));
             Raise(nameof(IsBuild3D));
             Raise(nameof(IsImageView));
+            Raise(nameof(IsBuildScroll));
             RefreshPreview();
         }
     }
     public bool IsBuildView => SelectedPreviewMode.Value is PreviewMode.Build2D or PreviewMode.Build3D or PreviewMode.HeightMap;
     public bool IsBuild3D => SelectedPreviewMode.Value == PreviewMode.Build3D;
     public bool IsImageView => !IsBuildView;
+    /// <summary>2D build view and height map: a scrollable picture. The 3D view has its own interactive panel.</summary>
+    public bool IsBuildScroll => SelectedPreviewMode.Value is PreviewMode.Build2D or PreviewMode.HeightMap;
 
     private bool _showGrid = true;
     public bool ShowGrid { get => _showGrid; set { if (Set(ref _showGrid, value)) RefreshPreview(); } }
@@ -282,6 +286,7 @@ public sealed partial class MainViewModel : ViewModelBase
     public int CellSize { get => _cellSize; set { if (Set(ref _cellSize, Math.Clamp(value, 1, 32))) RefreshPreview(); } }
     private int _rotation;
     public int Rotation { get => _rotation; set { if (Set(ref _rotation, value)) RefreshPreview(); } }
+    public bool HasView3D => View3D != null;
     private bool _showSupports = true, _showHeights = true, _editProgress;
     public bool ShowSupports { get => _showSupports; set { if (Set(ref _showSupports, value)) RefreshPreview(); } }
     public bool ShowHeights { get => _showHeights; set { if (Set(ref _showHeights, value)) RefreshPreview(); } }
@@ -289,6 +294,8 @@ public sealed partial class MainViewModel : ViewModelBase
     public RelayCommand RotateCommand { get; }
     private LayoutRegion _renderedRegion;
     private int _renderedCell;
+    /// <summary>The bitmap the hit-test values belong to (hover is ignored while another image is shown).</summary>
+    private Bitmap? _renderedBitmap;
 
     // ------------------------------------------------------------------ status
 
@@ -449,7 +456,12 @@ public sealed partial class MainViewModel : ViewModelBase
     {
         int version = ++_previewVersion;
         var mode = SelectedPreviewMode.Value;
-        if (mode is PreviewMode.Build2D or PreviewMode.Build3D or PreviewMode.HeightMap)
+        if (mode == PreviewMode.Build3D)
+        {
+            Request3D();
+            return;
+        }
+        if (mode is PreviewMode.Build2D or PreviewMode.HeightMap)
         {
             if (_layout is not { } layout || Profile is not { } profile)
             {
@@ -481,8 +493,8 @@ public sealed partial class MainViewModel : ViewModelBase
             }
             if (version != _previewVersion) return;
             _renderedRegion = region;
-            _renderedCell = cell;
-            Preview = BitmapHelper.ToBitmap(img);
+            _renderedCell = mode == PreviewMode.HeightMap ? Math.Max(1, cell) : cell;
+            Preview = _renderedBitmap = BitmapHelper.ToBitmap(img);
             PreviewInfo = mode == PreviewMode.HeightMap
                 ? L.Format("HeightLegend", layout.MaxHeight)
                 : L["InfoBuild"] + $"  ({img.Width} x {img.Height})";
@@ -545,9 +557,10 @@ public sealed partial class MainViewModel : ViewModelBase
     /// <summary>Pointer over the build view at fractions (0..1) of the rendered image.</summary>
     public void OnPreviewPointer(double fx, double fy, bool click, bool pressed = false, bool released = false)
     {
-        if (SelectedPreviewMode.Value is not (PreviewMode.Build2D or PreviewMode.HeightMap) || _layout is not { } layout || Preview is null) return;
+        if (SelectedPreviewMode.Value is not (PreviewMode.Build2D or PreviewMode.HeightMap) || _layout is not { } layout
+            || Preview is null || !ReferenceEquals(Preview, _renderedBitmap)) return;
         var hit = LayoutRenderer.HitTestTopDown(_renderedRegion, _renderedCell, fx * Preview.PixelSize.Width, fy * Preview.PixelSize.Height);
-        if (hit is not var (x, z) || x >= layout.Width || z >= layout.Depth) { HoverInfo = ""; return; }
+        if (hit is not var (x, z) || !layout.InBounds(x, z)) { HoverInfo = ""; return; }
         var b = layout.BlockAt(x, z);
         string world = Origin is { } o ? $"  {(L.English ? "world" : "ワールド")} X {o.X + x}, Y {o.Y + layout.HeightAt(x, z)}, Z {o.Z + z}" : "";
         int supportsBelow = layout.SupportPositions.Count(p => p.X == x && p.Z == z);
