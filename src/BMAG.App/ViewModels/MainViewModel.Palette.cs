@@ -22,7 +22,7 @@ public sealed partial class MainViewModel
     public ColorProfile? SelectedBaseProfile
     {
         get => BaseProfile;
-        set { if (value != null && value != BaseProfile) SelectProfile(value, CurrentSelection().Blocks); }
+        set { if (value != null && value != BaseProfile) SelectProfile(value, CurrentSelection().Keys); }
     }
 
     public string ProfileNote => Profile is null ? "" : L.English
@@ -43,6 +43,8 @@ public sealed partial class MainViewModel
     public RelayCommand AddCustomCommand { get; private set; } = null!;
     public RelayCommand ImportBpFolderCommand { get; private set; } = null!;
     public RelayCommand ImportBpFileCommand { get; private set; } = null!;
+    public RelayCommand SelectAllBlocksCommand { get; private set; } = null!;
+    public RelayCommand ClearAllBlocksCommand { get; private set; } = null!;
 
     public bool TexturesMissing => !Textures.IsAvailable;
 
@@ -71,6 +73,10 @@ public sealed partial class MainViewModel
         AddCustomCommand = new RelayCommand(AddCustom);
         ImportBpFolderCommand = new RelayCommand(() => ImportBehaviorPackAsync(true));
         ImportBpFileCommand = new RelayCommand(() => ImportBehaviorPackAsync(false));
+        SelectAllBlocksCommand = new RelayCommand(() => SelectAllBlocks(true));
+        ClearAllBlocksCommand = new RelayCommand(() => SelectAllBlocks(false));
+        Mixings = [new(BlockMixing.Balanced, "MixBalanced", L), new(BlockMixing.Mixed, "MixMixed", L)];
+        _mixing = Mixings[0];
 
         foreach (var c in CustomBlockStore.Load()) CustomBlocks.Add(new CustomBlockViewModel(c, RemoveCustom));
         Profiles.Clear();
@@ -82,7 +88,7 @@ public sealed partial class MainViewModel
     }
 
     /// <summary>Switches the colour profile and rebuilds the rows, keeping the selection where possible.</summary>
-    private void SelectProfile(ColorProfile baseProfile, Dictionary<int, string>? selection)
+    private void SelectProfile(ColorProfile baseProfile, IEnumerable<string>? selection)
     {
         BaseProfile = baseProfile;
         Profile = baseProfile.WithCustomBlocks(CustomBlocks.Select(c => c.Block));
@@ -98,7 +104,7 @@ public sealed partial class MainViewModel
         foreach (var p in BlockPreset.LoadUser()) Presets.Add(p);
         SelectedPreset = Presets.FirstOrDefault(p => p.Name == SelectedPreset?.Name) ?? Presets.FirstOrDefault();
 
-        ApplySelection(selection ?? Presets[0].Blocks);
+        ApplySelection(selection ?? Presets[0].Keys);
         ApplyLabels();
         SupportBlocks = Profile.Blocks.Where(b => !b.NeedsSupport && !b.Gravity).ToList();
         SelectedSupportBlock = Profile.Find(_supportKey) ?? Profile.Find("cobblestone") ?? SupportBlocks.FirstOrDefault();
@@ -130,21 +136,34 @@ public sealed partial class MainViewModel
         Raise(nameof(ColourSetsForCustom));
     }
 
-    private void ApplySelection(Dictionary<int, string> selection)
+    private void ApplySelection(IEnumerable<string> selection)
     {
-        foreach (var row in Rows)
-        {
-            var choice = selection.TryGetValue(row.Set.Id, out var key) ? row.Blocks.FirstOrDefault(b => b.Block.Key == key) : null;
-            row.Select(choice, notify: false);
-        }
+        var keys = selection.ToHashSet();
+        foreach (var row in Rows) row.Load(keys);
         UpdatePaletteSummary();
     }
 
     private PaletteSelection CurrentSelection() => new()
     {
-        Blocks = Rows.Where(r => r.Selected != null).ToDictionary(r => r.Set.Id, r => r.Selected!.Block.Key),
+        Keys = Rows.SelectMany(r => r.Chosen).Select(c => c.Block.Key).ToHashSet(),
         MaxBlockTypes = MaxBlockTypes,
+        Mixing = MixingOption?.Value ?? BlockMixing.Balanced,
     };
+
+    public IReadOnlyList<LocOption<BlockMixing>> Mixings { get; private set; } = [];
+    private LocOption<BlockMixing>? _mixing;
+    public LocOption<BlockMixing>? MixingOption { get => _mixing; set { if (value != null && Set(ref _mixing, value)) ScheduleUpdate(); } }
+
+    /// <summary>Selects or clears every block of every row (buttons in the palette tab).</summary>
+    private void SelectAllBlocks(bool on)
+    {
+        foreach (var row in Rows)
+        {
+            if (on) row.Load(row.Blocks.Where(b => b.Block.DefaultEnabled).Select(b => b.Block.Key));
+            else row.Load([]);
+        }
+        OnSelectionChanged();
+    }
 
     private void OnSelectionChanged()
     {
@@ -154,14 +173,17 @@ public sealed partial class MainViewModel
 
     private void UpdatePaletteSummary()
     {
-        int used = Rows.Count(r => r.Selected != null);
-        PaletteSummary = L.English ? $"{used} / {Rows.Count} colours in use" : $"{used} / {Rows.Count} 色を使用中";
+        int colours = Rows.Count(r => r.ChosenCount > 0);
+        int blocks = Rows.Sum(r => r.ChosenCount);
+        PaletteSummary = L.English
+            ? $"{blocks} blocks selected, {colours} / {Rows.Count} colours"
+            : $"{blocks} ブロックを選択中（{colours} / {Rows.Count} 色）";
     }
 
     private void ApplyPreset()
     {
         if (SelectedPreset is null) return;
-        ApplySelection(SelectedPreset.Blocks);
+        ApplySelection(SelectedPreset.Keys);
         Log((L.English ? "Applied preset: " : "プリセットを適用しました: ") + SelectedPreset.LocalName(L.English));
         ScheduleUpdate();
     }
@@ -170,7 +192,7 @@ public sealed partial class MainViewModel
     {
         var name = await _dialogs.PromptAsync(L["SavePreset"], L["PresetName"], ProjectName);
         if (string.IsNullOrWhiteSpace(name)) return;
-        var preset = new BlockPreset { Name = name.Trim(), NameEn = name.Trim(), Blocks = CurrentSelection().Blocks };
+        var preset = new BlockPreset { Name = name.Trim(), NameEn = name.Trim(), Keys = [.. CurrentSelection().Keys] };
         var existing = Presets.FirstOrDefault(p => !p.BuiltIn && p.Name == preset.Name);
         if (existing != null) Presets.Remove(existing);
         Presets.Add(preset);
@@ -298,13 +320,13 @@ public sealed partial class MainViewModel
         foreach (var b in blocks)
             if (CustomBlocks.All(c => c.Block.Key != b.Key)) CustomBlocks.Add(new CustomBlockViewModel(b, RemoveCustom));
         CustomBlockStore.Save(CustomBlocks.Select(c => c.Block));
-        if (BaseProfile != null) SelectProfile(BaseProfile, CurrentSelection().Blocks);
+        if (BaseProfile != null) SelectProfile(BaseProfile, CurrentSelection().Keys);
     }
 
     private void RemoveCustom(CustomBlockViewModel vm)
     {
         CustomBlocks.Remove(vm);
         CustomBlockStore.Save(CustomBlocks.Select(c => c.Block));
-        if (BaseProfile != null) SelectProfile(BaseProfile, CurrentSelection().Blocks);
+        if (BaseProfile != null) SelectProfile(BaseProfile, CurrentSelection().Keys);
     }
 }

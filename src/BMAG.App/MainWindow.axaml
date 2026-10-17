@@ -148,6 +148,13 @@
                 <TextBlock Grid.Column="2" Classes="note" Text="{Binding TextureStatus}" VerticalAlignment="Center" />
               </Grid>
               <TextBlock Classes="note" Text="{Binding L[PaletteHint]}" />
+              <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                <TextBlock Text="{Binding L[Mixing]}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <ComboBox Grid.Column="1" ItemsSource="{Binding Mixings}" SelectedItem="{Binding MixingOption}" HorizontalAlignment="Stretch"
+                          ToolTip.Tip="{Binding L[MixingHint]}" />
+                <Button Grid.Column="2" Content="{Binding L[SelectAll]}" Command="{Binding SelectAllBlocksCommand}" Margin="4,0,0,0" />
+                <Button Grid.Column="3" Content="{Binding L[ClearAll]}" Command="{Binding ClearAllBlocksCommand}" Margin="4,0,0,0" />
+              </Grid>
               <TextBlock Classes="note" Text="{Binding PaletteSummary}" FontWeight="SemiBold" />
             </StackPanel>
 
@@ -191,14 +198,16 @@
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:ColourSetRowViewModel">
                       <Grid ColumnDefinitions="22,Auto,*" Margin="0,1">
-                        <Border Width="18" Height="36" CornerRadius="2" ClipToBounds="True" VerticalAlignment="Top" Margin="0,2,0,0"
-                                ToolTip.Tip="{Binding Name}">
-                          <StackPanel>
-                            <Border Height="12" Background="{Binding BrightBrush}" />
-                            <Border Height="12" Background="{Binding NormalBrush}" />
-                            <Border Height="12" Background="{Binding DarkBrush}" />
-                          </StackPanel>
-                        </Border>
+                        <StackPanel VerticalAlignment="Top" Margin="0,2,0,0" ToolTip.Tip="{Binding Name}">
+                          <Border Width="18" Height="36" CornerRadius="2" ClipToBounds="True">
+                            <StackPanel>
+                              <Border Height="12" Background="{Binding BrightBrush}" />
+                              <Border Height="12" Background="{Binding NormalBrush}" />
+                              <Border Height="12" Background="{Binding DarkBrush}" />
+                            </StackPanel>
+                          </Border>
+                          <TextBlock Text="{Binding CountBadge}" Foreground="#8BFF8B" FontSize="10" HorizontalAlignment="Center" />
+                        </StackPanel>
                         <ToggleButton Grid.Column="1" Classes="blk" IsChecked="{Binding IsNone}" VerticalAlignment="Top"
                                       ToolTip.Tip="{Binding Loc[NoneBlock]}">
                           <Panel Width="32" Height="32">

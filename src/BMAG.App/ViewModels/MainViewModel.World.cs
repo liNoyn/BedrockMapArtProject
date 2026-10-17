@@ -317,7 +317,7 @@ public sealed partial class MainViewModel
         var profile = BaseProfile.WithMeasurements(_pendingMeasurements, id, $"{(L.English ? "Calibrated" : "実測プロファイル")} {DateTime.Now:yyyy-MM-dd HH:mm} ({version})");
         var path = Calibrator.SaveUserProfile(profile);
         Profiles.Add(profile);
-        SelectProfile(profile, CurrentSelection().Blocks);
+        SelectProfile(profile, CurrentSelection().Keys);
         Log(path);
         _pendingMeasurements = null;
         RaiseCommands();

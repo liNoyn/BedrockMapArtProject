@@ -1,42 +1,67 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using BMAG.Palette;
 
 namespace BMAG.BlockEngine;
 
+/// <summary>How the work is shared when several selected blocks produce the same map colour.</summary>
+public enum BlockMixing
+{
+    /// <summary>Equal shares in reading order (map by map, row by row): each block covers one connected stretch.</summary>
+    Balanced,
+    /// <summary>Equal shares scattered pixel by pixel (looks like a mix of materials in the build).</summary>
+    Mixed,
+}
+
 /// <summary>
-/// The user's block choice: at most one block per colour set (the MapartCraft model).
-/// Sets without an entry are not used.
+/// The user's block choice: any number of blocks, from any colour sets. Blocks that show the same map colour are
+/// matched as one colour and then share its pixels according to <see cref="Mixing"/>.
 /// </summary>
 public sealed record PaletteSelection
 {
-    /// <summary>Colour set id → chosen block key.</summary>
-    public Dictionary<int, string> Blocks { get; init; } = [];
+    /// <summary>Selected block keys.</summary>
+    public HashSet<string> Keys { get; init; } = [];
 
-    /// <summary>Upper bound for the number of different blocks in the result (0 = unlimited).</summary>
+    /// <summary>Upper bound for the number of different map colours in the result (0 = unlimited).</summary>
     public int MaxBlockTypes { get; init; }
 
+    public BlockMixing Mixing { get; init; } = BlockMixing.Balanced;
+
+    /// <summary>
+    /// One entry per reachable map colour. Entries list the selected blocks sharing that colour in
+    /// <see cref="PaletteEntry.Members"/>; unselected blocks of the set are <see cref="PaletteEntry.Alternatives"/>.
+    /// </summary>
     public List<PaletteEntry> Resolve(ColorProfile profile)
     {
         var list = new List<PaletteEntry>();
         foreach (var set in profile.ColourSets)
         {
-            if (!Blocks.TryGetValue(set.Id, out var key)) continue;
-            var block = set.Blocks.FirstOrDefault(b => b.Key == key);
-            if (block is null) continue;
-            list.Add(new PaletteEntry(block, set.Blocks.Where(b => b != block).ToList()));
+            var chosen = set.Blocks.Where(b => Keys.Contains(b.Key)).ToList();
+            if (chosen.Count == 0) continue;
+            var others = set.Blocks.Where(b => !Keys.Contains(b.Key)).ToList();
+            // Calibrated blocks may differ in colour: only blocks that look identical share one entry.
+            foreach (var group in chosen.GroupBy(b => string.Join("|", Enum.GetValues<Shade>().Select(s => profile.ColorOf(b, s).ToHex()))))
+            {
+                var members = group.ToList();
+                list.Add(new PaletteEntry(members[0], others, members));
+            }
         }
         return list;
     }
 
-    public PaletteSelection With(int setId, string? key)
+    public PaletteSelection With(string key, bool selected)
     {
-        var copy = new Dictionary<int, string>(Blocks);
-        if (key is null) copy.Remove(setId); else copy[setId] = key;
-        return this with { Blocks = copy };
+        var copy = new HashSet<string>(Keys);
+        if (selected) copy.Add(key); else copy.Remove(key);
+        return this with { Keys = copy };
     }
 }
 
-public sealed record PaletteEntry(BlockDefinition Block, List<BlockDefinition> Alternatives);
+/// <summary>A reachable map colour: the block that represents it, the selected blocks sharing it, and alternatives.</summary>
+public sealed record PaletteEntry(BlockDefinition Block, List<BlockDefinition> Alternatives, List<BlockDefinition>? Members = null)
+{
+    public IReadOnlyList<BlockDefinition> AllMembers => Members is { Count: > 0 } ? Members : [Block];
+}
 
 /// <summary>A named block selection (MapartCraft "presets").</summary>
 public sealed class BlockPreset
@@ -44,39 +69,51 @@ public sealed class BlockPreset
     public required string Name { get; init; }
     public string NameEn { get; init; } = "";
     public bool BuiltIn { get; init; }
-    /// <summary>Colour set id → block key.</summary>
-    public Dictionary<int, string> Blocks { get; init; } = [];
+    /// <summary>Selected block keys.</summary>
+    public List<string> Keys { get; init; } = [];
+
+    /// <summary>Old preset files (one block per colour set). Read only, merged into <see cref="Keys"/>.</summary>
+    [JsonPropertyName("Blocks")]
+    public Dictionary<int, string>? LegacyBlocks
+    {
+        get => null;
+        init { if (value != null) Keys.AddRange(value.Values.Where(v => !Keys.Contains(v))); }
+    }
 
     public string LocalName(bool english) => english && NameEn.Length > 0 ? NameEn : Name;
 
     /// <summary>Display label in the current UI language (set by the UI).</summary>
-    [System.Text.Json.Serialization.JsonIgnore] public string Label { get; set; } = "";
+    [JsonIgnore] public string Label { get; set; } = "";
 
-    public PaletteSelection ToSelection(int maxTypes = 0) => new() { Blocks = new(Blocks), MaxBlockTypes = maxTypes };
+    public PaletteSelection ToSelection(int maxTypes = 0, BlockMixing mixing = BlockMixing.Balanced) =>
+        new() { Keys = [.. Keys], MaxBlockTypes = maxTypes, Mixing = mixing };
 
     private static readonly int[] GreyscaleSets = [2, 5, 7, 9, 12, 13, 20, 21, 28, 58];
 
     public static List<BlockPreset> BuiltIns(ColorProfile profile)
     {
-        BlockPreset Make(string name, string en, Func<ColourSet, BlockDefinition?> pick)
+        BlockPreset Make(string name, string en, Func<ColourSet, IEnumerable<BlockDefinition>> pick) => new()
         {
-            var dict = new Dictionary<int, string>();
-            foreach (var set in profile.ColourSets)
-                if (pick(set) is { } b) dict[set.Id] = b.Key;
-            return new BlockPreset { Name = name, NameEn = en, BuiltIn = true, Blocks = dict };
-        }
-        BlockDefinition? First(ColourSet s, Func<BlockDefinition, bool> ok) => s.Blocks.FirstOrDefault(b => b.DefaultEnabled && ok(b));
+            Name = name, NameEn = en, BuiltIn = true,
+            Keys = profile.ColourSets.SelectMany(pick).Select(b => b.Key).Distinct().ToList(),
+        };
+        IEnumerable<BlockDefinition> First(ColourSet s, Func<BlockDefinition, bool> ok) =>
+            s.Blocks.Where(b => b.DefaultEnabled && ok(b)).Take(1);
+        IEnumerable<BlockDefinition> Ending(ColourSet s, string suffix) => s.Blocks.Where(b => b.Key.EndsWith(suffix)).Take(1);
 
         return
         [
-            Make("すべて（各色の先頭ブロック）", "Everything", s => First(s, _ => true)),
+            Make("各色 1 ブロック（先頭）", "One block per colour", s => First(s, _ => true)),
             Make("サバイバル向け（入手しやすい・落下しない）", "Survival friendly",
                 s => First(s, b => !b.NeedsSupport && !b.Gravity && b.Rarity <= 1 && !b.BiomeTinted)),
+            Make("サバイバル向け・全部（同じ色は分担）", "Survival friendly, all blocks (shared)",
+                s => s.Blocks.Where(b => b.DefaultEnabled && !b.NeedsSupport && !b.Gravity && b.Rarity <= 1 && !b.BiomeTinted)),
             Make("支え不要のブロックのみ", "No support needed", s => First(s, b => !b.NeedsSupport)),
-            Make("カーペット", "Carpets", s => s.Blocks.FirstOrDefault(b => b.Key.EndsWith("_carpet"))),
-            Make("コンクリート", "Concrete", s => s.Blocks.FirstOrDefault(b => b.Key.EndsWith("_concrete"))),
-            Make("羊毛", "Wool", s => s.Blocks.FirstOrDefault(b => b.Key.EndsWith("_wool"))),
-            Make("グレースケール", "Greyscale", s => GreyscaleSets.Contains(s.Id) ? First(s, _ => true) : null),
+            Make("すべてのブロック", "All blocks", s => s.Blocks.Where(b => b.DefaultEnabled)),
+            Make("カーペット", "Carpets", s => Ending(s, "_carpet")),
+            Make("コンクリート", "Concrete", s => Ending(s, "_concrete")),
+            Make("羊毛", "Wool", s => Ending(s, "_wool")),
+            Make("グレースケール", "Greyscale", s => GreyscaleSets.Contains(s.Id) ? First(s, _ => true) : []),
             new BlockPreset { Name = "なし", NameEn = "None", BuiltIn = true },
         ];
     }
@@ -84,7 +121,12 @@ public sealed class BlockPreset
     public static string UserPresetFile =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BMAG", "presets.json");
 
-    private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
+    private static readonly JsonSerializerOptions Options = new()
+    {
+        WriteIndented = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
 
     public static List<BlockPreset> LoadUser()
     {
