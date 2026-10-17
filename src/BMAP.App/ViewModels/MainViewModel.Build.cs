@@ -199,35 +199,6 @@ public sealed partial class MainViewModel
         catch (Exception ex) { Log(ex.Message); }
     }
 
-    /// <summary>Exports the shading test pad (one map) with the predicted map picture and a legend.</summary>
-    private async Task ExportTestPadAsync()
-    {
-        if (Profile is null) return;
-        var folder = await _dialogs.PickFolderAsync(L["BtnTestPad"]);
-        if (folder is null) return;
-        try
-        {
-            var profile = Profile;
-            var support = SelectedSupportBlock ?? profile.Find("cobblestone") ?? profile.Blocks.First();
-            bool en = L.English;
-            var origin = Origin;
-            string dir = Path.Combine(folder, "BMAP_shading_test");
-            await Task.Run(() =>
-            {
-                var pad = ShadingTestPad.Create(profile, support, en);
-                var map = MapSimulator.Simulate(pad.Layout, profile);
-                Directory.CreateDirectory(dir);
-                ImageCodec.SavePng(map.Image, Path.Combine(dir, "predicted_map.png"));
-                ImageCodec.SavePng(map.Image.ScaleNearest(4), Path.Combine(dir, "predicted_map_x4.png"));
-                File.WriteAllLines(Path.Combine(dir, en ? "LEGEND.txt" : "説明.txt"),
-                    pad.Legend.Append("").Append(L["ShadeRuleNote"]), new UTF8Encoding(true));
-                StructureExporter.Export(dir, "shading_test", pad.Layout, 1, CurrentStructureOptions() with { Split = StructureSplit.PerMap }, origin);
-            });
-            Log(L["TestPadDone"] + dir);
-            OpenFolder(dir);
-        }
-        catch (Exception ex) { Log(ex.Message); }
-    }
 
     private int _maxTypes;
     public int MaxBlockTypes { get => _maxTypes; set { if (Set(ref _maxTypes, Math.Max(0, value))) ScheduleUpdate(); } }
@@ -273,7 +244,7 @@ public sealed partial class MainViewModel
         UndoEditCommand = new RelayCommand(UndoEdit, () => _edits.CanUndo);
         ClearEditsCommand = new RelayCommand(ClearEditsAsync, () => _edits.Count > 0);
         SavePreviewPngCommand = new RelayCommand(SavePreviewPngAsync, () => _quantized != null);
-        ExportTestPadCommand = new RelayCommand(ExportTestPadAsync);
+        ExportTestPadCommand = new RelayCommand(() => ExportPadAsync(PadKind.Shading));
         View3DCommand = new RelayCommand(() => SelectedPreviewMode = PreviewModes.First(p => p.Value == PreviewMode.Build3D), () => _layout != null);
         ShowShadeMapCommand = new RelayCommand(() => SelectedPreviewMode = PreviewModes.First(p => p.Value == PreviewMode.ShadeMap));
         AnalyzeHeightCommand = new RelayCommand(AnalyzeHeightAsync, () => _processed != null && !IsAnalyzing);
@@ -399,7 +370,9 @@ public sealed partial class MainViewModel
         var all = MaterialCalculator.Calculate(_layout, MapsX);
         double err = MeanDeltaE(_processed, _quantized.Preview);
         int types = all.Count(m => !m.IsSupport);
-        int unverified = all.Where(m => !m.IsSupport).Count(m => !m.Block.Verified);
+        // Unverified: neither the block's colour nor its colour set's base colour has been confirmed on Bedrock maps.
+        int unverified = all.Where(m => !m.IsSupport).Count(m => m.Block.EffectiveStatus != ColorStatus.Verified
+            && Profile.SetOf(m.Block)?.Status != ColorStatus.Verified);
         var sb = new StringBuilder();
         if (L.English)
         {

@@ -91,7 +91,7 @@ public sealed class BlockTextureProvider
     public async Task<int> DownloadAsync(IEnumerable<BlockDefinition> blocks, IProgress<string>? progress = null, CancellationToken ct = default)
     {
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("BMAP/0.2 (+https://github.com/liNoyn/BedrockMapArtGenerator)");
+        http.DefaultRequestHeaders.UserAgent.ParseAdd("BMAP/0.2 (+https://github.com/liNoyn/BedrockMapArtProject)");
         Directory.CreateDirectory(Path.Combine(CacheDirectory, "textures", "blocks"));
 
         async Task Fetch(string relative)

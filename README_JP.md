@@ -71,6 +71,17 @@
 - 手修正: 建築ビュー 2D でブロックを 1 ピクセルずつ塗れます（元に戻す・自動に戻す、プロジェクトに保存）。
 - Bedrock 固有: 草ブロックと一部の葉はバイオームで地図色が変わるため、既定では使いません。
 
+**実機キャリブレーション（読み取り専用）** — 詳しくは [docs/calibration.md](docs/calibration.md)
+- 陰影テストパッド（段差 −4〜+4・カーペット・ハーフブロック・東西の段差・北が空・バイオームの色）と、全 323 ブロックの
+  色テストパッドを出力します。測る位置は `pad.json` に記録されます。
+- ゲームに地図を描かせたら、ワールドのデータベースの **一時コピー** から地図（`map_<ID>` の `colors`）を読み取り、
+  予測と比べます。ワールドには書き込みません。地図の向き・位置のずれ・未探索のピクセルも扱います。
+- 段差ごとの明るさから、陰影が変わる **最小の段差**・倍率・段階的な陰影の有無を求め、色テストパッドからはブロックごとの
+  実際の色を読み取ります。結果は「実機確認済み」の色プロファイルとして保存でき、減色・高さの計算・建築配置・3D ビューに使われます。
+- 色の状態を区別します: 実機確認済み / API 由来 / 他プロジェクト / 推定 / 不明。推定値を確認済みとは表示しません。
+- `mapcheck`: どのワールドの地図でも、全ピクセルが「基本色 × 倍率」になっているかを調べます。これで陰影の倍率
+  180 / 220 / 255 と 13 の色セットの基本色を、Bedrock が描いた地図で確認しました。
+
 **プレビュー・ガイド**
 - ブロック地図色（予測）/ 元画像 / 差分 / 陰影解析 / 建築ビュー 2D（テクスチャ・高さ・チャンク境界・座標表示）/ 高さマップ。
 - **建築ビュー 3D**: 自由に回転・移動・ズーム、遠近法（透視補正テクスチャ）。テクスチャ / 地図に写る色 / 陰影 / 高さ の色分け、
@@ -103,7 +114,8 @@ powershell -ExecutionPolicy Bypass -File tools/publish.ps1
 ```
 
 コマンドライン（`BMAP.Cli`）: `build`（建築データ出力）/ `analyze`（高さ分析）/ `bench`（ディザ・色差の比較）/
-`render`（3D ビューを PNG に、各段階の処理時間も表示）/ `textures`。引数なしで使い方を表示します。
+`render`（3D ビューを PNG に、各段階の処理時間も表示）/ `pad`・`calibrate`・`mapcheck`・`maps`・`worlds`（キャリブレーション、読み取り専用）/
+`textures`。引数なしで使い方を表示します。
 
 ## .mcstructure の読み込み方
 
@@ -121,7 +133,7 @@ powershell -ExecutionPolicy Bypass -File tools/publish.ps1
 | `tests/BMAP.Tests` | xUnit テスト |
 | `tools/PaletteGen` | `blocks.txt` から `palettes/bedrock-full-v2.json` を生成（Mojang のメタデータで検証） |
 | `tools/publish.ps1` / `tools/make-icon.ps1` | 配布用 zip / アプリアイコンの作成 |
-| `docs/` | [陰影規則](docs/shading-rules.md)、[ベンチマーク](docs/benchmarks.md) |
+| `docs/` | [陰影規則](docs/shading-rules.md)、[実機キャリブレーション](docs/calibration.md)、[ベンチマーク](docs/benchmarks.md) |
 
 | 機能 | 実装（`src/BMAP.Core`） |
 |---|---|
@@ -131,7 +143,8 @@ powershell -ExecutionPolicy Bypass -File tools/publish.ps1
 | 減色・ディザ | `BlockEngine/ColorQuantizer.cs`（`.Knoll.cs`）, `BlueNoise.cs` |
 | 階段・支えブロック | `BlockEngine/BlockLayout.cs`, `ColumnIndex.cs` |
 | 高さの分析・配置 | `BlockEngine/HeightAdvisor.cs` |
-| 陰影規則・地図シミュレーター | `Shading/` |
+| 陰影規則・地図シミュレーター・キャリブレーション | `Shading/`（`MapShading.cs`, `ShadingTestPad.cs`, `Calibration.cs`） |
+| Bedrock の地図の読み取り（読み取り専用） | `Bedrock/`（LevelDB・`level.dat`・`MapRecord`） |
 | 2D / 3D プレビュー | `Preview/LayoutRenderer.cs`, `Preview/Viewer3D.cs` |
 | 出力・ガイド・素材 | `Export/`, `BlockEngine/BuildGuideGenerator.cs`, `Materials.cs` |
 | テクスチャ | `Textures/`（ダウンロード・リソースパック・TGA） |
@@ -143,8 +156,10 @@ powershell -ExecutionPolicy Bypass -File tools/publish.ps1
 
 | 項目 | 状況 |
 |---|---|
-| ブロックの地図色 | Minecraft の地図の基本色（Java 版の値）を **推定値** として使用（全ブロック未検証） |
-| 陰影の規則と倍率（180/220/255） | Java 版の規則を仮定。陰影テストパッドで実機と見比べて確認できます |
+| 陰影の倍率 180 / 220 / 255 | **確認済み**（Bedrock 1.21.132〜1.26.51 が描いた地図 12 枚、約 19 万ピクセル） |
+| 色セットの基本色 | 60 色中 **13 色を確認済み**。残りは Java 版の値による推定 |
+| 陰影が変わる最小の段差（1 か 2 か） | **未確認**。陰影テストパッドで測定できます（2 なら設定で切り替えられます） |
+| ブロックと色セットの対応 | 未確認。色テストパッドで測定できます |
 | ブロック識別子・状態 | Mojang 公式メタデータ（1.26.50）で全 323 ブロックを検証済み。構造物としての読み込みは未確認 |
 
 問題があればログ（`%LOCALAPPDATA%\BMAP\logs`）をご確認ください。
@@ -153,7 +168,8 @@ powershell -ExecutionPolicy Bypass -File tools/publish.ps1
 
 - APNG は最初のフレームのみ。動画の読み込みには ffmpeg（PATH 上か BMAP と同じフォルダ）が必要です。
 - 水（深さで陰影が変わる）は MapartCraft と同じく対象外です。
-- 地図データの直接生成（ワールドへの書き込み）は、調整が難しいため v0.3.0 で削除しました。
+- 地図データの直接生成（ワールドへの書き込み）は、調整が難しいため v0.3.0 で削除しました。ワールドは読み取り（一時コピー）だけです。
+- 何もない列は Bedrock では黒く描かれるようです（実際の地図に不透明な黒が多数）。透明ピクセルの南隣の陰影は地形しだいです。
 - バイオームで色が変わるブロック（草・一部の葉）の色はバイオームを指定できません。
 - 構造ブロックでインポートした構造物の名前（mystructure:…）はゲームのバージョンによって異なる可能性があります。
 
@@ -161,6 +177,10 @@ powershell -ExecutionPolicy Bypass -File tools/publish.ps1
 
 - [MapartCraft](https://github.com/rebane2001/mapartcraft)（rebane2001、GPL-3.0）: 色セットの分け方、画面構成、多くの機能。コード・画像は含みません。
 - [Cartographer](https://github.com/julienvincent/cartographer): 複数の階段アルゴリズムを持つマップアート変換ツール。
+- [Image Map](https://github.com/tryashtar/image-map): Bedrock の地図データ（`map_<ID>`・`colors`）の形式。コードは使っていません。
+- Minecraft 公式ドキュメント: [BlockMapColorComponent](https://learn.microsoft.com/en-us/minecraft/creator/scriptapi/minecraft/server/blockmapcolorcomponent?view=minecraft-bedrock-stable)、
+  [Block.getMapColor（プレリリース）](https://learn.microsoft.com/en-us/minecraft/creator/scriptapi/minecraft/server/block?view=minecraft-bedrock-experimental)。
+  基本色の取得方法として検討しました（[docs/calibration.md](docs/calibration.md)）。
 - Pekka Väänänen, [Revisiting Yliluoma's ordered dither algorithm](https://30fps.net/pages/revisiting-yliluoma-2/):
   Knoll のパターンディザと、リニア光でディザするべき理由。
 - R. Ulichney, "The void-and-cluster method for dither array generation"（1993）: ブルーノイズの生成方法。

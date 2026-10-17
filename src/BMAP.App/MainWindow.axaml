@@ -3,6 +3,7 @@
         xmlns:vm="using:BMAP.App.ViewModels"
         xmlns:pal="using:BMAP.Palette"
         xmlns:pb="using:BMAP.BlockEngine"
+        xmlns:world="using:BMAP.Bedrock.World"
         x:Class="BMAP.App.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="Bedrock Map Art Project"
@@ -492,6 +493,38 @@
           <TextBlock Text="{Binding ShadingText}" TextWrapping="Wrap" FontSize="12" Margin="0,4" />
           <TextBlock Text="{Binding BlockSummary}" TextWrapping="Wrap" FontSize="12" />
           <Button Content="{Binding L[PvShadeMap]}" Command="{Binding ShowShadeMapCommand}" HorizontalAlignment="Stretch" Margin="0,4,0,0" />
+
+          <!-- In-game calibration (read only) -->
+          <Expander Header="{Binding L[SecCalibration]}" IsExpanded="{Binding CalExpanded}" Margin="0,10,0,0">
+            <StackPanel Spacing="4">
+              <TextBlock Classes="note" Text="{Binding L[CalIntro]}" />
+              <Button Classes="green" Content="{Binding L[BtnTestPad]}" Command="{Binding ExportTestPadCommand}" />
+              <Grid ColumnDefinitions="*,Auto,Auto">
+                <Button Classes="green" Content="{Binding L[CalColourPad]}" Command="{Binding ExportColourPadCommand}" />
+                <TextBlock Grid.Column="1" Text="{Binding L[CalStep]}" VerticalAlignment="Center" Margin="8,0,4,0" FontSize="12" />
+                <NumericUpDown Grid.Column="2" Value="{Binding ColourPadStep}" Minimum="1" Maximum="8" FormatString="0" Width="120" />
+              </Grid>
+              <Grid ColumnDefinitions="Auto,*" Margin="0,6,0,0">
+                <TextBlock Classes="lbl" Text="{Binding L[CalWorld]}" />
+                <ComboBox Grid.Column="1" ItemsSource="{Binding CalWorlds}" SelectedItem="{Binding CalWorld}" HorizontalAlignment="Stretch">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="world:WorldInfo">
+                      <TextBlock Text="{Binding Display}" TextTrimming="CharacterEllipsis" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </Grid>
+              <WrapPanel>
+                <Button Content="{Binding L[CalRefresh]}" Command="{Binding RefreshCalWorldsCommand}" Margin="0,0,4,4" />
+                <Button Content="{Binding L[CalBrowse]}" Command="{Binding BrowseCalWorldCommand}" Margin="0,0,4,4" />
+                <Button Content="{Binding L[CalLoadPad]}" Command="{Binding LoadPadCommand}" Margin="0,0,4,4" />
+              </WrapPanel>
+              <TextBlock Classes="note" Text="{Binding PadText}" />
+              <Button Classes="green" Content="{Binding L[CalRead]}" Command="{Binding ReadMapsCommand}" />
+              <SelectableTextBlock Text="{Binding CalibrationReport}" TextWrapping="Wrap" FontSize="12" FontFamily="Consolas, Yu Gothic UI" />
+              <Button Content="{Binding L[CalSave]}" Command="{Binding SaveCalibrationCommand}" HorizontalAlignment="Stretch" />
+            </StackPanel>
+          </Expander>
 
           <!-- Materials -->
           <TextBlock Classes="h2" Text="{Binding L[SecMaterials]}" Margin="0,12,0,4" />

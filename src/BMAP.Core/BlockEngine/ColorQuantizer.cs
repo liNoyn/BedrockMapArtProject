@@ -107,6 +107,8 @@ public sealed class QuantizeResult
     /// <summary>Predicted map colours ("Block Map" preview, design 11.3).</summary>
     public required RgbaImage Preview { get; init; }
     public StaircaseMode Mode { get; init; }
+    /// <summary>Height difference used for one light / dark step (the profile's shading rule).</summary>
+    public int Step { get; init; } = 1;
 
     public int Get(int x, int y) => EntryIndex[y * Width + x];
     public Shade GetShade(int x, int y) => Shades[y * Width + x];
@@ -115,7 +117,7 @@ public sealed class QuantizeResult
     public QuantizeResult Clone() => new()
     {
         Width = Width, Height = Height, EntryIndex = (int[])EntryIndex.Clone(), Shades = (Shade[])Shades.Clone(),
-        Entries = [.. Entries], Preview = Preview.Clone(), Mode = Mode,
+        Entries = [.. Entries], Preview = Preview.Clone(), Mode = Mode, Step = Step,
     };
 }
 
@@ -213,13 +215,22 @@ public static partial class ColorQuantizer
         }
         return new QuantizeResult
         {
-            Width = w, Height = h, EntryIndex = idx, Shades = q.Shades, Entries = flat, Preview = q.Preview, Mode = q.Mode,
+            Width = w, Height = h, EntryIndex = idx, Shades = q.Shades, Entries = flat, Preview = q.Preview, Mode = q.Mode, Step = q.Step,
         };
     }
 
     private static QuantizeResult QuantizeWith(RgbaImage image, ColorProfile profile, List<PaletteEntry> entries,
         QuantizeOptions options, CancellationToken ct)
     {
+        // The height limit counts blocks, the run limit counts light / dark steps: with a measured rule that needs a
+        // difference of 2 per step, a limit of 8 blocks allows runs of 4. A limit below one step means flat.
+        int step = profile.Shades.Step;
+        var resultMode = options.Mode;
+        if (options.HeightLimited)
+        {
+            int runs = options.MaxHeight / step;
+            options = runs == 0 ? options with { Mode = StaircaseMode.Flat, MaxHeight = 0 } : options with { MaxHeight = runs };
+        }
         var candidates = BuildCandidates(profile, entries, options.Mode);
         int w = image.Width, h = image.Height, n = w * h;
         var idx = new int[n];
@@ -289,7 +300,8 @@ public static partial class ColorQuantizer
 
         return new QuantizeResult
         {
-            Width = w, Height = h, EntryIndex = idx, Shades = shades, Entries = entries, Preview = preview, Mode = options.Mode,
+            Width = w, Height = h, EntryIndex = idx, Shades = shades, Entries = entries, Preview = preview,
+            Mode = options.Mode == StaircaseMode.Flat ? StaircaseMode.Flat : resultMode, Step = step,
         };
     }
 

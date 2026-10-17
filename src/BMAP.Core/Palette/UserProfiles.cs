@@ -16,4 +16,12 @@ public static class UserProfiles
         }
         return list;
     }
+
+    public static string Save(ColorProfile profile)
+    {
+        System.IO.Directory.CreateDirectory(Directory);
+        string path = Path.Combine(Directory, profile.Id + ".json");
+        File.WriteAllText(path, profile.ToJson(), new System.Text.UTF8Encoding(false));
+        return path;
+    }
 }

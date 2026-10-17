@@ -16,6 +16,21 @@ public enum Shade
     Bright = 2,
 }
 
+/// <summary>Where a colour value comes from. Estimated values are never shown as verified.</summary>
+public enum ColorStatus
+{
+    /// <summary>No usable value.</summary>
+    Unknown,
+    /// <summary>Derived from Java Edition or other assumptions.</summary>
+    Estimated,
+    /// <summary>Taken from another Bedrock project (source and version kept in the note).</summary>
+    ThirdParty,
+    /// <summary>From Bedrock data definitions or the Script API, not yet compared with a drawn map.</summary>
+    ApiDerived,
+    /// <summary>Read back from a map the game drew and saved, for the game version in the note.</summary>
+    Verified,
+}
+
 /// <summary>One block usable in map art (design 6.2 / 13.3).</summary>
 public sealed class BlockDefinition
 {
@@ -40,6 +55,11 @@ public sealed class BlockDefinition
 
     public string Source { get; init; } = "java-base-color";
     public bool Verified { get; init; }
+    /// <summary>Provenance of the colours (see <see cref="ColorStatus"/>). Old profiles only have <see cref="Verified"/>.</summary>
+    public ColorStatus Status { get; init; } = ColorStatus.Estimated;
+    /// <summary>Game version and conditions of a measurement ("Bedrock 1.26.51, map of pad …").</summary>
+    public string StatusNote { get; init; } = "";
+    [JsonIgnore] public ColorStatus EffectiveStatus => Verified ? ColorStatus.Verified : Status;
 
     /// <summary>Needs a block underneath to stay in place (carpets, slabs on air, pressure plates, falling blocks…).</summary>
     public bool NeedsSupport { get; init; }
@@ -82,11 +102,13 @@ public sealed class BlockDefinition
         return c;
     }
 
-    internal BlockDefinition With(Dictionary<Shade, string> measured, string source, bool verified) => new()
+    internal BlockDefinition With(Dictionary<Shade, string> measured, string source, bool verified,
+        ColorStatus? status = null, string? note = null) => new()
     {
         Key = Key, DisplayName = DisplayName, DisplayNameEn = DisplayNameEn, Name = Name, States = States,
         Version = Version, MapColor = MapColor, ColourSetId = ColourSetId, Measured = measured, Source = source,
-        Verified = verified, NeedsSupport = NeedsSupport, Gravity = Gravity, Flammable = Flammable,
+        Verified = verified, Status = status ?? (verified ? ColorStatus.Verified : Status), StatusNote = note ?? StatusNote,
+        NeedsSupport = NeedsSupport, Gravity = Gravity, Flammable = Flammable,
         BiomeTinted = BiomeTinted, Rarity = Rarity, DefaultEnabled = DefaultEnabled, MaxStack = MaxStack, IsCustom = IsCustom,
     };
 }
@@ -101,6 +123,9 @@ public sealed class ColourSet
     public required string MapColor { get; init; }
     public List<BlockDefinition> Blocks { get; init; } = [];
     public bool IsCustom { get; init; }
+    /// <summary>Provenance of the base colour (verified when seen on maps drawn by Bedrock in several shades).</summary>
+    public ColorStatus Status { get; init; } = ColorStatus.Estimated;
+    public string StatusNote { get; init; } = "";
 
     public string LocalName(bool english) => english && NameEn.Length > 0 ? NameEn : Name;
 
@@ -108,12 +133,24 @@ public sealed class ColourSet
     [JsonIgnore] public string Label { get; set; } = "";
 }
 
+/// <summary>
+/// The map shading rule of a profile: brightness multipliers (x/255) and the smallest height difference to the
+/// northern neighbour that changes the shade. Java Edition: 180 / 220 / 255 and a step of 1. Bedrock is measured with
+/// the shading test pad; until then these are estimates.
+/// </summary>
 public sealed class ShadeMultipliers
 {
     public int Dark { get; init; } = 180;
     public int Normal { get; init; } = 220;
     public int Bright { get; init; } = 255;
     public bool Verified { get; init; }
+    /// <summary>Height difference needed for the light / dark shade (smaller differences stay normal).</summary>
+    public int MinStep { get; init; } = 1;
+    public ColorStatus Status { get; init; } = ColorStatus.Estimated;
+    public string StatusNote { get; init; } = "";
+    /// <summary>Provenance of <see cref="MinStep"/> (separate from the multipliers, which are easier to confirm).</summary>
+    public ColorStatus StepStatus { get; init; } = ColorStatus.Estimated;
+    [JsonIgnore] public int Step => Math.Max(1, MinStep);
 
     public int Get(Shade s) => s switch { Shade.Dark => Dark, Shade.Bright => Bright, _ => Normal };
 }
@@ -209,23 +246,24 @@ public sealed class ColorProfile
     }
 
     /// <summary>Returns a copy where calibration measurements are applied and marked as verified.</summary>
-    public ColorProfile WithMeasurements(IReadOnlyDictionary<string, Dictionary<Shade, string>> measurements, string newId, string newName)
+    public ColorProfile WithMeasurements(IReadOnlyDictionary<string, Dictionary<Shade, string>> measurements, string newId, string newName,
+        ShadeMultipliers? shades = null, string note = "", string gameVersion = "")
     {
         var sets = ColourSets.Select(s => new ColourSet
         {
-            Id = s.Id, Name = s.Name, NameEn = s.NameEn, MapColor = s.MapColor, IsCustom = s.IsCustom,
+            Id = s.Id, Name = s.Name, NameEn = s.NameEn, MapColor = s.MapColor, IsCustom = s.IsCustom, Status = s.Status, StatusNote = s.StatusNote,
             Blocks = s.Blocks.Select(b =>
             {
                 if (!measurements.TryGetValue(b.Key, out var m) || m.Count == 0) return b;
                 var merged = new Dictionary<Shade, string>(b.Measured);
                 foreach (var (shade, hex) in m) merged[shade] = hex;
-                return b.With(merged, "in-game-calibration", true);
+                return b.With(merged, "in-game-calibration", true, ColorStatus.Verified, note);
             }).ToList(),
         }).ToList();
         var copy = new ColorProfile
         {
-            Id = newId, Name = newName, GameVersion = GameVersion, Updated = DateTime.Now.ToString("yyyy-MM-dd"),
-            Notes = Notes, Shades = Shades, ColourSets = sets,
+            Id = newId, Name = newName, GameVersion = gameVersion.Length > 0 ? gameVersion : GameVersion,
+            Updated = DateTime.Now.ToString("yyyy-MM-dd"), Notes = Notes, Shades = shades ?? Shades, ColourSets = sets,
         };
         copy.Link();
         return copy;
@@ -237,6 +275,7 @@ public sealed class ColorProfile
         var sets = ColourSets.Select(s => new ColourSet
         {
             Id = s.Id, Name = s.Name, NameEn = s.NameEn, MapColor = s.MapColor, IsCustom = s.IsCustom, Blocks = [.. s.Blocks],
+            Status = s.Status, StatusNote = s.StatusNote,
         }).ToList();
         int nextId = Math.Max(1000, sets.Max(s => s.Id) + 1);
         foreach (var c in custom)

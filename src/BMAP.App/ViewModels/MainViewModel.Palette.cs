@@ -24,9 +24,19 @@ public sealed partial class MainViewModel
         set { if (value != null && value != BaseProfile) SelectProfile(value, CurrentSelection().Keys); }
     }
 
-    public string ProfileNote => Profile is null ? "" : L.English
-        ? $"{Profile.Name} ({Profile.Blocks.Count(b => b.Verified)}/{Profile.Blocks.Count()} blocks measured, {Profile.ColourSets.Count} colours)"
-        : $"{Profile.Name}（{Profile.Blocks.Count(b => b.Verified)}/{Profile.Blocks.Count()} ブロック実測済み・{Profile.ColourSets.Count} 色）";
+    public string ProfileNote
+    {
+        get
+        {
+            if (Profile is not { } p) return "";
+            int blocks = p.Blocks.Count(b => b.EffectiveStatus == ColorStatus.Verified), sets = p.ColourSets.Count(s => s.Status == ColorStatus.Verified);
+            var sh = p.Shades;
+            string mult = sh.Status == ColorStatus.Verified ? L["StatusVerified"] : L["StatusEstimated"];
+            string step = sh.StepStatus == ColorStatus.Verified ? L["StatusVerified"] : L["StatusEstimated"];
+            return L.Format("ProfileNoteFmt", blocks, p.Blocks.Count(), sets, p.ColourSets.Count,
+                $"{sh.Dark}/{sh.Normal}/{sh.Bright}", mult, sh.Step, step);
+        }
+    }
 
     private string _paletteSummary = "";
     public string PaletteSummary { get => _paletteSummary; set => Set(ref _paletteSummary, value); }
