@@ -519,9 +519,14 @@
                 </DataTemplate>
               </ComboBox.ItemTemplate>
             </ComboBox>
-            <TextBlock Text="{Binding L[CellSize]}" VerticalAlignment="Center" Margin="0,0,4,0" />
-            <Slider Minimum="1" Maximum="24" Value="{Binding CellSize}" Width="110" IsSnapToTickEnabled="True" TickFrequency="1" Margin="0,0,8,0" />
-            <Button Content="{Binding L[Rotate]}" Command="{Binding RotateCommand}" IsVisible="{Binding IsBuild3D}" Margin="0,0,8,4" />
+            <TextBlock Text="{Binding L[CellSize]}" VerticalAlignment="Center" Margin="0,0,4,0" IsVisible="{Binding IsBuildScroll}" />
+            <Slider Minimum="1" Maximum="24" Value="{Binding CellSize}" Width="110" IsSnapToTickEnabled="True" TickFrequency="1" Margin="0,0,8,0" IsVisible="{Binding IsBuildScroll}" />
+            <Button Content="{Binding L[Reset3D]}" Command="{Binding Reset3DCommand}" IsVisible="{Binding IsBuild3D}" Margin="0,0,4,4" />
+            <Button Content="{Binding L[TopView3D]}" Command="{Binding TopView3DCommand}" IsVisible="{Binding IsBuild3D}" Margin="0,0,4,4" />
+            <Button Content="{Binding L[Turn3D]}" Command="{Binding Turn3DCommand}" IsVisible="{Binding IsBuild3D}" Margin="0,0,8,4" />
+            <ComboBox ItemsSource="{Binding ColorModes3D}" SelectedItem="{Binding ColorMode3D}" IsVisible="{Binding IsBuild3D}" Width="150" Margin="0,0,8,4" />
+            <CheckBox Content="{Binding L[Perspective3D]}" IsChecked="{Binding Perspective3D}" IsVisible="{Binding IsBuild3D}" Margin="0,0,8,0" />
+            <CheckBox Content="{Binding L[Outlines3D]}" IsChecked="{Binding Outlines3D}" IsVisible="{Binding IsBuild3D}" Margin="0,0,8,0" />
             <CheckBox Content="{Binding L[ShowSupports]}" IsChecked="{Binding ShowSupports}" IsVisible="{Binding IsBuild3D}" Margin="0,0,8,0" />
             <CheckBox Content="{Binding L[ShowHeights]}" IsChecked="{Binding ShowHeights}" IsVisible="{Binding !IsBuild3D}" Margin="0,0,8,0" />
             <CheckBox Content="{Binding L[EditProgress]}" IsChecked="{Binding EditProgress}" IsVisible="{Binding !IsBuild3D}" Margin="0,0,8,0" />
@@ -544,7 +549,11 @@
       </WrapPanel>
       <TextBlock DockPanel.Dock="Top" Text="{Binding PreviewInfo}" FontSize="12" Opacity="0.7" Margin="12,4" TextTrimming="CharacterEllipsis" />
       <TextBlock DockPanel.Dock="Bottom" Text="{Binding HoverInfo}" FontSize="12" Margin="12,2,12,6" TextTrimming="CharacterEllipsis"
-                 IsVisible="{Binding IsBuildView}" />
+                 IsVisible="{Binding IsBuildScroll}" />
+      <StackPanel DockPanel.Dock="Bottom" Margin="12,2,12,6" IsVisible="{Binding IsBuild3D}">
+        <TextBlock Text="{Binding View3DInfo}" FontSize="12" TextTrimming="CharacterEllipsis" />
+        <TextBlock Text="{Binding L[Help3D]}" FontSize="11" Opacity="0.6" />
+      </StackPanel>
       <Border Background="#18808080" Margin="10,0,10,6">
         <Grid>
           <Image x:Name="PreviewImage" Source="{Binding Preview}" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="None" Margin="8"
@@ -552,12 +561,15 @@
           <Canvas x:Name="CropOverlay" IsHitTestVisible="False">
             <Rectangle x:Name="CropRect" Stroke="#FF4040" StrokeThickness="2" StrokeDashArray="4,3" IsVisible="False" />
           </Canvas>
-          <ScrollViewer IsVisible="{Binding IsBuildView}" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+          <Border x:Name="View3DPanel" IsVisible="{Binding IsBuild3D}" Background="#22262E" ClipToBounds="True" Cursor="SizeAll">
+            <Image Source="{Binding View3D}" Stretch="Fill" RenderOptions.BitmapInterpolationMode="None" />
+          </Border>
+          <ScrollViewer IsVisible="{Binding IsBuildScroll}" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
             <Image x:Name="BuildImage" Source="{Binding Preview}" Stretch="None" RenderOptions.BitmapInterpolationMode="None"
                    HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" />
           </ScrollViewer>
           <TextBlock Text="{Binding L[DropHere]}" HorizontalAlignment="Center" VerticalAlignment="Center"
-                     Opacity="0.5" IsVisible="{Binding !HasPreview}" />
+                     Opacity="0.5" IsVisible="{Binding !HasPreview}" IsHitTestVisible="False" />
         </Grid>
       </Border>
     </DockPanel>

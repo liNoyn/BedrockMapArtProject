@@ -267,9 +267,10 @@ public static class LayoutRenderer
     /// <summary>Block under a point of a top-down render (for the hover info, MapartCraft's "WAILA").</summary>
     public static (int X, int Z)? HitTestTopDown(LayoutRegion region, int cell, double px, double py)
     {
-        if (px < 0 || py < 0) return null;
+        // cell is 0 until a build view has been rendered: there is nothing to hit yet.
+        if (cell <= 0 || !double.IsFinite(px) || !double.IsFinite(py) || px < 0 || py < 0) return null;
         int dx = (int)(px / cell), dz = (int)(py / cell);
-        if (dx >= region.Width || dz >= region.Depth) return null;
+        if (dx < 0 || dz < 0 || dx >= region.Width || dz >= region.Depth) return null;
         return (region.X0 + dx, region.Z0 + dz);
     }
 }

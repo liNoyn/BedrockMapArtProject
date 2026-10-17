@@ -367,6 +367,43 @@ public class BlockTests
         Assert.Equal((10, 21), LayoutRenderer.HitTestTopDown(LayoutRegion.Map(0, 0), 4, 41, 85));
     }
 
+    [Fact] // regression: hovering before the build view was rendered crashed with IndexOutOfRangeException
+    public void HitTest_BeforeRender_AndOutOfRange_IsSafe()
+    {
+        Assert.Null(LayoutRenderer.HitTestTopDown(default, 0, 10, 10));
+        Assert.Null(LayoutRenderer.HitTestTopDown(LayoutRegion.Map(0, 0), 4, double.NaN, 3));
+        var layout = BlockLayout.Generate(Quantize(TestHelpers.Gradient(128, 128)), Cobble);
+        Assert.Null(layout.BlockAt(-5, 3));
+        Assert.Null(layout.BlockAt(500, 500));
+        Assert.Equal(0, layout.HeightAt(-1, -1));
+    }
+
+    [Fact]
+    public void Viewer3D_RendersVisibleFacesAndPicksBlocks()
+    {
+        var q = Quantize(TestHelpers.Gradient(128, 128), opt: new QuantizeOptions { Mode = StaircaseMode.Valley, MaxHeight = 8 });
+        var layout = BlockLayout.Generate(q, Cobble, supports: SupportMode.Important);
+        var mesh = SceneMesh.Build(layout, LayoutRegion.Map(0, 0), includeSupports: true);
+        // Only exposed faces: far fewer than 5 per block.
+        Assert.True(mesh.FaceCount < mesh.Blocks.Count * 3, $"{mesh.FaceCount} faces for {mesh.Blocks.Count} blocks");
+        Assert.True(mesh.FaceCount >= 128 * 129); // at least every top face
+
+        // Straight down, fitted: the centre pixel shows a block, the corners show the background.
+        var top = mesh.FitCamera(400, 400, yaw: 0, pitch: 90);
+        var r = Viewer3D.Render(mesh, Profile, top, 400, 400, null, ViewColorMode.MapColor);
+        Assert.InRange(r.BlockAt(200, 200), 0, mesh.Blocks.Count - 1);
+        Assert.Equal(-1, r.BlockAt(1, 1));
+        // From above, the north-west corner of the image is the north-west of the build.
+        int nw = r.BlockAt(200 - (int)(60 * top.Zoom), 200 - (int)(60 * top.Zoom));
+        Assert.True(nw >= 0 && mesh.Blocks[nw].X < 20 && mesh.Blocks[nw].Z < 20);
+
+        // Any angle, perspective, textures-less: renders without throwing and covers part of the view.
+        foreach (var yaw in new[] { 0.0, 45, 135, 225, 315 })
+        {
+            var view = Viewer3D.Render(mesh, Profile, mesh.FitCamera(320, 240, yaw, 35) with { Perspective = yaw > 200 }, 320, 240, null, ViewColorMode.Texture);
+            Assert.True(view.BlockIds.Count(id => id >= 0) > 320 * 240 / 10);
+        }
+    }
     [Fact]
     public void Ciede2000_MatchesReferenceValue()
     {

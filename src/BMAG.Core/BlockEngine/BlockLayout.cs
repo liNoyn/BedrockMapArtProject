@@ -48,8 +48,10 @@ public sealed class BlockLayout
     public int ImageHeight => Depth - 1;
     public bool IsFlat => Mode == StaircaseMode.Flat;
 
-    public int CellAt(int x, int z) => Cells[z * Width + x];
-    public int HeightAt(int x, int z) => Heights[z * Width + x];
+    public bool InBounds(int x, int z) => x >= 0 && z >= 0 && x < Width && z < Depth;
+    /// <summary>Cell content; positions outside the layout are <see cref="Empty"/>.</summary>
+    public int CellAt(int x, int z) => InBounds(x, z) ? Cells[z * Width + x] : Empty;
+    public int HeightAt(int x, int z) => InBounds(x, z) ? Heights[z * Width + x] : 0;
 
     public BlockDefinition? BlockAt(int x, int z) => CellAt(x, z) switch
     {
