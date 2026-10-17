@@ -1,7 +1,7 @@
-# Draws BMAG's application icon (a framed 8x8 pixel-art map) and writes src/BMAG.App/Assets/bmag.ico.
+# Draws BMAP's application icon (a framed 8x8 pixel-art map) and writes src/BMAP.App/Assets/bmap.ico.
 # Original artwork, no game assets. Run: powershell -ExecutionPolicy Bypass -File tools/make-icon.ps1
 Add-Type -AssemblyName System.Drawing
-$out = Join-Path $PSScriptRoot '..\src\BMAG.App\Assets'
+$out = Join-Path $PSScriptRoot '..\src\BMAP.App\Assets'
 New-Item -ItemType Directory -Force $out | Out-Null
 
 # 8x8 "map art": a small sunset landscape.
@@ -48,13 +48,13 @@ $pngs = foreach ($s in $sizes) {
   $bmp = Draw-Icon $s
   $ms = New-Object System.IO.MemoryStream
   $bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
-  if ($s -eq 256) { $bmp.Save((Join-Path $out 'bmag.png'), [System.Drawing.Imaging.ImageFormat]::Png) }
+  if ($s -eq 256) { $bmp.Save((Join-Path $out 'bmap.png'), [System.Drawing.Imaging.ImageFormat]::Png) }
   $bmp.Dispose()
   , $ms.ToArray()
 }
 
 # ICO container with PNG-compressed entries.
-$fs = [System.IO.File]::Create((Join-Path $out 'bmag.ico'))
+$fs = [System.IO.File]::Create((Join-Path $out 'bmap.ico'))
 $w = New-Object System.IO.BinaryWriter $fs
 $w.Write([UInt16]0); $w.Write([UInt16]1); $w.Write([UInt16]$sizes.Count)
 $offset = 6 + 16 * $sizes.Count

@@ -14,5 +14,5 @@ jobs:
         with:
           dotnet-version: 8.0.x
       # Textures are not fetched in CI (they are Mojang's assets and not needed for the tests).
-      - run: dotnet build BMAG.sln -c Release -p:BundleTextures=false
-      - run: dotnet test tests/BMAG.Tests -c Release --no-build
+      - run: dotnet build BMAP.sln -c Release -p:BundleTextures=false
+      - run: dotnet test tests/BMAP.Tests -c Release --no-build

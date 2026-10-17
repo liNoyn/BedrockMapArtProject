@@ -165,6 +165,6 @@ return 0;
 static string FindRepoRoot()
 {
     var dir = new DirectoryInfo(AppContext.BaseDirectory);
-    while (dir != null && !File.Exists(Path.Combine(dir.FullName, "BMAG.sln"))) dir = dir.Parent;
-    return dir?.FullName ?? throw new DirectoryNotFoundException("BMAG.sln not found");
+    while (dir != null && !File.Exists(Path.Combine(dir.FullName, "BMAP.sln"))) dir = dir.Parent;
+    return dir?.FullName ?? throw new DirectoryNotFoundException("BMAP.sln not found");
 }

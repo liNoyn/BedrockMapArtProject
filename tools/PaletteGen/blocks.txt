@@ -1,4 +1,4 @@
-# BMAG palette source data.
+# BMAP palette source data.
 # Colour sets follow Minecraft's map colour list (the same grouping MapartCraft uses).
 # Base colours are Minecraft's map base colours. Block identifiers are current Bedrock identifiers,
 # validated against Mojang's mojang-blocks.json by PaletteGen.

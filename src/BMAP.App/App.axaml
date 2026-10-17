@@ -1,0 +1,188 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:BMAP.App.ViewModels"
+             x:Class="BMAP.App.App"
+             RequestedThemeVariant="Dark">
+  <Application.DataTemplates>
+    <!-- Language-aware combo box options -->
+    <DataTemplate DataType="vm:LocOptionBase">
+      <TextBlock Text="{Binding Label}" />
+    </DataTemplate>
+  </Application.DataTemplates>
+
+  <Application.Resources>
+    <!-- MapartCraft look: #333 page, white text, "rebane green" accents (colours only; no code or assets copied). -->
+    <Color x:Key="Green">#7BAE7F</Color>
+    <Color x:Key="GreenDark">#688E6B</Color>
+    <SolidColorBrush x:Key="PageBrush" Color="#333333" />
+    <SolidColorBrush x:Key="GreenBrush" Color="#7BAE7F" />
+    <SolidColorBrush x:Key="GreenDarkBrush" Color="#688E6B" />
+    <SolidColorBrush x:Key="PanelBrush" Color="#2B2B2B" />
+    <Color x:Key="SystemAccentColor">#7BAE7F</Color>
+    <Color x:Key="SystemAccentColorDark1">#688E6B</Color>
+    <Color x:Key="SystemAccentColorLight1">#8FC493</Color>
+  </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme />
+
+    <Style Selector="Window">
+      <Setter Property="Background" Value="#333333" />
+      <Setter Property="FontFamily" Value="Lato, Segoe UI, Yu Gothic UI, Meiryo, sans-serif" />
+    </Style>
+
+    <!-- Section titles (MapartCraft h1 / h2) -->
+    <Style Selector="TextBlock.h1">
+      <Setter Property="FontSize" Value="26" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="TextBlock.h2">
+      <Setter Property="FontSize" Value="22" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Margin" Value="0,0,0,6" />
+    </Style>
+    <!-- Setting labels are bold like MapartCraft's <b> labels -->
+    <Style Selector="TextBlock.lbl">
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="0,0,8,0" />
+    </Style>
+    <Style Selector="TextBlock.h">
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Margin" Value="0,8,0,4" />
+    </Style>
+    <Style Selector="TextBlock.note">
+      <Setter Property="Opacity" Value="0.72" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.warn">
+      <Setter Property="Foreground" Value="#F0A050" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.ok">
+      <Setter Property="Foreground" Value="#8FD493" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.bad">
+      <Setter Property="Foreground" Value="#FF7B6B" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <!-- A section column -->
+    <Style Selector="Border.section">
+      <Setter Property="Padding" Value="8,6" />
+    </Style>
+    <!-- MapartCraft "settingsGroup": options that belong to the setting above, outlined in white -->
+    <Style Selector="Border.group">
+      <Setter Property="BorderBrush" Value="White" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="6,4" />
+      <Setter Property="Margin" Value="0,3" />
+    </Style>
+    <Style Selector="StackPanel.setting">
+      <Setter Property="Orientation" Value="Horizontal" />
+      <Setter Property="Margin" Value="0,3" />
+    </Style>
+
+    <!-- Green buttons (MapartCraft "greenButton") -->
+    <Style Selector="Button.green">
+      <Setter Property="Background" Value="#7BAE7F" />
+      <Setter Property="Foreground" Value="#333333" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Margin" Value="0,2" />
+    </Style>
+    <Style Selector="Button.green:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#688E6B" />
+      <Setter Property="Foreground" Value="#222222" />
+    </Style>
+    <Style Selector="Button.green:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#5A7C5D" />
+    </Style>
+    <Style Selector="Button.green:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#4E5E4F" />
+      <Setter Property="Foreground" Value="#2A2A2A" />
+    </Style>
+    <Style Selector="Button.green.large">
+      <Setter Property="FontSize" Value="20" />
+      <Setter Property="MinHeight" Value="50" />
+    </Style>
+    <!-- Text links in the header -->
+    <Style Selector="Button.link">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Foreground" Value="#7BAE7F" />
+      <Setter Property="Padding" Value="6,2" />
+    </Style>
+    <Style Selector="Button.link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="#A6D8AA" />
+    </Style>
+
+    <!-- Preview view switch: tab-like list -->
+    <Style Selector="ListBox.tabs">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="ListBox.tabs ListBoxItem">
+      <Setter Property="Padding" Value="10,4" />
+      <Setter Property="Margin" Value="0,0,2,2" />
+      <Setter Property="Background" Value="#3D3D3D" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="ListBox.tabs ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#7BAE7F" />
+      <Setter Property="Foreground" Value="#222222" />
+    </Style>
+    <Style Selector="ListBox.tabs ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#7BAE7F" />
+      <Setter Property="Foreground" Value="#222222" />
+    </Style>
+    <Style Selector="ListBox.tabs ListBoxItem:selected TextBlock">
+      <Setter Property="Foreground" Value="#222222" />
+      <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+    <Style Selector="ListBox.tabs ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#8FC493" />
+      <Setter Property="Foreground" Value="#222222" />
+    </Style>
+
+    <!-- MapartCraft-style block buttons: dark tiles, green frame when selected -->
+    <Style Selector="ToggleButton.blk">
+      <Setter Property="Padding" Value="1" />
+      <Setter Property="Margin" Value="1" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="2" />
+    </Style>
+    <Style Selector="ToggleButton.blk:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#4A4A4A" />
+      <Setter Property="BorderBrush" Value="#9A9A9A" />
+    </Style>
+    <Style Selector="ToggleButton.blk:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#3F5A41" />
+      <Setter Property="BorderBrush" Value="#7BAE7F" />
+    </Style>
+    <Style Selector="ToggleButton.blk:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#4C6E4F" />
+      <Setter Property="BorderBrush" Value="#A6D8AA" />
+    </Style>
+
+    <Style Selector="Expander">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Margin" Value="0,3" />
+    </Style>
+  </Application.Styles>
+</Application>
