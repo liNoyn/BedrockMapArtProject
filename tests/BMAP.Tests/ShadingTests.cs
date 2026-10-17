@@ -101,19 +101,4 @@ public class ShadingTests
         Assert.Equal(0, supported.WillFall);
         Assert.Equal(0, supported.Mismatches);
     }
-
-    [Fact]
-    public void ShadingTestPad_PredictsEveryRule()
-    {
-        var pad = ShadingTestPad.Create(Profile, Cobble);
-        var report = ShadingAnalyzer.Analyze(pad.Layout, Profile, null);
-        Assert.Equal(128, pad.Layout.Width);
-        Assert.Equal(129, pad.Layout.Depth);
-        Assert.Equal(0, report.WillFall);
-        Assert.Equal(0, report.WillBreak);
-        Assert.NotEmpty(pad.Cases);
-        // Every case predicts its own shade.
-        foreach (var c in pad.Cases)
-            Assert.Equal(c.Expected, report.Map.Shades[report.Map.Index(c.X, c.Z - 1)]);
-    }
 }

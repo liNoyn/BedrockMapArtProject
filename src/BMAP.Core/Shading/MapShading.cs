@@ -7,14 +7,17 @@ namespace BMAP.Shading;
 /// <summary>
 /// The map shading rule, written down in one place (see docs/shading-rules.md).
 /// A scale-0 map pixel shows the top-most block of its column. Its brightness comes only from the height of that
-/// block compared with the top-most block of the column directly north of it (Z - 1):
-/// higher → bright, same height → normal, lower → dark. How much higher or lower does not matter, and the east/west
-/// neighbours play no part. The first row of a map is compared with the row just outside the map to the north.
+/// block compared with the top-most block of the column directly north of it (Z - 1): at least <c>step</c> higher →
+/// bright, at least <c>step</c> lower → dark, otherwise normal. Java Edition uses step 1; the step of the profile
+/// (<see cref="ShadeMultipliers.MinStep"/>) is used so a measured Bedrock rule can replace it. East/west neighbours play
+/// no part. The first row of a map is compared with the row just outside the map to the north.
 /// </summary>
 public static class ShadeRule
 {
-    public static Shade Compare(int height, int northHeight) =>
-        height > northHeight ? Shade.Bright : height < northHeight ? Shade.Dark : Shade.Normal;
+    public static Shade Compare(int height, int northHeight, int step = 1) =>
+        height - northHeight >= Math.Max(1, step) ? Shade.Bright
+        : northHeight - height >= Math.Max(1, step) ? Shade.Dark
+        : Shade.Normal;
 }
 
 /// <summary>What a map pixel shows according to the simulation.</summary>
@@ -78,9 +81,11 @@ public static class MapSimulator
                 if (top[i] is not { } block) { states[o] = PixelState.Empty; shades[o] = Shade.Normal; continue; }
                 Shade shade;
                 if (top[n] is null) { states[o] = PixelState.DependsOnTerrain; shade = Shade.Normal; }
-                else shade = ShadeRule.Compare(topY[i], topY[n]);
+                else shade = ShadeRule.Compare(topY[i], topY[n], profile.Shades.Step);
                 shades[o] = shade;
-                img[x, z - 1] = profile.ColorOf(block, shade);
+                // Colours come from the given profile (by key), so a layout can be checked against another profile,
+                // e.g. one with colours measured in game.
+                img[x, z - 1] = profile.ColorOf(profile.Find(block.Key) ?? block, shade);
             }
         return new SimulatedMap { Width = w, Height = rows, Image = img, Shades = shades, States = states, TopBlocks = blocks, TopY = ys };
     }

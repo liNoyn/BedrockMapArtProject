@@ -73,6 +73,19 @@ renderer are implemented in the project without further libraries.
 - Manual pixel painting in the 2D build view (undo, back to automatic, saved in the project).
 - Bedrock specifics: grass and some leaves change map colour with the biome and are off by default.
 
+**In-game calibration (read only)** — details in [docs/calibration.md](docs/calibration.md) (Japanese)
+- Exports a shading test pad (steps −4 … +4 with full blocks, carpets and slabs, east/west steps, empty north column,
+  biome tints) and a colour test pad with all 323 blocks; `pad.json` records every sample position.
+- After the game has drawn a map of the pad, BMAP reads the map (`map_<ID>`, `colors`) from a **temporary copy** of the
+  world database and compares it with the prediction. Worlds are never written. Map orientation, offsets and unexplored
+  pixels are handled.
+- From the brightness per step it derives the **smallest step that changes the shade**, the multipliers and whether
+  shading is graded; the colour pad gives the real colour of each block. Results are saved as a colour profile marked
+  "verified" and used by quantizing, height limits, layout and the 3D view.
+- Every colour has a status: verified / API-derived / third-party / estimated / unknown. Estimates are never shown as verified.
+- `mapcheck` checks that every pixel of any drawn map is "base colour × multiplier". This confirmed the multipliers
+  180 / 220 / 255 and 13 base colours on maps drawn by Bedrock.
+
 **Previews and guides**
 - Predicted map colours, original, difference, shading analysis, 2D build view (textures, heights, chunk borders,
   coordinates), height map.
@@ -106,7 +119,8 @@ powershell -ExecutionPolicy Bypass -File tools/publish.ps1
 ```
 
 Command line (`BMAP.Cli`): `build` (export), `analyze` (height analysis), `bench` (compare dithering and metrics),
-`render` (3D view to PNG with timings per stage), `textures`. Run without arguments for usage.
+`render` (3D view to PNG with timings per stage), `pad` / `calibrate` / `mapcheck` / `maps` / `worlds` (calibration,
+read only), `textures`. Run without arguments for usage.
 
 ## Loading .mcstructure files
 
@@ -124,7 +138,7 @@ Command line (`BMAP.Cli`): `build` (export), `analyze` (height analysis), `bench
 | `tests/BMAP.Tests` | xUnit tests |
 | `tools/PaletteGen` | Builds `palettes/bedrock-full-v2.json` from `blocks.txt` (validated against Mojang's metadata) |
 | `tools/publish.ps1`, `tools/make-icon.ps1` | Release zip, app icon |
-| `docs/` | [Shading rules](docs/shading-rules.md), [benchmarks](docs/benchmarks.md) |
+| `docs/` | [Shading rules](docs/shading-rules.md), [in-game calibration](docs/calibration.md), [benchmarks](docs/benchmarks.md) |
 
 | Feature | Code (`src/BMAP.Core`) |
 |---|---|
@@ -134,7 +148,8 @@ Command line (`BMAP.Cli`): `build` (export), `analyze` (height analysis), `bench
 | Quantizing and dithering | `BlockEngine/ColorQuantizer.cs` (`.Knoll.cs`), `BlueNoise.cs` |
 | Staircases and supports | `BlockEngine/BlockLayout.cs`, `ColumnIndex.cs` |
 | Height analysis and placement | `BlockEngine/HeightAdvisor.cs` |
-| Shading rule and map simulator | `Shading/` |
+| Shading rule, map simulator, calibration | `Shading/` (`MapShading.cs`, `ShadingTestPad.cs`, `Calibration.cs`) |
+| Reading Bedrock maps (read only) | `Bedrock/` (LevelDB, `level.dat`, `MapRecord`) |
 | 2D / 3D previews | `Preview/LayoutRenderer.cs`, `Preview/Viewer3D.cs` |
 | Export, guides, materials | `Export/`, `BlockEngine/BuildGuideGenerator.cs`, `Materials.cs` |
 | Textures | `Textures/` |
@@ -146,8 +161,10 @@ The game cannot be driven from the development environment, so these points are 
 
 | Item | Status |
 |---|---|
-| Block map colours | Minecraft's map base colours (Java values) used as **estimates**; no block verified |
-| Shading rule and multipliers (180 / 220 / 255) | Java's rule assumed; check with the shading test pad |
+| Shade multipliers 180 / 220 / 255 | **Verified** on 12 maps (~190 k pixels) drawn by Bedrock 1.21.132 – 1.26.51 |
+| Base colours of the colour sets | **13 of 60 verified**; the rest are Java values (estimates) |
+| Smallest height step that changes the shade (1 or 2) | **Not verified**; measure it with the shading test pad (2 can be set if needed) |
+| Which block gives which colour | Not verified; measure with the colour test pad |
 | Block identifiers and states | All 323 validated against Mojang's metadata (1.26.50); loading as structures not checked |
 
 Logs are in `%LOCALAPPDATA%\BMAP\logs`.
@@ -156,7 +173,8 @@ Logs are in `%LOCALAPPDATA%\BMAP\logs`.
 
 - APNG: first frame only. Video needs ffmpeg (on PATH or next to BMAP).
 - Water (shade by depth) is not supported, as in MapartCraft.
-- Writing map data directly into worlds was removed in v0.3.0 (too hard to get right).
+- Writing map data directly into worlds was removed in v0.3.0 (too hard to get right). Worlds are only read (temporary copy).
+- Empty columns appear to be drawn black on Bedrock (many opaque black pixels on real maps); the shade south of a transparent pixel depends on the terrain.
 - Biome-tinted blocks (grass, some leaves) cannot be given a biome.
 - The name of imported structures (`mystructure:…`) may differ between game versions.
 
@@ -165,6 +183,10 @@ Logs are in `%LOCALAPPDATA%\BMAP\logs`.
 - [MapartCraft](https://github.com/rebane2001/mapartcraft) (rebane2001, GPL-3.0): colour set grouping, screen layout and
   many features. No MapartCraft code or images are included.
 - [Cartographer](https://github.com/julienvincent/cartographer): a map art converter with several staircasing algorithms.
+- [Image Map](https://github.com/tryashtar/image-map): the Bedrock map data format (`map_<ID>`, `colors`). No code used.
+- Minecraft docs: [BlockMapColorComponent](https://learn.microsoft.com/en-us/minecraft/creator/scriptapi/minecraft/server/blockmapcolorcomponent?view=minecraft-bedrock-stable),
+  [Block.getMapColor (pre-release)](https://learn.microsoft.com/en-us/minecraft/creator/scriptapi/minecraft/server/block?view=minecraft-bedrock-experimental),
+  considered for reading base colours (see docs/calibration.md).
 - Pekka Väänänen, [Revisiting Yliluoma's ordered dither algorithm](https://30fps.net/pages/revisiting-yliluoma-2/):
   Knoll's pattern dithering, and why to dither in linear light.
 - R. Ulichney, "The void-and-cluster method for dither array generation" (1993): blue noise.

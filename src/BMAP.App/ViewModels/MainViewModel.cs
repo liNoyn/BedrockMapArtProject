@@ -23,7 +23,7 @@ public interface IDialogService
     Task InfoAsync(string title, string message);
 }
 
-public enum PreviewMode { Original, BlockMap, Difference, ShadeMap, Build2D, Build3D, HeightMap }
+public enum PreviewMode { Original, BlockMap, Difference, ShadeMap, Build2D, Build3D, HeightMap, Calibration }
 
 /// <summary>Main window state. Split into partial files by area (palette, build, 3D view).</summary>
 public sealed partial class MainViewModel : ViewModelBase
@@ -66,7 +66,7 @@ public sealed partial class MainViewModel : ViewModelBase
         [
             new(PreviewMode.BlockMap, "PvBlockMap", L), new(PreviewMode.Original, "PvOriginal", L), new(PreviewMode.Difference, "PvDifference", L),
             new(PreviewMode.ShadeMap, "PvShadeMap", L), new(PreviewMode.Build2D, "PvBuild2D", L), new(PreviewMode.Build3D, "PvBuild3D", L),
-            new(PreviewMode.HeightMap, "PvHeightMap", L),
+            new(PreviewMode.HeightMap, "PvHeightMap", L), new(PreviewMode.Calibration, "PvCalibration", L),
         ];
         _fit = FitModes[0];
         _interp = Interpolations[0];
@@ -89,6 +89,7 @@ public sealed partial class MainViewModel : ViewModelBase
         InitPalette();
         InitBuild();
         Init3D();
+        InitCalibration();
         L.PropertyChanged += (_, _) => { RaiseLocalizedTexts(); RefreshPreview(); };
         Log(L.English ? "Bedrock Map Art Project started. Open an image." : "Bedrock Map Art Project を起動しました。画像を開いてください。");
         if (!Textures.IsAvailable && !_settings.TexturesAsked)
@@ -115,13 +116,13 @@ public sealed partial class MainViewModel : ViewModelBase
     }
 
     private Task ShowAboutAsync() => _dialogs.InfoAsync(L["About"], L.English
-        ? $"Bedrock Map Art Project {Version}\nhttps://github.com/liNoyn/BedrockMapArtGenerator\n\n" +
+        ? $"Bedrock Map Art Project {Version}\nhttps://github.com/liNoyn/BedrockMapArtProject\n\n" +
           "Map art for Minecraft Bedrock Edition: .mcstructure builds, 3D staircasing with shading analysis.\n\n" +
           "License: MIT. Layout and features inspired by MapartCraft (rebane2001, GPL-3.0; no code or images copied).\n" +
           "Block textures are © Mojang AB, downloaded to your PC from Mojang/bedrock-samples under the Minecraft EULA.\n" +
           "Minecraft is a trademark of Mojang Studios / Microsoft. This project is not affiliated with them.\n\n" +
           $"Logs: {LogDirectory}"
-        : $"Bedrock Map Art Project {Version}\nhttps://github.com/liNoyn/BedrockMapArtGenerator\n\n" +
+        : $"Bedrock Map Art Project {Version}\nhttps://github.com/liNoyn/BedrockMapArtProject\n\n" +
           "Minecraft 統合版のマップアート作成ツール（.mcstructure 建築データ・3D 階段・陰影解析）。\n\n" +
           "ライセンス: MIT。画面構成と機能は MapartCraft（rebane2001、GPL-3.0。コード・画像は含みません）を参考にしています。\n" +
           "ブロックのテクスチャは © Mojang AB で、Mojang/bedrock-samples から Minecraft EULA に基づいて PC にダウンロードしたものです。\n" +
@@ -334,6 +335,7 @@ public sealed partial class MainViewModel : ViewModelBase
     [
         ReloadFrameCommand, ExportBlockCommand, SavePreviewPngCommand, ExportMaterialsCommand, DownloadTexturesCommand,
         UndoEditCommand, ClearEditsCommand, AnalyzeHeightCommand, ApplyRecommendedYCommand, View3DCommand,
+        ReadMapsCommand, SaveCalibrationCommand,
     ];
 
     private void RaiseCommands()
@@ -534,6 +536,7 @@ public sealed partial class MainViewModel : ViewModelBase
             PreviewMode.Original => _sourceThumb,
             PreviewMode.BlockMap => _quantized?.Preview,
             PreviewMode.ShadeMap => _report is null ? null : ShadingAnalyzer.RenderShadeMap(_report),
+            PreviewMode.Calibration => _calImage,
             PreviewMode.Difference => _processed is null || _quantized is null ? null : Difference(_processed, _quantized.Preview),
             _ => null,
         };
@@ -566,7 +569,7 @@ public sealed partial class MainViewModel : ViewModelBase
                 }
             }
         }
-        if (mode != PreviewMode.Original)
+        if (mode is not (PreviewMode.Original or PreviewMode.Calibration))
         {
             int factor = Math.Max(1, 1024 / Math.Max(image.Width, image.Height));
             image = factor > 1 ? image.ScaleNearest(Math.Min(factor, 6)) : image.Clone();
@@ -578,6 +581,7 @@ public sealed partial class MainViewModel : ViewModelBase
             PreviewMode.Original => L.Format("InfoOriginal", _source!.Width, _source.Height),
             PreviewMode.BlockMap => L["InfoBlockMap"],
             PreviewMode.ShadeMap => L["InfoShadeMap"],
+            PreviewMode.Calibration => L["InfoCalibration"],
             _ => L["InfoDifference"],
         };
     }

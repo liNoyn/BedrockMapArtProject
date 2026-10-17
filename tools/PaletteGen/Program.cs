@@ -108,6 +108,15 @@ foreach (var rawLine in File.ReadAllLines(Path.Combine(root, "tools", "PaletteGe
                 ["mapColor"] = $"#{rgb[0]:X2}{rgb[1]:X2}{rgb[2]:X2}",
                 ["blocks"] = new JsonArray(),
             };
+            // Evidence from maps drawn by Bedrock: base colour x180 / x220 / x255 pixel counts.
+            if (f.Length > 5 && f[5].StartsWith("seen="))
+            {
+                var n = f[5][5..].Split(',').Select(int.Parse).ToArray();
+                bool verified = n.Count(c => c >= 3) >= 2;
+                current["status"] = verified ? "verified" : "estimated";
+                current["statusNote"] = $"Seen on maps drawn by Bedrock 1.21.132-1.26.51: x180 {n[0]}, x220 {n[1]}, x255 {n[2]} pixels" +
+                    (verified ? "" : " (one shade only: not enough to verify)");
+            }
             sets.Add(current);
             break;
         case "B":
@@ -150,8 +159,13 @@ var profile = new JsonObject
     ["name"] = "Bedrock 全ブロック / All blocks（推定色・未検証 / estimated colours）",
     ["gameVersion"] = "1.26",
     ["updated"] = DateTime.Now.ToString("yyyy-MM-dd"),
-    ["notes"] = "色セットと地図の基本色は Minecraft の地図色（Java 版の値）を初期値にした推定値で、Bedrock 実機では未検証です。ブロック識別子と状態は Bedrock 1.26 の公式メタデータで検証済み。",
-    ["shades"] = new JsonObject { ["dark"] = 180, ["normal"] = 220, ["bright"] = 255, ["verified"] = false },
+    ["notes"] = "色セットと地図の基本色は Minecraft の地図色（Java 版の値）を初期値にしています。陰影の倍率 180/220/255 と一部の色セットの基本色は、Bedrock が描いた地図から確認済み（status）。ブロックとの対応と陰影の段差は未検証。ブロック識別子と状態は Bedrock 1.26 の公式メタデータで検証済み。",
+    ["shades"] = new JsonObject
+    {
+        ["dark"] = 180, ["normal"] = 220, ["bright"] = 255, ["verified"] = true, ["status"] = "verified",
+        ["statusNote"] = "Multipliers seen exactly (base x180 / x220 / x255, integer) on maps drawn by Bedrock 1.21.132-1.26.51. The height step is not verified.",
+        ["minStep"] = 1, ["stepStatus"] = "estimated",
+    },
     ["colourSets"] = sets,
 };
 File.WriteAllText(output, profile.ToJsonString(new JsonSerializerOptions

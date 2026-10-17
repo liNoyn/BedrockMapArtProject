@@ -17,6 +17,12 @@ if (args.Length == 0)
           render <image> <out.png> [--maps 1x1] [--mode texture|map|shade|height] [--yaw 35] [--pitch 40] [--zoom 0]
                 [--size 1200x800] [--textures dir] [--grid] [--nolight]
                                          3D ビューを PNG に描画（各段階の処理時間を表示）
+          worlds                         ワールドを一覧表示（読み取り専用）
+          maps <world> [outDir]          ワールドの地図を一覧し、outDir があれば PNG で保存（データベースのコピーを読むだけ）
+          pad shading|colours <outDir> [--origin mapX,mapZ,y] [--step n]
+                                         キャリブレーション用テストパッド（.mcstructure と pad.json）を出力
+          calibrate <world> <pad.json> [--out dir] [--en]
+                                         ゲームが描いた地図からパッドを読み取り、陰影規則と地図色を測定
           textures [cacheDir]            ブロックテクスチャを取得
         """);
     return 0;
@@ -198,6 +204,108 @@ try
             {
                 var t = totals[name];
                 Console.WriteLine($"{name,-38} {t.P / images.Count,9:0.000} {t.D / images.Count,10:0.000} {t.Ms / images.Count,7}");
+            }
+            break;
+        }
+
+        case "worlds":
+            foreach (var w in BMAP.Bedrock.World.WorldLocator.FindWorlds())
+                Console.WriteLine($"{w.Version,-10} {w.LastPlayed:yyyy-MM-dd HH:mm}  {w.Name}  {w.Folder}");
+            break;
+
+        case "maps":
+        {
+            // maps <world> [outDir]: lists the maps (read from a temporary copy of the database).
+            var maps = BMAP.Bedrock.MapRecord.ReadAll(args[1]);
+            foreach (var m in maps.OrderBy(m => m.Id))
+            {
+                int span = m.Width << m.Scale;
+                Console.WriteLine($"map_{m.Id}\tscale={m.Scale} dim={m.Dimension} centre=({m.XCenter},{m.ZCenter}) area x {m.MinX}..{m.MinX + span - 1}, z {m.MinZ}..{m.MinZ + span - 1} locked={m.Locked}");
+                if (args.Length > 2 && m.ToImage() is { } img) ImageCodec.SavePng(img, Path.Combine(args[2], $"map_{m.Id}.png"));
+            }
+            Console.WriteLine($"{maps.Count} maps");
+            break;
+        }
+
+        case "mapcheck":
+        {
+            // mapcheck <world>...: are the colours of drawn maps "base colour x multiplier"? (read only)
+            var profile = BMAP.Palette.ColorProfile.LoadBuiltIn();
+            var bases = profile.ColourSets.Select(s => BMAP.Imaging.Rgba.FromHex(s.MapColor)).Append(new BMAP.Imaging.Rgba(64, 64, 255)).ToList(); // + water
+            var images = new List<BMAP.Imaging.RgbaImage>();
+            foreach (var world in args.Skip(1))
+            {
+                try
+                {
+                    foreach (var m in BMAP.Bedrock.MapRecord.ReadAll(world).Where(m => m.ToImage() is { } im && im.Pixels.Where((_, i) => i % 4 == 3).Any(a => a > 0)))
+                    {
+                        // Image maps (imported pictures) sit far outside the world and are locked: not drawn by the game.
+                        bool image = m.XCenter == int.MaxValue || m.ZCenter == int.MaxValue || Math.Abs((long)m.XCenter) > 30_000_000;
+                        var one = BMAP.Shading.Calibrator.PaletteCheck([m.ToImage()!], bases, [180, 220, 255, 135]);
+                        Console.WriteLine($"  map_{m.Id} scale={m.Scale} locked={m.Locked} centre=({m.XCenter},{m.ZCenter}) in {Path.GetFileName(world)}: drawn={one.Drawn} " +
+                            string.Join(" ", one.PerMultiplier.Select(kv => $"x{kv.Key}={kv.Value}")) + $" unexplained={one.Unexplained.Sum(u => u.Count)}" + (image ? "  [image map, skipped]" : ""));
+                        if (!image) images.Add(m.ToImage()!);
+                    }
+                }
+                catch (Exception ex) { Console.WriteLine($"  skip {Path.GetFileName(world)}: {ex.Message}"); }
+            }
+            var (drawn, per, unexplained) = BMAP.Shading.Calibrator.PaletteCheck(images, bases, [180, 220, 255, 135]);
+            Console.WriteLine($"maps={images.Count} drawn pixels={drawn}");
+            foreach (var (m, n) in per) Console.WriteLine($"  x{m}/255: {n} ({(drawn == 0 ? 0 : 100.0 * n / drawn):0.0} %)");
+            int un = unexplained.Sum(u => u.Count);
+            Console.WriteLine($"  unexplained: {un} ({(drawn == 0 ? 0 : 100.0 * un / drawn):0.0} %), {unexplained.Count} colours");
+            foreach (var (c, n) in unexplained.Take(25)) Console.WriteLine($"    {c.ToHex()} x{n}");
+            // Which colour sets were seen, in which shade.
+            var seen = new Dictionary<(string Set, int M), int>();
+            foreach (var img in images)
+                for (int i = 0; i < img.Width * img.Height; i++)
+                {
+                    if (img.Pixels[i * 4 + 3] == 0) continue;
+                    foreach (var s in profile.ColourSets.Select(s => (Name: s.NameEn, C: BMAP.Imaging.Rgba.FromHex(s.MapColor))).Append((Name: "Water", C: new BMAP.Imaging.Rgba(64, 64, 255))))
+                        foreach (int mul in new[] { 180, 220, 255 })
+                            if (img.Pixels[i * 4] == s.C.R * mul / 255 && img.Pixels[i * 4 + 1] == s.C.G * mul / 255 && img.Pixels[i * 4 + 2] == s.C.B * mul / 255)
+                                seen[(s.Name, mul)] = seen.GetValueOrDefault((s.Name, mul)) + 1;
+                }
+            Console.WriteLine("colour sets seen (x180 / x220 / x255):");
+            foreach (var g in seen.GroupBy(k => k.Key.Set).OrderByDescending(g => g.Sum(x => x.Value)))
+                Console.WriteLine($"    {g.Key,-22} {seen.GetValueOrDefault((g.Key, 180)),7} {seen.GetValueOrDefault((g.Key, 220)),7} {seen.GetValueOrDefault((g.Key, 255)),7}");
+            break;
+        }
+
+        case "pad":
+        {
+            // pad shading|colours <outDir> [--origin mapX,mapZ,y] [--step n]
+            var opts = ParseOptions(args.Skip(3));
+            var profile = BMAP.Palette.ColorProfile.LoadBuiltIn();
+            var support = profile.Find("cobblestone")!;
+            var pad = args[1] == "colours" || args[1] == "colors"
+                ? BMAP.Shading.ShadingTestPad.CreateColourPad(profile, support, int.Parse(opts.GetValueOrDefault("step", "1")))
+                : BMAP.Shading.ShadingTestPad.Create(profile, support);
+            var p = opts.GetValueOrDefault("origin", "0,0,64").Split(',').Select(int.Parse).ToArray();
+            var origin = BMAP.BlockEngine.WorldOrigin.AlignedToMap(p[0], p[1], p[2]);
+            var files = BMAP.Shading.PadExporter.Export(args[2], pad, profile, origin, english: opts.ContainsKey("en"));
+            Console.WriteLine($"{pad.Descriptor.Kind}: {pad.Descriptor.Samples.Count} samples -> {files}");
+            break;
+        }
+
+        case "calibrate":
+        {
+            // calibrate <world> <pad.json> [--out dir] [--en]
+            var opts = ParseOptions(args.Skip(3));
+            bool en = opts.ContainsKey("en");
+            var pad = BMAP.Shading.PadDescriptor.Load(args[2]);
+            var profile = BMAP.Palette.ColorProfile.LoadBuiltIn();
+            var world = BMAP.Bedrock.World.WorldInfo.Load(args[1]);
+            var maps = BMAP.Bedrock.MapRecord.ReadAll(args[1]);
+            var predicted = BMAP.Shading.MapSimulator.Simulate(BMAP.Shading.ShadingTestPad.Recreate(pad, profile).Layout, profile).Image;
+            var map = BMAP.Shading.Calibrator.FindMap(maps, pad, predicted) ?? throw new InvalidOperationException("no scale-0 map found");
+            var r = BMAP.Shading.Calibrator.Analyze(pad, map, profile, world.Version ?? "?", en);
+            Console.WriteLine(BMAP.Shading.Calibrator.Report(r, en));
+            if (opts.TryGetValue("out", out var outDir))
+            {
+                Directory.CreateDirectory(outDir);
+                ImageCodec.SavePng(BMAP.Shading.Calibrator.ComparisonImage(r), Path.Combine(outDir, "comparison.png"));
+                File.WriteAllText(Path.Combine(outDir, "report.txt"), BMAP.Shading.Calibrator.Report(r, en));
             }
             break;
         }

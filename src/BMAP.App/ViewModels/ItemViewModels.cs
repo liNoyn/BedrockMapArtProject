@@ -69,7 +69,15 @@ public sealed class BlockChoiceViewModel : ViewModelBase
             if (Block.BiomeTinted) flags.Add(Loc.English ? "biome tinted" : "バイオームで色が変わる");
             if (Block.Rarity >= 2) flags.Add(Loc.English ? "rare" : "希少");
             if (Block.IsCustom) flags.Add(Loc.English ? "custom" : "カスタム");
-            flags.Add(Block.Verified ? (Loc.English ? "measured colour" : "実測色") : (Loc.English ? "estimated colour" : "推定色"));
+            flags.Add(Block.EffectiveStatus switch
+            {
+                ColorStatus.Verified => Loc.English ? "colour measured in game" : "実機で測定した色",
+                ColorStatus.ApiDerived => Loc.English ? "colour from Bedrock data" : "Bedrock のデータの色",
+                ColorStatus.ThirdParty => Loc.English ? "colour from another project" : "他プロジェクトの色",
+                _ => _row.Set.Status == ColorStatus.Verified
+                    ? (Loc.English ? "colour seen on Bedrock maps (block not checked)" : "Bedrock の地図で確認済みの色（ブロックとの対応は未確認）")
+                    : (Loc.English ? "estimated colour" : "推定色"),
+            });
             return $"{Block.LocalName(Loc.English)}\n{Block.Name}{Block.StatesText}\n{string.Join(" · ", flags)}";
         }
     }
