@@ -4,12 +4,9 @@ using System.Text.Json.Serialization;
 using BMAG.BlockEngine;
 using BMAG.ColorEngine;
 using BMAG.Imaging;
-using BMAG.MapData;
 using BMAG.Palette;
 
 namespace BMAG.Project;
-
-public enum ExportMode { BlockConstruction, DirectMap }
 
 /// <summary>Build progress state (design 7.3).</summary>
 public enum ProgressState { NotStarted, InProgress, Done, Skipped, NeedsFix }
@@ -31,7 +28,6 @@ public sealed class BmagProject
     public double SourceVideoSeconds { get; set; }
 
     public ImageSettings Image { get; set; } = new();
-    public ExportMode Mode { get; set; } = ExportMode.BlockConstruction;
     public string TargetGameVersion { get; set; } = "1.26";
 
     // Block construction
@@ -63,12 +59,6 @@ public sealed class BmagProject
     public int? OriginX { get; set; }
     public int? OriginY { get; set; }
     public int? OriginZ { get; set; }
-
-    // Direct map
-    public string? LastWorldFolder { get; set; }
-    public long StartMapId { get; set; } = MapIdAllocator.DefaultStart;
-    public ItemDelivery Delivery { get; set; } = ItemDelivery.ChestAndFrameWall;
-    public bool GlowFrames { get; set; }
 
     /// <summary>Build progress per map number (1-based).</summary>
     public Dictionary<int, ProgressState> MapProgress { get; set; } = [];

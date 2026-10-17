@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Text.Json;
 using BMAG.BlockEngine;
-using BMAG.Calibration;
 using BMAG.Palette;
 
 namespace BMAG.App.ViewModels;
@@ -81,7 +80,7 @@ public sealed partial class MainViewModel
         foreach (var c in CustomBlockStore.Load()) CustomBlocks.Add(new CustomBlockViewModel(c, RemoveCustom));
         Profiles.Clear();
         foreach (var id in ColorProfile.BuiltInIds()) Profiles.Add(ColorProfile.LoadBuiltIn(id));
-        foreach (var p in Calibrator.LoadUserProfiles()) Profiles.Add(p);
+        foreach (var p in UserProfiles.Load()) Profiles.Add(p);
         var first = Profiles.FirstOrDefault(p => p.Id == ColorProfile.DefaultId) ?? Profiles.First();
         SelectProfile(first, null);
         Textures.Changed += () => Avalonia.Threading.Dispatcher.UIThread.Post(() => { Raise(nameof(TextureStatus)); Raise(nameof(TexturesMissing)); LoadIcons(); RefreshPreview(); });

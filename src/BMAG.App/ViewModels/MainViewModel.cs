@@ -8,6 +8,7 @@ using BMAG.Imaging;
 using BMAG.Palette;
 using BMAG.Preview;
 using BMAG.Project;
+using BMAG.Shading;
 using BMAG.Textures;
 
 namespace BMAG.App.ViewModels;
@@ -22,9 +23,9 @@ public interface IDialogService
     Task InfoAsync(string title, string message);
 }
 
-public enum PreviewMode { Original, DirectMap, BlockMap, Difference, Build2D, Build3D, HeightMap }
+public enum PreviewMode { Original, BlockMap, Difference, ShadeMap, Build2D, Build3D, HeightMap }
 
-/// <summary>Main window state. Split into partial files by area (palette, build, world).</summary>
+/// <summary>Main window state. Split into partial files by area (palette, build, 3D view).</summary>
 public sealed partial class MainViewModel : ViewModelBase
 {
     private readonly IDialogService _dialogs;
@@ -37,6 +38,8 @@ public sealed partial class MainViewModel : ViewModelBase
     private QuantizeResult? _baseQuantized;
     private QuantizeResult? _quantized;
     private BlockLayout? _layout;
+    /// <summary>Shading / buildability analysis of <see cref="_layout"/> (computed in the background).</summary>
+    private ShadingReport? _report;
     private PixelOverrides _edits = new();
     private string? _projectPath;
     private bool _loadingProject;
@@ -61,15 +64,15 @@ public sealed partial class MainViewModel : ViewModelBase
         TransparencyModes = [new(TransparencyMode.Smooth, "TransSmooth", L), new(TransparencyMode.Dithered, "TransDithered", L), new(TransparencyMode.Keep, "TransKeep", L)];
         PreviewModes =
         [
-            new(PreviewMode.Original, "PvOriginal", L), new(PreviewMode.DirectMap, "PvDirect", L), new(PreviewMode.BlockMap, "PvBlockMap", L),
-            new(PreviewMode.Difference, "PvDifference", L), new(PreviewMode.Build2D, "PvBuild2D", L), new(PreviewMode.Build3D, "PvBuild3D", L),
+            new(PreviewMode.BlockMap, "PvBlockMap", L), new(PreviewMode.Original, "PvOriginal", L), new(PreviewMode.Difference, "PvDifference", L),
+            new(PreviewMode.ShadeMap, "PvShadeMap", L), new(PreviewMode.Build2D, "PvBuild2D", L), new(PreviewMode.Build3D, "PvBuild3D", L),
             new(PreviewMode.HeightMap, "PvHeightMap", L),
         ];
         _fit = FitModes[0];
         _interp = Interpolations[0];
         _cropMode = CropModes[0];
         _transparency = TransparencyModes[0];
-        _previewMode = PreviewModes[0];
+        _previewMode = PreviewModes[1];
 
         OpenImageCommand = new RelayCommand(OpenImageAsync);
         ReloadFrameCommand = new RelayCommand(ReloadFrameAsync, () => _sourcePath != null);
@@ -85,7 +88,6 @@ public sealed partial class MainViewModel : ViewModelBase
 
         InitPalette();
         InitBuild();
-        InitWorld();
         Init3D();
         L.PropertyChanged += (_, _) => { RaiseLocalizedTexts(); RefreshPreview(); };
         Log(L.English ? "Bedrock Map Art Generator started. Open an image." : "Bedrock Map Art Generator を起動しました。画像を開いてください。");
@@ -114,14 +116,14 @@ public sealed partial class MainViewModel : ViewModelBase
 
     private Task ShowAboutAsync() => _dialogs.InfoAsync(L["About"], L.English
         ? $"Bedrock Map Art Generator {Version}\nhttps://github.com/liNoyn/BedrockMapArtGenerator\n\n" +
-          "Map art for Minecraft Bedrock Edition: .mcstructure builds and direct map data.\n\n" +
-          "License: MIT. Inspired by MapartCraft (rebane2001, GPL-3.0; no code copied) and Image Map (tryashtar).\n" +
+          "Map art for Minecraft Bedrock Edition: .mcstructure builds, 3D staircasing with shading analysis.\n\n" +
+          "License: MIT. Layout and features inspired by MapartCraft (rebane2001, GPL-3.0; no code or images copied).\n" +
           "Block textures are © Mojang AB, downloaded to your PC from Mojang/bedrock-samples under the Minecraft EULA.\n" +
           "Minecraft is a trademark of Mojang Studios / Microsoft. This project is not affiliated with them.\n\n" +
           $"Logs: {LogDirectory}"
         : $"Bedrock Map Art Generator {Version}\nhttps://github.com/liNoyn/BedrockMapArtGenerator\n\n" +
-          "Minecraft 統合版のマップアート作成ツール（.mcstructure 建築データと地図データの直接生成）。\n\n" +
-          "ライセンス: MIT。MapartCraft（rebane2001、GPL-3.0。コードは含みません）と Image Map（tryashtar）を参考にしています。\n" +
+          "Minecraft 統合版のマップアート作成ツール（.mcstructure 建築データ・3D 階段・陰影解析）。\n\n" +
+          "ライセンス: MIT。画面構成と機能は MapartCraft（rebane2001、GPL-3.0。コード・画像は含みません）を参考にしています。\n" +
           "ブロックのテクスチャは © Mojang AB で、Mojang/bedrock-samples から Minecraft EULA に基づいて PC にダウンロードしたものです。\n" +
           "Minecraft は Mojang Studios / Microsoft の商標です。本プロジェクトはこれらと関係ありません。\n\n" +
           $"ログ: {LogDirectory}");
@@ -167,8 +169,7 @@ public sealed partial class MainViewModel : ViewModelBase
         Raise(nameof(OriginText));
         Raise(nameof(ProfileNote));
         Raise(nameof(TextureStatus));
-        Raise(nameof(WorldDetails));
-        Raise(nameof(CalibrationText));
+        UpdateShadingText();
         UpdatePlacement();
         foreach (var row in HeightRows.ToList()) { HeightRows.Remove(row); HeightRows.Add(new HeightRowViewModel(row.Option, L, ApplyHeightOption)); }
         if (_source is null) SourceInfo = L["NoImage"];
@@ -306,9 +307,17 @@ public sealed partial class MainViewModel : ViewModelBase
     private string _logText = "";
     public string LogText { get => _logText; set => Set(ref _logText, value); }
 
+    private string _lastLog = "";
+    /// <summary>The newest log line, shown in the status bar.</summary>
+    public string LastLog { get => _lastLog; set => Set(ref _lastLog, value); }
+
     public void Log(string message)
     {
-        void Append() => LogText += $"[{DateTime.Now:HH:mm:ss}] {message}\n";
+        void Append()
+        {
+            LogText += $"[{DateTime.Now:HH:mm:ss}] {message}\n";
+            LastLog = message.Split('\n')[0];
+        }
         if (Dispatcher.UIThread.CheckAccess()) Append(); else Dispatcher.UIThread.Post(Append);
     }
 
@@ -323,10 +332,8 @@ public sealed partial class MainViewModel : ViewModelBase
 
     private IEnumerable<RelayCommand?> AllCommands() =>
     [
-        ReloadFrameCommand, ExportBlockCommand, ExportTilesCommand, PlanWorldExportCommand, ExecuteWorldExportCommand,
-        LoadMapsCommand, ExportMapPngCommand, UseMapAsSourceCommand, MeasureCalibrationCommand, SaveCalibratedProfileCommand,
-        ExportMaterialsCommand, DownloadTexturesCommand, RegisterInWorldCommand, UndoEditCommand, ClearEditsCommand,
-        AnalyzeHeightCommand, ApplyRecommendedYCommand,
+        ReloadFrameCommand, ExportBlockCommand, SavePreviewPngCommand, ExportMaterialsCommand, DownloadTexturesCommand,
+        UndoEditCommand, ClearEditsCommand, AnalyzeHeightCommand, ApplyRecommendedYCommand, View3DCommand,
     ];
 
     private void RaiseCommands()
@@ -415,6 +422,27 @@ public sealed partial class MainViewModel : ViewModelBase
         var support = SelectedSupportBlock ?? Profile.Find("cobblestone") ?? Profile.Blocks.First();
         try { _layout = BlockLayout.Generate(q, support, 0, SupportModeOption.Value); }
         catch (InvalidOperationException ex) { _layout = null; Log(ex.Message); }
+        AnalyzeShading();
+    }
+
+    private int _analysisVersion;
+
+    /// <summary>Simulates the map from the block positions and checks it against the plan (background).</summary>
+    private async void AnalyzeShading()
+    {
+        int version = ++_analysisVersion;
+        _report = null;
+        if (_layout is not { } layout || _quantized is not { } q || Profile is not { } profile) { UpdateShadingText(); return; }
+        try
+        {
+            var report = await Task.Run(() => ShadingAnalyzer.Analyze(layout, profile, q.Preview));
+            if (version != _analysisVersion) return;
+            _report = report;
+            UpdateShadingText();
+            if (SelectedPreviewMode.Value == PreviewMode.ShadeMap) RefreshPreview();
+            if (SelectedPreviewMode.Value == PreviewMode.Build3D) Request3D(); // problem marks in the shade view
+        }
+        catch (Exception ex) { Log(ex.Message); }
     }
 
     private static double MeanDeltaE(RgbaImage a, RgbaImage b)
@@ -504,8 +532,8 @@ public sealed partial class MainViewModel : ViewModelBase
         RgbaImage? image = mode switch
         {
             PreviewMode.Original => _sourceThumb,
-            PreviewMode.DirectMap => _processed,
             PreviewMode.BlockMap => _quantized?.Preview,
+            PreviewMode.ShadeMap => _report is null ? null : ShadingAnalyzer.RenderShadeMap(_report),
             PreviewMode.Difference => _processed is null || _quantized is null ? null : Difference(_processed, _quantized.Preview),
             _ => null,
         };
@@ -548,8 +576,8 @@ public sealed partial class MainViewModel : ViewModelBase
         PreviewInfo = mode switch
         {
             PreviewMode.Original => L.Format("InfoOriginal", _source!.Width, _source.Height),
-            PreviewMode.DirectMap => L["InfoDirect"],
             PreviewMode.BlockMap => L["InfoBlockMap"],
+            PreviewMode.ShadeMap => L["InfoShadeMap"],
             _ => L["InfoDifference"],
         };
     }
@@ -649,7 +677,7 @@ public sealed partial class MainViewModel : ViewModelBase
         _source = img;
         _sourceThumb = ImagePipeline.Thumbnail(img, 1024);
         SourceInfo = path is null ? $"map ({img.Width}x{img.Height})" : $"{Path.GetFileName(path)} ({img.Width}x{img.Height})";
-        if (SelectedPreviewMode.Value == PreviewMode.Original) SelectedPreviewMode = PreviewModes[1];
+        if (SelectedPreviewMode.Value == PreviewMode.Original) SelectedPreviewMode = PreviewModes[0];
         ScheduleUpdate();
         RefreshPreview();
     }
@@ -661,6 +689,8 @@ public sealed partial class MainViewModel : ViewModelBase
         _source = _sourceThumb = _processed = null;
         _quantized = _baseQuantized = null;
         _layout = null;
+        _report = null;
+        UpdateShadingText();
         _edits = new PixelOverrides();
         _sourcePath = null;
         FrameCount = 1;
@@ -744,10 +774,6 @@ public sealed partial class MainViewModel : ViewModelBase
         p.OriginX = UseOrigin ? OriginMapX : null;
         p.OriginZ = UseOrigin ? OriginMapZ : null;
         p.OriginY = OriginY;
-        p.LastWorldFolder = SelectedWorld?.Folder;
-        p.StartMapId = StartId;
-        p.Delivery = Delivery.Value;
-        p.GlowFrames = GlowFrames;
         return p;
     }
 
@@ -787,10 +813,6 @@ public sealed partial class MainViewModel : ViewModelBase
             if (profile != null) SelectProfile(profile, p.SelectionKeys());
             UseOrigin = p.OriginX != null;
             OriginMapX = p.OriginX ?? 0; OriginMapZ = p.OriginZ ?? 0; OriginY = p.OriginY ?? 64;
-            StartId = p.StartMapId;
-            Delivery = Deliveries.First(d => d.Value == p.Delivery);
-            GlowFrames = p.GlowFrames;
-            if (p.LastWorldFolder != null) SelectedWorld = Worlds.FirstOrDefault(w => w.Folder == p.LastWorldFolder) ?? SelectedWorld;
         }
         finally { _loadingProject = false; }
         RebuildProgress();

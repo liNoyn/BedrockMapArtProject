@@ -54,9 +54,10 @@ public sealed record QuantizeOptions
     /// <summary>Error diffusion / ordered dithering strength, 0..1.</summary>
     public double DitherStrength { get; init; } = 1.0;
     /// <summary>
-    /// Classic / Valley only: the largest height difference the build may have (0 = unlimited). The shades are then
-    /// chosen so that no column needs more levels: optimally (dynamic programming) without dithering or with ordered
-    /// dithering, and with a per-pixel feasibility check for error diffusion.
+    /// Valley only: the largest height difference the build may have (0 = unlimited). The shades are then chosen so
+    /// that no column needs more levels: optimally (dynamic programming) without dithering or with ordered dithering.
+    /// With error diffusion a run is stopped when it reaches the limit and the colour error is diffused to the
+    /// neighbours (measured better than planning the shades first and dithering inside the plan).
     /// </summary>
     public int MaxHeight { get; init; }
     /// <summary>
@@ -66,7 +67,11 @@ public sealed record QuantizeOptions
     public double ShadePenalty { get; init; }
 
     /// <summary>True when the height limit applies (it is meaningless for flat and full dark/light).</summary>
-    public bool HeightLimited => MaxHeight > 0 && Mode is StaircaseMode.Classic or StaircaseMode.Valley;
+    /// <remarks>
+    /// Valley only: a Classic staircase never drops back, so its height is the running sum of all steps and cannot
+    /// be bounded by limiting the length of runs.
+    /// </remarks>
+    public bool HeightLimited => MaxHeight > 0 && Mode == StaircaseMode.Valley;
     public DitherMode Dither { get; init; } = DitherMode.None;
     public StaircaseMode Mode { get; init; } = StaircaseMode.Flat;
     /// <summary>Pixels with alpha below this become empty (no block). Only relevant when transparency is kept.</summary>

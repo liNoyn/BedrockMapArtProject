@@ -10,7 +10,7 @@
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <ApplicationIcon>Assets\bmag.ico</ApplicationIcon>
     <Product>Bedrock Map Art Generator</Product>
     <Copyright>Copyright (c) 2026 Noyn (MIT)</Copyright>
