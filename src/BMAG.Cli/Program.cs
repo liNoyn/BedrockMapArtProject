@@ -118,6 +118,31 @@ try
             break;
         }
 
+        case "analyze":
+        {
+            // analyze <image> [--maps 1x1] [--dither none|fs|bayer4] [--preset 0-7]: quality vs height for 3D map art.
+            var opts = ParseOptions(args.Skip(2));
+            var (mx, my) = ParseGrid(opts.GetValueOrDefault("maps", "1x1"));
+            var img = ImagePipeline.Process(ImageCodec.Load(args[1]), new ImageSettings { MapsX = mx, MapsY = my, BackgroundColor = opts.GetValueOrDefault("bg", "#FFFFFF") });
+            var profile = BMAG.Palette.ColorProfile.LoadBuiltIn();
+            var preset = BMAG.BlockEngine.BlockPreset.BuiltIns(profile)[int.Parse(opts.GetValueOrDefault("preset", "0"))];
+            var dither = opts.GetValueOrDefault("dither", "none") switch
+            {
+                "fs" => BMAG.BlockEngine.DitherMode.FloydSteinberg,
+                "bayer4" => BMAG.BlockEngine.DitherMode.Bayer4,
+                _ => BMAG.BlockEngine.DitherMode.None,
+            };
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var rows = BMAG.BlockEngine.HeightAdvisor.Analyze(img, profile, preset.ToSelection(),
+                new BMAG.BlockEngine.QuantizeOptions { Mode = BMAG.BlockEngine.StaircaseMode.Valley, Dither = dither },
+                profile.Find("cobblestone")!, BMAG.BlockEngine.SupportMode.None);
+            Console.WriteLine("mode      limit  maxH  build  ΔE     quality  blocks");
+            foreach (var r in rows)
+                Console.WriteLine($"{r.Mode,-9} {(r.Mode == BMAG.BlockEngine.StaircaseMode.Flat ? "-" : r.Limit == 0 ? "∞" : r.Limit.ToString()),5} {r.MaxHeight,5} {r.BuildHeight,6} {r.MeanDeltaE,6:0.00} {r.Quality,7:0}% {r.Blocks,7}{(r.Recommended ? "  <= recommended" : "")}");
+            Console.WriteLine($"({sw.ElapsedMilliseconds} ms)");
+            break;
+        }
+
         case "direct":
         {
             // direct <image> <worldFolder> [--maps 2x2] [--name n] [--yes]: adds the image as maps to a COPY of the world.

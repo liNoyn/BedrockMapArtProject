@@ -26,7 +26,12 @@ public partial class MainWindow : Window, IDialogService
         };
         // "BMAG.exe picture.png" (Open with…) loads the image on start.
         var startFile = Environment.GetCommandLineArgs().Skip(1).FirstOrDefault(File.Exists);
-        if (startFile != null) Opened += async (_, _) => await _vm.LoadImageAsync(startFile);
+        if (startFile != null)
+            Opened += async (_, _) =>
+            {
+                if (startFile.EndsWith(".bmag.json", StringComparison.OrdinalIgnoreCase)) await _vm.OpenProjectFileAsync(startFile);
+                else await _vm.LoadImageAsync(startFile);
+            };
         // Keep the log scrolled to the newest line.
         _vm.PropertyChanged += (_, e) =>
         {

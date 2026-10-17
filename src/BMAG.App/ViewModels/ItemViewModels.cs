@@ -221,3 +221,17 @@ public sealed record BrushOption(string Key, string Label, BlockDefinition? Bloc
     public const string None = "<none>";
     public override string ToString() => Label;
 }
+
+/// <summary>One row of the "best height" analysis table.</summary>
+public sealed class HeightRowViewModel(HeightOption option, Loc loc, Action<HeightOption> apply)
+{
+    public HeightOption Option { get; } = option;
+    public string LimitText => Option.Mode == StaircaseMode.Flat ? loc["Flat"] : Option.Limit == 0 ? loc["Unlimited"] : $"≤ {Option.Limit}";
+    public string HeightText => loc.Format("BlocksTall", Option.BuildHeight);
+    public string DeltaText => $"ΔE {Option.MeanDeltaE:0.00}";
+    public double Quality => Option.Quality;
+    public string QualityText => $"{Option.Quality:0}%";
+    public bool IsRecommended => Option.Recommended;
+    public string Badge => Option.Recommended ? "★ " + loc["Recommended"] : "";
+    public RelayCommand ApplyCommand => new(() => apply(Option));
+}

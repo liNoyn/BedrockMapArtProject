@@ -219,6 +219,51 @@ public static class LayoutRenderer
         return img;
     }
 
+    /// <summary>
+    /// Height map: each block coloured by its height (blue = lowest, red = highest) with contour lines every
+    /// <paramref name="contour"/> levels. Shows at a glance where a staircase climbs and how tall it gets.
+    /// </summary>
+    public static RgbaImage RenderHeightMap(BlockLayout layout, LayoutRegion region, int cell, int contour = 4)
+    {
+        int w = region.Width * cell, h = region.Depth * cell;
+        var img = new RgbaImage(w, h);
+        int maxH = Math.Max(1, layout.MaxHeight);
+        for (int dz = 0; dz < region.Depth; dz++)
+            for (int dx = 0; dx < region.Width; dx++)
+            {
+                int x = region.X0 + dx, z = region.Z0 + dz;
+                if (x >= layout.Width || z >= layout.Depth) continue;
+                Rgba c;
+                if (layout.BlockAt(x, z) is null) c = new Rgba(30, 30, 30);
+                else
+                {
+                    int y = layout.HeightAt(x, z);
+                    c = Ramp(y / (double)maxH);
+                    bool edge = contour > 0 && ((z > 0 && layout.HeightAt(x, z - 1) / contour != y / contour)
+                                                || (x > 0 && layout.BlockAt(x - 1, z) != null && layout.HeightAt(x - 1, z) / contour != y / contour));
+                    if (edge) c = new Rgba((byte)(c.R / 2), (byte)(c.G / 2), (byte)(c.B / 2));
+                }
+                for (int py = 0; py < cell; py++)
+                    for (int px = 0; px < cell; px++)
+                        img[dx * cell + px, dz * cell + py] = c;
+            }
+        return img;
+    }
+
+    /// <summary>Blue → cyan → green → yellow → red.</summary>
+    public static Rgba Ramp(double t)
+    {
+        t = Math.Clamp(t, 0, 1);
+        (double r, double g, double b) = t switch
+        {
+            < 0.25 => (0.0, t / 0.25, 1.0),
+            < 0.5 => (0.0, 1.0, 1 - (t - 0.25) / 0.25),
+            < 0.75 => ((t - 0.5) / 0.25, 1.0, 0.0),
+            _ => (1.0, 1 - (t - 0.75) / 0.25, 0.0),
+        };
+        return new Rgba((byte)(40 + r * 215), (byte)(40 + g * 215), (byte)(60 + b * 195));
+    }
+
     /// <summary>Block under a point of a top-down render (for the hover info, MapartCraft's "WAILA").</summary>
     public static (int X, int Z)? HitTestTopDown(LayoutRegion region, int cell, double px, double py)
     {

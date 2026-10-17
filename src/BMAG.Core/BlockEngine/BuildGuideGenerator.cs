@@ -102,6 +102,11 @@ public static class BuildGuideGenerator
             sb.AppendLine(T(en, "スケール 0 の地図の範囲は X/Z = 128k-64 ～ 128k+63 です。画像左上を (128i-64, 128j-64) に置くと地図 1 枚にぴったり収まります。",
                 "A scale-0 map covers X/Z = 128k-64 .. 128k+63. Put the top-left pixel at (128i-64, 128j-64) to fill one map exactly."));
         }
+        var advice = PlacementAdvisor.Advise(layout, origin?.Y, en);
+        sb.AppendLine();
+        sb.AppendLine(T(en, $"必要な高さ: {advice.BuildHeight} ブロック / 置ける Y（下端）: {advice.MinBaseY} ～ {advice.MaxBaseY} / 推奨 Y: {advice.RecommendedBaseY}",
+            $"Height needed: {advice.BuildHeight} blocks / bottom Y range: {advice.MinBaseY} .. {advice.MaxBaseY} / recommended Y: {advice.RecommendedBaseY}"));
+        foreach (var note in advice.Notes) sb.AppendLine("  - " + note);
         sb.AppendLine();
         sb.AppendLine(T(en, "必要素材:", "Materials:"));
         foreach (var m in materials)

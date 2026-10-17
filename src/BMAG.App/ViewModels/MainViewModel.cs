@@ -22,7 +22,7 @@ public interface IDialogService
     Task InfoAsync(string title, string message);
 }
 
-public enum PreviewMode { Original, DirectMap, BlockMap, Difference, Build2D, Build3D }
+public enum PreviewMode { Original, DirectMap, BlockMap, Difference, Build2D, Build3D, HeightMap }
 
 /// <summary>Main window state. Split into partial files by area (palette, build, world).</summary>
 public sealed partial class MainViewModel : ViewModelBase
@@ -63,6 +63,7 @@ public sealed partial class MainViewModel : ViewModelBase
         [
             new(PreviewMode.Original, "PvOriginal", L), new(PreviewMode.DirectMap, "PvDirect", L), new(PreviewMode.BlockMap, "PvBlockMap", L),
             new(PreviewMode.Difference, "PvDifference", L), new(PreviewMode.Build2D, "PvBuild2D", L), new(PreviewMode.Build3D, "PvBuild3D", L),
+            new(PreviewMode.HeightMap, "PvHeightMap", L),
         ];
         _fit = FitModes[0];
         _interp = Interpolations[0];
@@ -167,6 +168,8 @@ public sealed partial class MainViewModel : ViewModelBase
         Raise(nameof(TextureStatus));
         Raise(nameof(WorldDetails));
         Raise(nameof(CalibrationText));
+        UpdatePlacement();
+        foreach (var row in HeightRows.ToList()) { HeightRows.Remove(row); HeightRows.Add(new HeightRowViewModel(row.Option, L, ApplyHeightOption)); }
         if (_source is null) SourceInfo = L["NoImage"];
         UpdateBlockInfo();
         RebuildViewAreas();
@@ -257,7 +260,7 @@ public sealed partial class MainViewModel : ViewModelBase
             RefreshPreview();
         }
     }
-    public bool IsBuildView => SelectedPreviewMode.Value is PreviewMode.Build2D or PreviewMode.Build3D;
+    public bool IsBuildView => SelectedPreviewMode.Value is PreviewMode.Build2D or PreviewMode.Build3D or PreviewMode.HeightMap;
     public bool IsBuild3D => SelectedPreviewMode.Value == PreviewMode.Build3D;
     public bool IsImageView => !IsBuildView;
 
@@ -316,6 +319,7 @@ public sealed partial class MainViewModel : ViewModelBase
         ReloadFrameCommand, ExportBlockCommand, ExportTilesCommand, PlanWorldExportCommand, ExecuteWorldExportCommand,
         LoadMapsCommand, ExportMapPngCommand, UseMapAsSourceCommand, MeasureCalibrationCommand, SaveCalibratedProfileCommand,
         ExportMaterialsCommand, DownloadTexturesCommand, RegisterInWorldCommand, UndoEditCommand, ClearEditsCommand,
+        AnalyzeHeightCommand, ApplyRecommendedYCommand,
     ];
 
     private void RaiseCommands()
@@ -445,7 +449,7 @@ public sealed partial class MainViewModel : ViewModelBase
     {
         int version = ++_previewVersion;
         var mode = SelectedPreviewMode.Value;
-        if (mode is PreviewMode.Build2D or PreviewMode.Build3D)
+        if (mode is PreviewMode.Build2D or PreviewMode.Build3D or PreviewMode.HeightMap)
         {
             if (_layout is not { } layout || Profile is not { } profile)
             {
@@ -463,9 +467,12 @@ public sealed partial class MainViewModel : ViewModelBase
             RgbaImage img;
             try
             {
-                img = await Task.Run(() => mode == PreviewMode.Build2D
-                    ? LayoutRenderer.RenderTopDown(layout, profile, region, cell, tex is null ? null : tex.GetIcon, heights, isDone)
-                    : LayoutRenderer.RenderIsometric(layout, profile, region, Math.Max(2, cell), rotation, tex is null ? null : tex.GetIcon, supports));
+                img = await Task.Run(() => mode switch
+                {
+                    PreviewMode.Build2D => LayoutRenderer.RenderTopDown(layout, profile, region, cell, tex is null ? null : tex.GetIcon, heights, isDone),
+                    PreviewMode.HeightMap => LayoutRenderer.RenderHeightMap(layout, region, Math.Max(1, cell), Math.Max(2, layout.MaxHeight / 8)),
+                    _ => LayoutRenderer.RenderIsometric(layout, profile, region, Math.Max(2, cell), rotation, tex is null ? null : tex.GetIcon, supports),
+                });
             }
             catch (Exception ex)
             {
@@ -476,7 +483,9 @@ public sealed partial class MainViewModel : ViewModelBase
             _renderedRegion = region;
             _renderedCell = cell;
             Preview = BitmapHelper.ToBitmap(img);
-            PreviewInfo = L["InfoBuild"] + $"  ({img.Width} x {img.Height})";
+            PreviewInfo = mode == PreviewMode.HeightMap
+                ? L.Format("HeightLegend", layout.MaxHeight)
+                : L["InfoBuild"] + $"  ({img.Width} x {img.Height})";
             return;
         }
 
@@ -536,7 +545,7 @@ public sealed partial class MainViewModel : ViewModelBase
     /// <summary>Pointer over the build view at fractions (0..1) of the rendered image.</summary>
     public void OnPreviewPointer(double fx, double fy, bool click, bool pressed = false, bool released = false)
     {
-        if (SelectedPreviewMode.Value != PreviewMode.Build2D || _layout is not { } layout || Preview is null) return;
+        if (SelectedPreviewMode.Value is not (PreviewMode.Build2D or PreviewMode.HeightMap) || _layout is not { } layout || Preview is null) return;
         var hit = LayoutRenderer.HitTestTopDown(_renderedRegion, _renderedCell, fx * Preview.PixelSize.Width, fy * Preview.PixelSize.Height);
         if (hit is not var (x, z) || x >= layout.Width || z >= layout.Depth) { HoverInfo = ""; return; }
         var b = layout.BlockAt(x, z);
@@ -653,6 +662,11 @@ public sealed partial class MainViewModel : ViewModelBase
     {
         var path = await _dialogs.OpenFileAsync(L["OpenProject"], "BMAG", ["*.bmag.json", "*.json"]);
         if (path is null) return;
+        await OpenProjectFileAsync(path);
+    }
+
+    public async Task OpenProjectFileAsync(string path)
+    {
         try
         {
             var p = BmagProject.Load(path);
@@ -701,6 +715,8 @@ public sealed partial class MainViewModel : ViewModelBase
         p.Metric = Metric.Value;
         p.Dither = Dither.Value;
         p.DitherStrength = DitherStrength;
+        p.MaxHeight = MaxHeight;
+        p.ShadePenalty = ShadePenalty;
         p.Serpentine = Serpentine;
         p.Split = SplitOption.Value;
         p.WriteBehaviorPack = WriteBehaviorPack;
@@ -740,6 +756,8 @@ public sealed partial class MainViewModel : ViewModelBase
             Metric = Metrics.First(m => m.Value == p.Metric);
             Dither = Dithers.First(d => d.Value == p.Dither);
             DitherStrength = p.DitherStrength;
+            MaxHeight = p.MaxHeight;
+            ShadePenalty = p.ShadePenalty;
             Serpentine = p.Serpentine;
             SplitOption = Splits.First(s => s.Value == p.Split);
             WriteBehaviorPack = p.WriteBehaviorPack;

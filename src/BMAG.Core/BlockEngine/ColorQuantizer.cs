@@ -53,6 +53,20 @@ public sealed record QuantizeOptions
     public bool Serpentine { get; init; } = true;
     /// <summary>Error diffusion / ordered dithering strength, 0..1.</summary>
     public double DitherStrength { get; init; } = 1.0;
+    /// <summary>
+    /// Classic / Valley only: the largest height difference the build may have (0 = unlimited). The shades are then
+    /// chosen so that no column needs more levels: optimally (dynamic programming) without dithering or with ordered
+    /// dithering, and with a per-pixel feasibility check for error diffusion.
+    /// </summary>
+    public int MaxHeight { get; init; }
+    /// <summary>
+    /// Extra cost (0..1, relative) for the dark and light shades. Higher values prefer the normal shade when the
+    /// colours are close, which gives lower, calmer staircases at a small colour cost.
+    /// </summary>
+    public double ShadePenalty { get; init; }
+
+    /// <summary>True when the height limit applies (it is meaningless for flat and full dark/light).</summary>
+    public bool HeightLimited => MaxHeight > 0 && Mode is StaircaseMode.Classic or StaircaseMode.Valley;
     public DitherMode Dither { get; init; } = DitherMode.None;
     public StaircaseMode Mode { get; init; } = StaircaseMode.Flat;
     /// <summary>Pixels with alpha below this become empty (no block). Only relevant when transparency is kept.</summary>
@@ -145,7 +159,11 @@ public static class ColorQuantizer
         bool IsEmpty(int i) => image.Pixels[i * 4 + 3] < options.AlphaThreshold;
 
         var ordered = OrderedMatrix(options.Dither);
-        if (options.Dither == DitherMode.None || ordered != null)
+        if (options.HeightLimited && (options.Dither == DitherMode.None || ordered != null))
+        {
+            HeightLimitedOptimal(image, w, h, options, candidates, ordered, IsEmpty, idx, shades, Assign, ct);
+        }
+        else if (options.Dither == DitherMode.None || ordered != null)
         {
             int size = ordered is null ? 1 : (int)Math.Sqrt(ordered.Length);
             const double spread = 32; // roughly the typical distance between neighbouring palette colours
@@ -162,7 +180,7 @@ public static class ColorQuantizer
                         double k = t * spread * options.DitherStrength;
                         r += k; g += k; b += k;
                     }
-                    Assign(i, local.Find(r, g, b));
+                    Assign(i, local.Find(r, g, b, AllShades, options.ShadePenalty));
                 }
                 return local;
             }, _ => { });
@@ -176,6 +194,103 @@ public static class ColorQuantizer
         {
             Width = w, Height = h, EntryIndex = idx, Shades = shades, Entries = entries, Preview = preview, Mode = options.Mode,
         };
+    }
+
+    private const int AllShades = 0b111;
+
+    /// <summary>Deterministic pseudo-random value in [0, 1) per pixel (so results stay reproducible).</summary>
+    private static double Jitter(int x, int y)
+    {
+        uint h = (uint)(x * 73856093) ^ (uint)(y * 19349663);
+        h ^= h >> 13; h *= 0x5bd1e995; h ^= h >> 15;
+        return (h & 0xFFFFFF) / (double)0x1000000;
+    }
+    private static int Bit(Shade s) => 1 << (int)s;
+
+    /// <summary>
+    /// Height-limited staircasing, solved optimally per column (Viterbi). A column needs H+1 height levels when it has
+    /// a run of H darker (or H lighter) steps, normal steps not breaking the run, so the state is the current run:
+    /// k = H is "no run", k &lt; H a dark run of H-k, k &gt; H a light run of k-H.
+    /// </summary>
+    private static void HeightLimitedOptimal(RgbaImage image, int w, int h, QuantizeOptions options, List<Candidate> candidates,
+        int[]? ordered, Func<int, bool> isEmpty, int[] idx, Shade[] shades, Action<int, int> assign, CancellationToken ct)
+    {
+        int H = options.MaxHeight, S = 2 * H + 1;
+        int size = ordered is null ? 1 : (int)Math.Sqrt(ordered.Length);
+        Parallel.For(0, w, new ParallelOptions { CancellationToken = ct }, () => new NearestMatcher(candidates, options.Metric), (x, _, matcher) =>
+        {
+            // Per row: best candidate and cost for each shade.
+            var bestCand = new int[h * 3];
+            var bestCost = new double[h * 3];
+            for (int y = 0; y < h; y++)
+            {
+                int i = y * w + x;
+                if (isEmpty(i)) { for (int s = 0; s < 3; s++) { bestCand[y * 3 + s] = -1; bestCost[y * 3 + s] = 0; } continue; }
+                double r = image.Pixels[i * 4], g = image.Pixels[i * 4 + 1], b = image.Pixels[i * 4 + 2];
+                if (ordered != null)
+                {
+                    double t = (ordered[(y % size) * size + x % size] + 0.5) / ordered.Length - 0.5;
+                    double k = t * 32 * options.DitherStrength;
+                    r += k; g += k; b += k;
+                }
+                for (int s = 0; s < 3; s++)
+                {
+                    int c = matcher.Find(r, g, b, Bit((Shade)s), options.ShadePenalty);
+                    bestCand[y * 3 + s] = c;
+                    bestCost[y * 3 + s] = c < 0 ? double.PositiveInfinity : matcher.Cost(r, g, b, c, options.ShadePenalty);
+                }
+            }
+
+            var cost = new double[S];
+            var next = new double[S];
+            var from = new int[h * S];
+            var choice = new byte[h * S];
+            Array.Fill(cost, double.PositiveInfinity);
+            cost[H] = 0; // the support row is a neutral start
+            for (int y = 0; y < h; y++)
+            {
+                Array.Fill(next, double.PositiveInfinity);
+                bool empty = bestCand[y * 3 + 1] < 0;
+                for (int k = 0; k < S; k++)
+                {
+                    double c0 = cost[k];
+                    if (double.IsPositiveInfinity(c0)) continue;
+                    // Normal (or an empty pixel): the run continues unchanged.
+                    Relax(k, c0 + (empty ? 0 : bestCost[y * 3 + (int)Shade.Normal]), k, (byte)Shade.Normal);
+                    if (empty) continue;
+                    // Dark: extends a dark run or starts a new one. A tiny per-pixel jitter breaks exact ties so that
+                    // columns in flat areas drop back at different rows (scattered, like dithering) instead of all
+                    // at the same row, which would show as a dark horizontal line.
+                    int kd = k <= H ? k - 1 : H - 1;
+                    if (kd >= 0) Relax(kd, c0 + bestCost[y * 3 + (int)Shade.Dark] + matcher.TieBreak * Jitter(x, y), k, (byte)Shade.Dark);
+                    // Light: extends a light run or starts a new one.
+                    int kb = k >= H ? k + 1 : H + 1;
+                    if (kb < S) Relax(kb, c0 + bestCost[y * 3 + (int)Shade.Bright], k, (byte)Shade.Bright);
+                }
+                (cost, next) = (next, cost);
+
+                void Relax(int to, double value, int fromState, byte shade)
+                {
+                    if (value >= next[to]) return;
+                    next[to] = value;
+                    from[y * S + to] = fromState;
+                    choice[y * S + to] = shade;
+                }
+            }
+
+            int state = 0;
+            for (int k = 1; k < S; k++) if (cost[k] < cost[state]) state = k;
+            for (int y = h - 1; y >= 0; y--)
+            {
+                int i = y * w + x;
+                var shade = (Shade)choice[y * S + state];
+                int c = bestCand[y * 3 + (int)shade];
+                if (c < 0) { idx[i] = -1; shades[i] = Shade.Normal; }
+                else assign(i, c);
+                state = from[y * S + state];
+            }
+            return matcher;
+        }, _ => { });
     }
 
     /// <summary>Threshold matrix (values 0..n-1) for ordered dithering, or null for error diffusion.</summary>
@@ -216,6 +331,9 @@ public static class ColorQuantizer
             buf[i * 3 + 2] = image.Pixels[i * 4 + 2];
         }
         double strength = Math.Clamp(options.DitherStrength, 0, 1);
+        // Height limit: per column, the current run of darker (<0) or lighter (>0) steps.
+        var run = new int[w];
+        int H = options.HeightLimited ? options.MaxHeight : int.MaxValue;
         for (int y = 0; y < h; y++)
         {
             if ((y & 15) == 0) ct.ThrowIfCancellationRequested();
@@ -226,8 +344,18 @@ public static class ColorQuantizer
                 int i = y * w + x;
                 if (isEmpty(i)) { idx[i] = -1; shades[i] = Shade.Normal; continue; }
                 double r = Math.Clamp(buf[i * 3], 0, 255), g = Math.Clamp(buf[i * 3 + 1], 0, 255), b = Math.Clamp(buf[i * 3 + 2], 0, 255);
-                int c = matcher.Find(r, g, b);
+                int mask = AllShades;
+                if (-run[x] >= H) mask &= ~Bit(Shade.Dark);
+                if (run[x] >= H) mask &= ~Bit(Shade.Bright);
+                int c = matcher.Find(r, g, b, mask, options.ShadePenalty);
+                if (c < 0) c = matcher.Find(r, g, b, AllShades, options.ShadePenalty); // modes without a normal shade
                 assign(i, c);
+                run[x] = candidates[c].Shade switch
+                {
+                    Shade.Dark => run[x] < 0 ? run[x] - 1 : -1,
+                    Shade.Bright => run[x] > 0 ? run[x] + 1 : 1,
+                    _ => run[x],
+                };
                 var col = candidates[c].Color;
                 double er = (r - col.R) * strength, eg = (g - col.G) * strength, eb = (b - col.B) * strength;
                 foreach (var (dx, dy, wt) in kernel)
@@ -265,7 +393,10 @@ public static class ColorQuantizer
         return m;
     }
 
-    /// <summary>Finds the nearest candidate colour, with a cache per quantised input colour.</summary>
+    /// <summary>
+    /// Finds the nearest candidate colour, restricted to a set of shades and with an optional extra cost for the
+    /// dark/light shades. Results are cached per (quantised colour, shade mask).
+    /// </summary>
     private sealed class NearestMatcher
     {
         private readonly List<Candidate> _candidates;
@@ -282,36 +413,73 @@ public static class ColorQuantizer
                 : ColorMath.ToLab(c.Color.R, c.Color.G, c.Color.B)).ToArray();
         }
 
-        public int Find(double r, double g, double b)
-        {
-            int ri = (int)Math.Round(Math.Clamp(r, 0, 255)), gi = (int)Math.Round(Math.Clamp(g, 0, 255)), bi = (int)Math.Round(Math.Clamp(b, 0, 255));
-            int key = (ri << 16) | (gi << 8) | bi;
-            if (_cache.TryGetValue(key, out int hit)) return hit;
+        public int Find(double r, double g, double b) => Find(r, g, b, AllShades, 0);
 
-            int best = 0;
+        /// <summary>Nearest candidate whose shade is in <paramref name="shadeMask"/>, or -1 if there is none.</summary>
+        public int Find(double r, double g, double b, int shadeMask, double penalty)
+        {
+            int ri = Q(r), gi = Q(g), bi = Q(b);
+            int key = (shadeMask << 24) | (ri << 16) | (gi << 8) | bi;
+            bool cacheable = penalty == 0 || _penaltyForCache == penalty;
+            if (cacheable && _cache.TryGetValue(key, out int hit)) return hit;
+
+            int best = -1;
             double bestD = double.MaxValue;
-            Lab lab = _metric switch
-            {
-                ColorMetric.Lab or ColorMetric.Ciede2000 => ColorMath.ToLab(ri, gi, bi),
-                ColorMetric.Oklab => ColorMath.ToOklab(ri, gi, bi),
-                _ => default,
-            };
+            var lab = LabOf(ri, gi, bi);
             for (int i = 0; i < _candidates.Count; i++)
             {
-                var c = _candidates[i].Color;
-                double d = _metric switch
-                {
-                    ColorMetric.Rgb => Sq(ri - c.R) + Sq(gi - c.G) + Sq(bi - c.B),
-                    ColorMetric.WeightedRgb => ColorMath.WeightedRgbSq(ri, gi, bi, c.R, c.G, c.B),
-                    ColorMetric.Lab or ColorMetric.Oklab => ColorMath.DeltaE76(lab, _labs[i]),
-                    _ => ColorMath.DeltaE2000(lab, _labs[i]),
-                };
+                if ((shadeMask & (1 << (int)_candidates[i].Shade)) == 0) continue;
+                double d = Distance(ri, gi, bi, lab, i, penalty);
                 if (d < bestD) { bestD = d; best = i; } // strict '<' keeps the first (preferred) candidate on ties
             }
-            if (_cache.Count < 1 << 20) _cache[key] = best;
+            if (_cache.Count == 0) _penaltyForCache = penalty;
+            if (_penaltyForCache == penalty && _cache.Count < 1 << 20) _cache[key] = best;
             return best;
         }
 
+        private double _penaltyForCache = double.NaN;
+
+        /// <summary>The (penalised) distance of a candidate, in the same units <see cref="Find"/> minimises.</summary>
+        public double Cost(double r, double g, double b, int candidate, double penalty)
+        {
+            int ri = Q(r), gi = Q(g), bi = Q(b);
+            return Distance(ri, gi, bi, LabOf(ri, gi, bi), candidate, penalty);
+        }
+
+        private Lab LabOf(int r, int g, int b) => _metric switch
+        {
+            ColorMetric.Lab or ColorMetric.Ciede2000 => ColorMath.ToLab(r, g, b),
+            ColorMetric.Oklab => ColorMath.ToOklab(r, g, b),
+            _ => default,
+        };
+
+        private double Distance(int ri, int gi, int bi, Lab lab, int i, double penalty)
+        {
+            var c = _candidates[i].Color;
+            double d = _metric switch
+            {
+                ColorMetric.Rgb => Sq(ri - c.R) + Sq(gi - c.G) + Sq(bi - c.B),
+                ColorMetric.WeightedRgb => ColorMath.WeightedRgbSq(ri, gi, bi, c.R, c.G, c.B),
+                ColorMetric.Lab or ColorMetric.Oklab => ColorMath.DeltaE76(lab, _labs[i]),
+                _ => ColorMath.DeltaE2000(lab, _labs[i]),
+            };
+            // A small absolute floor makes the penalty work even for exact matches.
+            if (penalty > 0 && _candidates[i].Shade != Shade.Normal) d = d * (1 + penalty) + penalty * Floor;
+            return d;
+        }
+
+        /// <summary>A cost far below any visible difference, used only to break exact ties.</summary>
+        public double TieBreak => Floor * 0.01;
+
+        private double Floor => _metric switch
+        {
+            ColorMetric.Oklab => 0.0004,
+            ColorMetric.Lab => 4,
+            ColorMetric.Ciede2000 => 2,
+            _ => 100,
+        };
+
+        private static int Q(double v) => (int)Math.Round(Math.Clamp(v, 0, 255));
         private static double Sq(double v) => v * v;
     }
 }

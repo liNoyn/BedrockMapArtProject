@@ -39,6 +39,9 @@ public sealed class BmagProject
     public ColorMetric Metric { get; set; } = ColorMetric.Oklab;
     public DitherMode Dither { get; set; } = DitherMode.None;
     public double DitherStrength { get; set; } = 1.0;
+    /// <summary>Maximum staircase height (0 = unlimited).</summary>
+    public int MaxHeight { get; set; }
+    public double ShadePenalty { get; set; }
     public bool Serpentine { get; set; } = true;
     public Export.StructureSplit Split { get; set; } = Export.StructureSplit.Tiles64;
     public bool WriteBehaviorPack { get; set; }
