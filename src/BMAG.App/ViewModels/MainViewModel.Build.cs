@@ -5,9 +5,9 @@ using BMAG.BlockEngine;
 using BMAG.ColorEngine;
 using BMAG.Export;
 using BMAG.Imaging;
-using BMAG.MapData;
 using BMAG.Palette;
 using BMAG.Project;
+using BMAG.Shading;
 
 namespace BMAG.App.ViewModels;
 
@@ -39,7 +39,8 @@ public sealed partial class MainViewModel
     public int MaxHeight { get => _maxHeight; set { if (Set(ref _maxHeight, Math.Max(0, value))) ScheduleUpdate(); } }
     private double _shadePenalty;
     public double ShadePenalty { get => _shadePenalty; set { if (Set(ref _shadePenalty, Math.Clamp(value, 0, 1))) ScheduleUpdate(); } }
-    public bool CanLimitHeight => StaircaseOption?.Value is StaircaseMode.Classic or StaircaseMode.Valley;
+    /// <summary>The height limit works with Valley only (a Classic staircase never drops back).</summary>
+    public bool CanLimitHeight => StaircaseOption?.Value is StaircaseMode.Valley;
     public ObservableCollection<HeightRowViewModel> HeightRows { get; } = [];
     private bool _isAnalyzing;
     public bool IsAnalyzing { get => _isAnalyzing; set { if (Set(ref _isAnalyzing, value)) AnalyzeHeightCommand?.RaiseCanExecuteChanged(); } }
@@ -148,7 +149,83 @@ public sealed partial class MainViewModel
     public string EditsText => L.Format("EditsCount", _edits.Count);
     public RelayCommand UndoEditCommand { get; private set; } = null!;
     public RelayCommand ClearEditsCommand { get; private set; } = null!;
-    public RelayCommand RegisterInWorldCommand { get; private set; } = null!;
+    public RelayCommand SavePreviewPngCommand { get; private set; } = null!;
+    public RelayCommand ExportTestPadCommand { get; private set; } = null!;
+    public RelayCommand View3DCommand { get; private set; } = null!;
+    public RelayCommand ShowShadeMapCommand { get; private set; } = null!;
+
+    // ---- shading & build check ----
+    private string _shadingText = "";
+    public string ShadingText { get => _shadingText; set => Set(ref _shadingText, value); }
+    private string _shadingVerdict = "";
+    public string ShadingVerdict { get => _shadingVerdict; set => Set(ref _shadingVerdict, value); }
+    private bool _shadingOk = true;
+    public bool ShadingOk { get => _shadingOk; set { if (Set(ref _shadingOk, value)) Raise(nameof(ShadingProblem)); } }
+    public bool ShadingProblem => !ShadingOk;
+
+    private void UpdateShadingText()
+    {
+        if (_report is not { } r) { ShadingText = ""; ShadingVerdict = ""; ShadingOk = true; return; }
+        var notes = new List<string> { r.Mismatches == 0 ? L["ExactYes"] : L.Format("ExactNo", r.Mismatches) };
+        if (r.DependsOnTerrain > 0) notes.Add(L.Format("TerrainNote", r.DependsOnTerrain));
+        if (r.WillFall + r.WillBreak > 0) notes.Add(L.Format("FallNote", r.WillFall + r.WillBreak));
+        ShadingVerdict = string.Join("\n", notes);
+        ShadingOk = r.Mismatches == 0 && r.WillFall + r.WillBreak == 0;
+        ShadingText = L.Format("ShadingSummary", r.Dark, r.Normal, r.Bright, r.MaxY, r.TallestX, r.TallestZ, r.MeanHeight, r.Steps, r.Drops);
+    }
+
+    /// <summary>Saves the predicted map (block map colours) as PNG: the whole picture and one file per map.</summary>
+    private async Task SavePreviewPngAsync()
+    {
+        if (_quantized is null) return;
+        var folder = await _dialogs.PickFolderAsync(L["BtnSavePng"]);
+        if (folder is null) return;
+        try
+        {
+            string dir = Path.Combine(folder, $"BMAG_{StructureExporter.Slug(ProjectName)}_preview");
+            var img = _quantized.Preview;
+            var tiles = TileSplitter.Split(img, MapsX, MapsY);
+            await Task.Run(() =>
+            {
+                ImageCodec.SavePng(img, Path.Combine(dir, "map_preview.png"));
+                if (tiles.Count > 1)
+                    foreach (var t in tiles) ImageCodec.SavePng(t.Image, Path.Combine(dir, $"map_{t.Index + 1:00}_x{t.GridX}_y{t.GridY}.png"));
+            });
+            Log((L.English ? "Saved: " : "保存しました: ") + dir);
+            OpenFolder(dir);
+        }
+        catch (Exception ex) { Log(ex.Message); }
+    }
+
+    /// <summary>Exports the shading test pad (one map) with the predicted map picture and a legend.</summary>
+    private async Task ExportTestPadAsync()
+    {
+        if (Profile is null) return;
+        var folder = await _dialogs.PickFolderAsync(L["BtnTestPad"]);
+        if (folder is null) return;
+        try
+        {
+            var profile = Profile;
+            var support = SelectedSupportBlock ?? profile.Find("cobblestone") ?? profile.Blocks.First();
+            bool en = L.English;
+            var origin = Origin;
+            string dir = Path.Combine(folder, "BMAG_shading_test");
+            await Task.Run(() =>
+            {
+                var pad = ShadingTestPad.Create(profile, support, en);
+                var map = MapSimulator.Simulate(pad.Layout, profile);
+                Directory.CreateDirectory(dir);
+                ImageCodec.SavePng(map.Image, Path.Combine(dir, "predicted_map.png"));
+                ImageCodec.SavePng(map.Image.ScaleNearest(4), Path.Combine(dir, "predicted_map_x4.png"));
+                File.WriteAllLines(Path.Combine(dir, en ? "LEGEND.txt" : "説明.txt"),
+                    pad.Legend.Append("").Append(L["ShadeRuleNote"]), new UTF8Encoding(true));
+                StructureExporter.Export(dir, "shading_test", pad.Layout, 1, CurrentStructureOptions() with { Split = StructureSplit.PerMap }, origin);
+            });
+            Log(L["TestPadDone"] + dir);
+            OpenFolder(dir);
+        }
+        catch (Exception ex) { Log(ex.Message); }
+    }
 
     private int _maxTypes;
     public int MaxBlockTypes { get => _maxTypes; set { if (Set(ref _maxTypes, Math.Max(0, value))) ScheduleUpdate(); } }
@@ -193,7 +270,10 @@ public sealed partial class MainViewModel
         _brushShade = BrushShades[0];
         UndoEditCommand = new RelayCommand(UndoEdit, () => _edits.CanUndo);
         ClearEditsCommand = new RelayCommand(ClearEditsAsync, () => _edits.Count > 0);
-        RegisterInWorldCommand = new RelayCommand(RegisterInWorldAsync, () => _layout != null && SelectedWorld != null && !IsBusy);
+        SavePreviewPngCommand = new RelayCommand(SavePreviewPngAsync, () => _quantized != null);
+        ExportTestPadCommand = new RelayCommand(ExportTestPadAsync);
+        View3DCommand = new RelayCommand(() => SelectedPreviewMode = PreviewModes.First(p => p.Value == PreviewMode.Build3D), () => _layout != null);
+        ShowShadeMapCommand = new RelayCommand(() => SelectedPreviewMode = PreviewModes.First(p => p.Value == PreviewMode.ShadeMap));
         AnalyzeHeightCommand = new RelayCommand(AnalyzeHeightAsync, () => _processed != null && !IsAnalyzing);
         FlatBackgroundCommand = new RelayCommand(UseFlatBackground);
         ApplyRecommendedYCommand = new RelayCommand(() => { if (_advice is { Fits: true } a) { UseOrigin = true; OriginY = a.RecommendedBaseY; } }, () => _advice is { Fits: true });
@@ -419,32 +499,6 @@ public sealed partial class MainViewModel
             OpenFolder(outDir);
         }
         catch (Exception ex) { Log((L.English ? "Export failed: " : "建築データの出力に失敗しました: ") + ex.Message); }
-        finally { IsBusy = false; Status = L["Ready"]; }
-    }
-
-    /// <summary>Registers the structure pieces in a copy of the selected world ("mystructure:&lt;file name&gt;").</summary>
-    private async Task RegisterInWorldAsync()
-    {
-        if (_layout is null || SelectedWorld is null) return;
-        var world = SelectedWorld;
-        var layout = _layout;
-        string name = ProjectName, slug = StructureExporter.Slug(name);
-        var options = CurrentStructureOptions();
-        var tiles = StructureExporter.Split(layout, MapsX, options);
-        string message = L.Format("RegisterConfirm", tiles.Count, world.Name);
-        if (!await _dialogs.ConfirmAsync(L["RegisterInWorld"], message)) return;
-        IsBusy = true;
-        try
-        {
-            var origin = Origin;
-            var result = await Task.Run(() => SafeWorldExporter.RegisterStructures(world, name,
-                tiles.Select(t => (StructureExporter.FileName(slug, t), t.Structure.ToBytes())).ToList(), new Progress<string>(Log)));
-            Log(L["RegisterDone"] + " " + result.Destination);
-            var guide = StructureExporter.PlacementGuide(name, slug, tiles, origin, options);
-            Log(guide);
-            RefreshWorlds();
-        }
-        catch (Exception ex) { Log((L.English ? "Failed (original world unchanged): " : "失敗しました（元ワールドは変更されていません）: ") + ex.Message); }
         finally { IsBusy = false; Status = L["Ready"]; }
     }
 

@@ -1,8 +1,5 @@
 using System.Text;
-using BMAG.Bedrock.LevelDb;
-using BMAG.Bedrock.World;
 using BMAG.Imaging;
-using BMAG.MapData;
 
 Console.OutputEncoding = Encoding.UTF8;
 
@@ -10,16 +7,13 @@ if (args.Length == 0)
 {
     Console.WriteLine("""
         BMAG CLI
-          worlds                         検出したワールドを一覧表示
-          info <worldFolder>             LevelDB の概要（キー数の内訳）を表示（読み取り専用）
-          maps <worldFolder> [outDir]    地図を一覧し、outDir があれば PNG で書き出す（読み取り専用）
           build <image> <outDir> [--maps 2x2] [--dither none|fs|jjn|burkes|sierra|stucki|atkinson|bayer2|bayer4|ordered3]
                 [--staircase flat|classic|valley|dark|bright] [--support none|important|all|double] [--preset 0-7]
                 [--origin mapX,mapZ,y] [--name n]
-                                         ブロック建築データ（ガイド・構造物・ビヘイビアパック）を出力
-          direct <image> <worldFolder> [--maps 2x2] [--name n] [--yes]
-                                         ワールドのコピーを作り、画像を地図として追加（--yes なしは計画表示のみ）
-          dump <worldFolder> <keyPrefix> / find <worldFolder> <name>   調査用（読み取り専用）
+                                         ブロック建築データ（.mcstructure とガイド）を出力
+          analyze <image> [--maps 1x1] [--dither none|fs|bayer4] [--preset n] [--bg #RRGGBB]
+                                         3D マップアートの高さと画質の関係を解析
+          textures [cacheDir]            ブロックテクスチャを取得
         """);
     return 0;
 }
@@ -28,38 +22,6 @@ try
 {
     switch (args[0])
     {
-        case "worlds":
-            foreach (var w in WorldLocator.FindWorlds())
-                Console.WriteLine($"{w.FolderName}\t{w.Name}\t{w.Version}\t{w.LastPlayed:yyyy-MM-dd}\t{w.Error}");
-            break;
-
-        case "info":
-        {
-            using var db = LevelDbDatabase.Open(Path.Combine(args[1], "db"));
-            var all = db.Scan(Array.Empty<byte>());
-            Console.WriteLine($"tables={db.TableCount} lastSeq={db.LastSequence} keys={all.Count} logCorruption={db.LogCorruption ?? "none"}");
-            var named = all.Where(kv => kv.Key.All(b => b >= 0x20 && b < 0x7F))
-                .GroupBy(kv => new string(Encoding.ASCII.GetString(kv.Key).TakeWhile(c => c != '_' && !char.IsDigit(c)).ToArray()))
-                .OrderByDescending(g => g.Count());
-            foreach (var g in named) Console.WriteLine($"  {g.Key,-28} {g.Count()}");
-            Console.WriteLine($"  (binary chunk keys)          {all.Count(kv => !kv.Key.All(b => b >= 0x20 && b < 0x7F))}");
-            break;
-        }
-
-        case "maps":
-        {
-            using var db = LevelDbDatabase.Open(Path.Combine(args[1], "db"));
-            foreach (var kv in db.Scan("map_"))
-            {
-                string key = Encoding.ASCII.GetString(kv.Key);
-                if (!MapDataEncoder.TryParseKey(key, out long id)) continue;
-                var m = MapRecord.Parse(id, kv.Value);
-                Console.WriteLine($"{key}\tscale={m.Scale} locked={m.Locked} dim={m.Dimension} center=({m.XCenter},{m.ZCenter}) {m.Width}x{m.Height} colors={m.Colors?.Length} fields={string.Join(",", m.Nbt.Select(e => e.Key + ":" + e.Value.Type))}");
-                if (args.Length > 2 && m.ToImage() is { } img) ImageCodec.SavePng(img, Path.Combine(args[2], key + ".png"));
-            }
-            break;
-        }
-
         case "build":
         {
             // build <image> <outDir> [--maps 2x2] [--dither <mode>] [--staircase flat|classic|valley|dark|bright]
@@ -143,19 +105,33 @@ try
             break;
         }
 
-        case "direct":
+        case "render":
         {
-            // direct <image> <worldFolder> [--maps 2x2] [--name n] [--yes]: adds the image as maps to a COPY of the world.
+            // render <image> <out.png> [--staircase valley] [--mode texture|map|shade|height] [--yaw 35] [--pitch 40] [--zoom 0]
+            //        [--size 1200x800] [--textures dir] [--focus x,z]: renders the 3D build view to a PNG (for docs and checks).
             var opts = ParseOptions(args.Skip(3));
-            var (mx, my) = ParseGrid(opts.GetValueOrDefault("maps", "1x1"));
-            var img = ImagePipeline.Process(ImageCodec.Load(args[1]), new ImageSettings { MapsX = mx, MapsY = my });
-            var tiles = TileSplitter.Split(img, mx, my);
-            var plan = SafeWorldExporter.Plan(WorldInfo.Load(args[2]), tiles, mx, my,
-                new WorldExportOptions { ProjectName = opts.GetValueOrDefault("name", Path.GetFileNameWithoutExtension(args[1])) });
-            Console.WriteLine(plan.Describe());
-            if (!opts.ContainsKey("yes")) { Console.WriteLine("--yes を付けると実行します。"); break; }
-            var res = SafeWorldExporter.Execute(plan, new Progress<string>(Console.WriteLine));
-            Console.WriteLine(res.Instructions);
+            var img = ImagePipeline.Process(ImageCodec.Load(args[1]), new ImageSettings());
+            var profile = BMAG.Palette.ColorProfile.LoadBuiltIn();
+            var mode = opts.GetValueOrDefault("staircase", "valley") == "flat" ? BMAG.BlockEngine.StaircaseMode.Flat : BMAG.BlockEngine.StaircaseMode.Valley;
+            var q = BMAG.BlockEngine.ColorQuantizer.Quantize(img, profile, BMAG.BlockEngine.BlockPreset.BuiltIns(profile)[0].ToSelection(),
+                new BMAG.BlockEngine.QuantizeOptions { Mode = mode, Dither = BMAG.BlockEngine.DitherMode.FloydSteinberg });
+            var layout = BMAG.BlockEngine.BlockLayout.Generate(q, profile.Find("cobblestone")!, 0, BMAG.BlockEngine.SupportMode.Important);
+            var report = BMAG.Shading.ShadingAnalyzer.Analyze(layout, profile, q.Preview);
+            var mesh = BMAG.Preview.SceneMesh.Build(layout, BMAG.Preview.LayoutRegion.All(layout), true, null, report);
+            var (w, h) = ParseGrid(opts.GetValueOrDefault("size", "1200x800"));
+            var cam = mesh.FitCamera(w, h, double.Parse(opts.GetValueOrDefault("yaw", "35")), double.Parse(opts.GetValueOrDefault("pitch", "40")));
+            if (double.Parse(opts.GetValueOrDefault("zoom", "0")) is > 0 and var z) cam = cam with { Zoom = z };
+            var tex = opts.TryGetValue("textures", out var td) ? new BMAG.Textures.BlockTextureProvider(td) : null;
+            var vmode = opts.GetValueOrDefault("mode", "texture") switch
+            {
+                "map" => BMAG.Preview.ViewColorMode.MapColor, "shade" => BMAG.Preview.ViewColorMode.Shade,
+                "height" => BMAG.Preview.ViewColorMode.Height, _ => BMAG.Preview.ViewColorMode.Texture,
+            };
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var r = BMAG.Preview.Viewer3D.Render(mesh, profile, cam, w, h, tex is { IsAvailable: true } ? tex.GetIcon : null,
+                new BMAG.Preview.View3DOptions { Mode = vmode, Lighting = !opts.ContainsKey("nolight"), Grid = opts.ContainsKey("grid") });
+            ImageCodec.SavePng(r.Image, args[2]);
+            Console.WriteLine($"faces={mesh.FaceCount} render={sw.ElapsedMilliseconds}ms maxY={report.MaxY} mismatches={report.Mismatches} exact={report.IsExact}");
             break;
         }
 
@@ -169,40 +145,6 @@ try
             Console.WriteLine($"textures={n} cache={provider.CacheDirectory} missing={missing.Count} {string.Join(",", missing)}");
             if (missing.Count == 0) File.WriteAllText(Path.Combine(provider.CacheDirectory, ".complete"), DateTime.UtcNow.ToString("O"));
             else return 3;
-            break;
-        }
-
-        case "dump":
-        {
-            // dump <world> <keyPrefix> [maxDepth]: prints NBT values as indented text (read-only).
-            using var db = LevelDbDatabase.Open(Path.Combine(args[1], "db"));
-            int maxItems = args.Length > 3 ? int.Parse(args[3]) : 40;
-            foreach (var kv in db.Scan(args[2]).Take(5))
-            {
-                Console.WriteLine($"== {Encoding.ASCII.GetString(kv.Key)} ({kv.Value.Length} bytes)");
-                foreach (var root in BMAG.Nbt.NbtIO.ReadAll(kv.Value)) Print(root, "", maxItems);
-            }
-            break;
-        }
-
-        case "find":
-        {
-            // find <world> <text>: prints NBT compounds anywhere in the DB whose "Name"/"name" equals text (read-only).
-            using var db = LevelDbDatabase.Open(Path.Combine(args[1], "db"));
-            int found = 0;
-            foreach (var kv in db.Scan(Array.Empty<byte>()))
-            {
-                List<BMAG.Nbt.NbtCompound> roots;
-                try { roots = BMAG.Nbt.NbtIO.ReadAll(kv.Value); } catch { continue; }
-                foreach (var root in roots)
-                    foreach (var c in Walk(root))
-                        if ((c.GetString("Name") ?? c.GetString("name")) == args[2] && found++ < 3)
-                        {
-                            Console.WriteLine($"== in key {Convert.ToHexString(kv.Key)}");
-                            Print(c, "  ", 30);
-                        }
-            }
-            Console.WriteLine($"found {found}");
             break;
         }
 
@@ -236,39 +178,4 @@ static (int, int) ParseGrid(string s)
 {
     var p = s.ToLowerInvariant().Split('x');
     return (int.Parse(p[0]), int.Parse(p[1]));
-}
-
-static IEnumerable<BMAG.Nbt.NbtCompound> Walk(BMAG.Nbt.NbtTag tag)
-{
-    if (tag is BMAG.Nbt.NbtCompound c)
-    {
-        yield return c;
-        foreach (var (_, v) in c) foreach (var x in Walk(v)) yield return x;
-    }
-    else if (tag is BMAG.Nbt.NbtList l)
-        foreach (var item in l.Items) foreach (var x in Walk(item)) yield return x;
-}
-
-static void Print(BMAG.Nbt.NbtTag tag, string indent, int maxItems)
-{
-    switch (tag)
-    {
-        case BMAG.Nbt.NbtCompound c:
-            foreach (var (k, v) in c)
-            {
-                if (v is BMAG.Nbt.NbtCompound or BMAG.Nbt.NbtList) { Console.WriteLine($"{indent}{k}: {v}"); Print(v, indent + "  ", maxItems); }
-                else Console.WriteLine($"{indent}{k}: {v}");
-            }
-            break;
-        case BMAG.Nbt.NbtList l:
-            int i = 0;
-            foreach (var item in l.Items.Take(maxItems))
-            {
-                if (item is BMAG.Nbt.NbtCompound or BMAG.Nbt.NbtList) { Console.WriteLine($"{indent}[{i}]"); Print(item, indent + "  ", maxItems); }
-                else Console.WriteLine($"{indent}[{i}] {item}");
-                i++;
-            }
-            if (l.Count > maxItems) Console.WriteLine($"{indent}... ({l.Count - maxItems} more)");
-            break;
-    }
 }

@@ -390,7 +390,7 @@ public class BlockTests
 
         // Straight down, fitted: the centre pixel shows a block, the corners show the background.
         var top = mesh.FitCamera(400, 400, yaw: 0, pitch: 90);
-        var r = Viewer3D.Render(mesh, Profile, top, 400, 400, null, ViewColorMode.MapColor);
+        var r = Viewer3D.Render(mesh, Profile, top, 400, 400, null, new View3DOptions { Mode = ViewColorMode.MapColor });
         Assert.InRange(r.BlockAt(200, 200), 0, mesh.Blocks.Count - 1);
         Assert.Equal(-1, r.BlockAt(1, 1));
         // From above, the north-west corner of the image is the north-west of the build.
@@ -400,9 +400,47 @@ public class BlockTests
         // Any angle, perspective, textures-less: renders without throwing and covers part of the view.
         foreach (var yaw in new[] { 0.0, 45, 135, 225, 315 })
         {
-            var view = Viewer3D.Render(mesh, Profile, mesh.FitCamera(320, 240, yaw, 35) with { Perspective = yaw > 200 }, 320, 240, null, ViewColorMode.Texture);
+            var view = Viewer3D.Render(mesh, Profile, mesh.FitCamera(320, 240, yaw, 35) with { Perspective = yaw > 200 }, 320, 240, null,
+                new View3DOptions { Grid = true, Highlight = 5 });
             Assert.True(view.BlockIds.Count(id => id >= 0) > 320 * 240 / 10);
         }
+    }
+
+    [Fact]
+    public void Viewer3D_MapColourView_FromAbove_EqualsThePlannedMap()
+    {
+        // Straight down, unlit, one pixel per block: the top faces must show exactly the predicted map colours.
+        var q = Quantize(TestHelpers.Gradient(32, 32), opt: new QuantizeOptions { Mode = StaircaseMode.Valley });
+        var layout = BlockLayout.Generate(q, Cobble);
+        var mesh = SceneMesh.Build(layout, LayoutRegion.All(layout), includeSupports: true);
+        var cam = new Camera3D { Yaw = 0, Pitch = 90, Zoom = 8 };
+        var r = Viewer3D.Render(mesh, Profile, cam, 32 * 8, 33 * 8, null,
+            new View3DOptions { Mode = ViewColorMode.MapColor, Lighting = false, Outlines = false });
+        int hits = 0;
+        for (int row = 2; row < 30; row++)
+            for (int x = 2; x < 30; x++)
+            {
+                int id = r.BlockAt(x * 8 + 4, (row + 1) * 8 + 4);
+                Assert.True(id >= 0);
+                var b = mesh.Blocks[id];
+                Assert.Equal(x, b.X);
+                Assert.Equal(row + 1, b.Z);
+                Assert.Equal(q.Preview[x, row], r.Image[x * 8 + 4, (row + 1) * 8 + 4]);
+                hits++;
+            }
+        Assert.Equal(28 * 28, hits);
+    }
+
+    [Fact]
+    public void SceneMesh_ShadowsAndOcclusion_DarkenTheFootOfAStep()
+    {
+        // A wall of height 3 south-east of a low floor: the floor right next to the wall is in its shadow / corner.
+        var q = Quantize(TestHelpers.Gradient(16, 16), opt: new QuantizeOptions { Mode = StaircaseMode.Valley });
+        var layout = BlockLayout.Generate(q, Cobble);
+        var mesh = SceneMesh.Build(layout, LayoutRegion.All(layout), includeSupports: true);
+        Assert.Contains(mesh.Faces, f => f.Dir == 0 && f.Sun == 1);
+        Assert.Contains(mesh.Faces, f => f.Dir == 0 && f.Ao != 0xFF); // some top corners are occluded
+        Assert.All(mesh.Faces.Where(f => f.Dir is 1 or 3), f => Assert.Equal(0, f.Sun)); // north/west sides face away from the sun
     }
     [Fact]
     public void Ciede2000_MatchesReferenceValue()

@@ -107,6 +107,9 @@ public sealed class BlockLayout
             void Add(int x, int y, int z)
             {
                 if (z < 0 || z >= depth || Occupied(x, y, z)) return;
+                // A support must stay below the visible block of its column, otherwise it becomes the top block and
+                // changes the map (a neighbour's support in a valley, or a block in a transparent pixel).
+                if (Block(x, z) is null || y >= heights[z * w + x]) return;
                 supportSet.Add((x, y, z));
             }
 

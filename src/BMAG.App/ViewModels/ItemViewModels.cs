@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using BMAG.BlockEngine;
-using BMAG.MapData;
 using BMAG.Palette;
 using BMAG.Project;
 
@@ -226,16 +225,6 @@ public sealed class MapProgressViewModel : ViewModelBase
         set { if (value != null && Set(ref _state, value)) _changed(Number, value.Value); }
     }
     public string ChunksText { get => _chunksText; set => Set(ref _chunksText, value); }
-}
-
-public sealed class MapEntryViewModel(MapRecord record, Bitmap? thumbnail)
-{
-    public MapRecord Record { get; } = record;
-    public Bitmap? Thumbnail { get; } = thumbnail;
-    public string Title => $"map_{Record.Id}";
-    public string Info => $"scale {Record.Scale} / center ({FormatCenter(Record.XCenter)}, {FormatCenter(Record.ZCenter)}) / {(Record.Locked ? "locked" : "unlocked")} / dim {Record.Dimension}";
-
-    private static string FormatCenter(int v) => v == int.MaxValue ? "∞" : v.ToString();
 }
 
 public sealed class CustomBlockViewModel(CustomBlock block, Action<CustomBlockViewModel> remove)
