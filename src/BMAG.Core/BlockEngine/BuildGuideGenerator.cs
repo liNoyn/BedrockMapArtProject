@@ -77,7 +77,7 @@ public static class BuildGuideGenerator
         sb.AppendLine($"Bedrock Map Art Generator - 建築ガイド: {projectName}");
         sb.AppendLine($"生成日時: {DateTime.Now:yyyy-MM-dd HH:mm}");
         sb.AppendLine($"地図: {mapsX} x {mapsY} 枚 ({mapsX * 128} x {mapsY * 128} ブロック)");
-        sb.AppendLine($"方式: {(layout.Mode == BuildMode.Flat ? "Flat（平面）" : "Staircase（階段・実験的）")}, 最大高さ差: {layout.MaxHeight}");
+        sb.AppendLine($"方式: {ModeName(layout.Mode)}, 支えブロック: {SupportName(layout.Supports)}, 最大高さ: {layout.MaxHeight}");
         sb.AppendLine($"色プロファイル: {profile.Name} ({profile.Id})");
         var used = materials.Where(m => !m.IsSupport).Select(m => m.Block).ToList();
         int unverified = used.Count(b => !b.Verified);
@@ -131,7 +131,7 @@ public static class BuildGuideGenerator
             while (x < x0 + 128 && layout.BlockAt(x, z) == b && layout.HeightAt(x, z) == h) x++;
             if (b is null) continue;
             string range = x - start == 1 ? $"{start}" : $"{start}-{x - 1}";
-            string hText = layout.Mode == BuildMode.Flat ? "" : $" y{h}";
+            string hText = layout.IsFlat ? "" : $" y{h}";
             runs.Add($"{range}{hText} {b.DisplayName}×{x - start}");
         }
         sb.AppendLine(string.Join(" | ", runs));
@@ -190,6 +190,23 @@ public static class BuildGuideGenerator
         using var image = surface.Snapshot();
         return image.Encode(SKEncodedImageFormat.Png, 100);
     }
+
+    public static string ModeName(StaircaseMode m) => m switch
+    {
+        StaircaseMode.Flat => "Flat（平面）",
+        StaircaseMode.Classic => "Classic 階段（実験的）",
+        StaircaseMode.Valley => "Valley 階段（実験的）",
+        StaircaseMode.FullDark => "全面暗（実験的）",
+        _ => "全面明（実験的）",
+    };
+
+    public static string SupportName(SupportMode m) => m switch
+    {
+        SupportMode.None => "なし",
+        SupportMode.Important => "必要なブロックのみ",
+        SupportMode.AllOptimized => "すべて（最適化）",
+        _ => "すべて（二重・最適化）",
+    };
 
     private static string Csv(string s) => s.Contains(',') || s.Contains('"') ? "\"" + s.Replace("\"", "\"\"") + "\"" : s;
 }

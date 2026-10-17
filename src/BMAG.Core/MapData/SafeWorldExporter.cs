@@ -30,6 +30,8 @@ public sealed record WorldExportOptions
     public bool BackingWall { get; init; } = true;
     /// <summary>Renames the copy (levelname.txt / LevelName) so it is easy to tell apart in the world list.</summary>
     public bool RenameCopy { get; init; } = true;
+    /// <summary>Also put the maps into empty slots of the local player's inventory (design 9.6 option A).</summary>
+    public bool AddToInventory { get; init; }
 }
 
 /// <summary>Everything that will be written, shown to the user before execution (design 13.5).</summary>
@@ -93,6 +95,7 @@ public static class SafeWorldExporter
         string slug = StructureExporter.Slug(options.ProjectName);
         if (options.Delivery is ItemDelivery.Chest or ItemDelivery.ChestAndFrameWall) keys.Add($"structuretemplate_bmag:{slug}_maps");
         if (options.Delivery is ItemDelivery.FrameWall or ItemDelivery.ChestAndFrameWall) keys.Add($"structuretemplate_bmag:{slug}_wall");
+        if (options.AddToInventory) keys.Add(LocalPlayerKey + "（空きスロットに地図を追加）");
 
         string parent = Path.GetDirectoryName(world.Folder)!;
         string folderName = $"{world.FolderName}_bmag_{DateTime.Now:yyyyMMdd_HHmmss}";
@@ -120,7 +123,7 @@ public static class SafeWorldExporter
 
         try
         {
-            if (WorldLocator.IsMinecraftRunning())
+            if (MinecraftRunningCheck())
                 throw new InvalidOperationException("Minecraft が起動中です。ワールドを閉じるだけでなく、ゲームを終了してから実行してください。");
             if (Directory.Exists(plan.Destination) || Directory.Exists(tempDest))
                 throw new IOException($"出力先がすでに存在します: {plan.Destination}");
@@ -194,10 +197,19 @@ public static class SafeWorldExporter
         if (plan.Options.Delivery is ItemDelivery.FrameWall or ItemDelivery.ChestAndFrameWall)
         {
             var backing = plan.Options.BackingWall
-                ? new PaletteBlock("minecraft:smooth_stone", new NbtCompound(), MapItemGenerator.LegacyBlockVersion)
+                ? new PaletteBlock("minecraft:smooth_stone", new NbtCompound(), MapItemGenerator.BlockVersion)
                 : null;
             Put($"structuretemplate_bmag:{slug}_wall",
                 MapItemGenerator.CreateFrameWall(grid, plan.Profile, plan.Options.GlowFrames && plan.Profile.SupportsGlowFrames, backing).ToBytes());
+        }
+
+        if (plan.Options.AddToInventory)
+        {
+            using var read = LevelDbDatabase.Open(Path.Combine(worldDir, "db"), readOnly: true);
+            var player = read.Get(LocalPlayerKey) ?? throw new InvalidDataException("ローカルプレイヤーのデータがありません（一度もワールドに入っていない可能性があります）。");
+            bool chestToo = plan.Options.Delivery is ItemDelivery.Chest or ItemDelivery.ChestAndFrameWall;
+            var updated = AddMapsToInventory(player, plan.MapIds, plan.Profile, chestToo, log);
+            if (updated != null) Put(LocalPlayerKey, updated);
         }
 
         ct.ThrowIfCancellationRequested();
@@ -226,6 +238,43 @@ public static class SafeWorldExporter
         }
         log($"検証 OK: {expected.Count} 件");
         return expected.Keys.ToList();
+    }
+
+    public const string LocalPlayerKey = "~local_player";
+
+    /// <summary>Replaceable in tests (the real check looks for a running Minecraft process).</summary>
+    internal static Func<bool> MinecraftRunningCheck = WorldLocator.IsMinecraftRunning;
+
+    /// <summary>
+    /// Puts map items into empty inventory slots (Count 0 / Name ""). The player NBT must re-serialise byte for byte
+    /// before it is touched; otherwise nothing is changed.
+    /// </summary>
+    public static byte[]? AddMapsToInventory(byte[] playerData, IReadOnlyList<long> mapIds, VersionProfile profile, bool chestFallback, Action<string> log)
+    {
+        var root = NbtIO.Read(playerData, out string rootName, out int used);
+        if (used != playerData.Length || !NbtIO.Write(root, rootName).AsSpan().SequenceEqual(playerData))
+        {
+            if (chestFallback) { log("プレイヤーデータを完全に再現できないため、インベントリへの追加は行いません（チェストを使ってください）。"); return null; }
+            throw new InvalidDataException("プレイヤーデータを完全に再現できないため、インベントリへの追加を中止しました。");
+        }
+        var inv = root.Get<NbtList>("Inventory") ?? throw new InvalidDataException("Inventory がありません。");
+        var empty = inv.Items.OfType<NbtCompound>()
+            .Where(i => (i.GetInt("Count") ?? 0) == 0 || string.IsNullOrEmpty(i.GetString("Name")))
+            .OrderBy(i => i.GetInt("Slot") ?? 0).ToList();
+        if (empty.Count < mapIds.Count && !chestFallback)
+            throw new InvalidOperationException($"インベントリの空きが足りません（必要 {mapIds.Count}, 空き {empty.Count}）。チェストでの受け取りも選んでください。");
+        int n = Math.Min(empty.Count, mapIds.Count);
+        for (int i = 0; i < n; i++)
+        {
+            var slot = empty[i];
+            byte slotIndex = (byte)(slot.GetInt("Slot") ?? 0);
+            int idx = inv.Items.IndexOf(slot);
+            var item = MapItemGenerator.CreateMapItem(mapIds[i], profile);
+            item.Add("Slot", new NbtByte(slotIndex));
+            inv.Items[idx] = item;
+        }
+        log($"インベントリの空きスロットに地図を {n} 枚追加します" + (n < mapIds.Count ? $"（残り {mapIds.Count - n} 枚はチェストから取り出してください）" : "") + "。");
+        return n == 0 ? null : NbtIO.Write(root, rootName);
     }
 
     private static void RenameWorld(string worldDir, string newName, Action<string> log)

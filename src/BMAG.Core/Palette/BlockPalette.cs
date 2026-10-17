@@ -1,6 +1,4 @@
-using System.Reflection;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using BMAG.Imaging;
 using BMAG.Nbt;
@@ -22,17 +20,20 @@ public enum Shade
 public sealed class BlockDefinition
 {
     public required string Key { get; init; }
+    /// <summary>Japanese display name.</summary>
     public required string DisplayName { get; init; }
-    public string Category { get; init; } = "other";
+    public string DisplayNameEn { get; init; } = "";
 
-    /// <summary>Block identifier written to structures (legacy identifiers are upgraded by the game based on <see cref="Version"/>).</summary>
+    /// <summary>Current Bedrock block identifier.</summary>
     public required string Name { get; init; }
+    /// <summary>Complete block state set (values: string, number or bool).</summary>
     public Dictionary<string, JsonElement> States { get; init; } = [];
     /// <summary>Block palette "version" written to .mcstructure files.</summary>
-    public int Version { get; init; } = 17959425;
+    public int Version { get; init; } = 18168865;
 
-    /// <summary>Base map colour (before shading).</summary>
-    public required string MapColor { get; init; }
+    /// <summary>Base map colour (before shading). Filled from the colour set when loading.</summary>
+    public string MapColor { get; set; } = "";
+    [JsonIgnore] public int ColourSetId { get; set; }
 
     /// <summary>Colours measured in-game per shade (filled by calibration). Override the computed ones.</summary>
     public Dictionary<Shade, string> Measured { get; init; } = [];
@@ -40,6 +41,9 @@ public sealed class BlockDefinition
     public string Source { get; init; } = "java-base-color";
     public bool Verified { get; init; }
 
+    /// <summary>Needs a block underneath to stay in place (carpets, slabs on air, pressure plates, falling blocks…).</summary>
+    public bool NeedsSupport { get; init; }
+    /// <summary>Falls when nothing is below (sand, gravel, concrete powder).</summary>
     public bool Gravity { get; init; }
     public bool Flammable { get; init; }
     public bool BiomeTinted { get; init; }
@@ -47,8 +51,15 @@ public sealed class BlockDefinition
     public int Rarity { get; init; }
     public bool DefaultEnabled { get; init; } = true;
     public int MaxStack { get; init; } = 64;
+    /// <summary>True for blocks the user added (custom / behavior pack blocks).</summary>
+    public bool IsCustom { get; init; }
 
     [JsonIgnore] public Rgba BaseColor => Rgba.FromHex(MapColor);
+
+    public string LocalName(bool english) => english && DisplayNameEn.Length > 0 ? DisplayNameEn : DisplayName;
+
+    /// <summary>Display label in the current UI language (set by the UI).</summary>
+    [JsonIgnore] public string Label { get; set; } = "";
 
     public string StatesText => States.Count == 0 ? "" :
         "[" + string.Join(",", States.Select(kv => $"\"{kv.Key}\"={kv.Value.GetRawText()}")) + "]";
@@ -70,6 +81,31 @@ public sealed class BlockDefinition
         }
         return c;
     }
+
+    internal BlockDefinition With(Dictionary<Shade, string> measured, string source, bool verified) => new()
+    {
+        Key = Key, DisplayName = DisplayName, DisplayNameEn = DisplayNameEn, Name = Name, States = States,
+        Version = Version, MapColor = MapColor, ColourSetId = ColourSetId, Measured = measured, Source = source,
+        Verified = verified, NeedsSupport = NeedsSupport, Gravity = Gravity, Flammable = Flammable,
+        BiomeTinted = BiomeTinted, Rarity = Rarity, DefaultEnabled = DefaultEnabled, MaxStack = MaxStack, IsCustom = IsCustom,
+    };
+}
+
+/// <summary>All blocks that share one map colour (MapartCraft calls this a "colour set").</summary>
+public sealed class ColourSet
+{
+    public required int Id { get; init; }
+    /// <summary>Japanese name.</summary>
+    public required string Name { get; init; }
+    public string NameEn { get; init; } = "";
+    public required string MapColor { get; init; }
+    public List<BlockDefinition> Blocks { get; init; } = [];
+    public bool IsCustom { get; init; }
+
+    public string LocalName(bool english) => english && NameEn.Length > 0 ? NameEn : Name;
+
+    /// <summary>Display label in the current UI language (set by the UI).</summary>
+    [JsonIgnore] public string Label { get; set; } = "";
 }
 
 public sealed class ShadeMultipliers
@@ -85,13 +121,18 @@ public sealed class ShadeMultipliers
 /// <summary>A versioned Bedrock map colour profile (design 3.3 / 13.6).</summary>
 public sealed class ColorProfile
 {
+    public int FormatVersion { get; init; } = 2;
     public required string Id { get; init; }
     public required string Name { get; init; }
     public string GameVersion { get; init; } = "";
     public string Updated { get; init; } = "";
     public string Notes { get; init; } = "";
     public ShadeMultipliers Shades { get; init; } = new();
-    public List<BlockDefinition> Blocks { get; init; } = [];
+    public List<ColourSet> ColourSets { get; init; } = [];
+
+    [JsonIgnore] public IEnumerable<BlockDefinition> Blocks => ColourSets.SelectMany(s => s.Blocks);
+
+    private Dictionary<string, BlockDefinition>? _byKey;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -100,24 +141,49 @@ public sealed class ColorProfile
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
         WriteIndented = true,
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        DefaultIgnoreCondition = JsonIgnoreCondition.Never,
     };
 
-    public BlockDefinition? Find(string key) => Blocks.FirstOrDefault(b => b.Key == key);
+    public BlockDefinition? Find(string key)
+    {
+        _byKey ??= Blocks.GroupBy(b => b.Key).ToDictionary(g => g.Key, g => g.First());
+        return _byKey.TryGetValue(key, out var b) ? b : null;
+    }
+
+    public ColourSet? SetOf(BlockDefinition block) => ColourSets.FirstOrDefault(s => s.Id == block.ColourSetId);
 
     /// <summary>The map colour a block shows with the given shade. Measured values win over computed ones.</summary>
     public Rgba ColorOf(BlockDefinition block, Shade shade)
     {
         if (block.Measured.TryGetValue(shade, out var hex)) return Rgba.FromHex(hex);
-        var c = block.BaseColor;
+        return Shaded(block.BaseColor, shade);
+    }
+
+    public Rgba Shaded(Rgba c, Shade shade)
+    {
         int m = Shades.Get(shade);
         return new Rgba((byte)(c.R * m / 255), (byte)(c.G * m / 255), (byte)(c.B * m / 255));
     }
 
-    /// <summary>True when the colour for this block/shade comes from an in-game measurement.</summary>
-    public static bool IsMeasured(BlockDefinition block, Shade shade) => block.Measured.ContainsKey(shade);
+    public static ColorProfile LoadJson(string json)
+    {
+        var p = JsonSerializer.Deserialize<ColorProfile>(json, JsonOptions) ?? throw new InvalidDataException("Empty profile.");
+        if (p.FormatVersion < 2 || p.ColourSets.Count == 0)
+            throw new InvalidDataException("古い形式の色プロファイルです（BMAG 0.1）。新しい形式で作り直してください。");
+        p.Link();
+        return p;
+    }
 
-    public static ColorProfile LoadJson(string json) =>
-        JsonSerializer.Deserialize<ColorProfile>(json, JsonOptions) ?? throw new InvalidDataException("Empty profile.");
+    private void Link()
+    {
+        foreach (var set in ColourSets)
+            foreach (var b in set.Blocks)
+            {
+                b.ColourSetId = set.Id;
+                if (string.IsNullOrEmpty(b.MapColor)) b.MapColor = set.MapColor;
+            }
+        _byKey = null;
+    }
 
     public static ColorProfile LoadFile(string path) => LoadJson(File.ReadAllText(path));
 
@@ -129,8 +195,10 @@ public sealed class ColorProfile
             .Select(n => n.Split('.')[^2])
             .ToList();
 
+    public const string DefaultId = "bedrock-full-v2";
+
     /// <summary>The default estimated profile shipped with the app.</summary>
-    public static ColorProfile LoadBuiltIn(string id = "bedrock-estimate-v1")
+    public static ColorProfile LoadBuiltIn(string id = DefaultId)
     {
         var asm = typeof(ColorProfile).Assembly;
         var name = asm.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith($".{id}.json"))
@@ -143,43 +211,78 @@ public sealed class ColorProfile
     /// <summary>Returns a copy where calibration measurements are applied and marked as verified.</summary>
     public ColorProfile WithMeasurements(IReadOnlyDictionary<string, Dictionary<Shade, string>> measurements, string newId, string newName)
     {
-        var json = JsonNode.Parse(ToJson())!;
-        var copy = JsonSerializer.Deserialize<ColorProfile>(json, JsonOptions)!;
-        var blocks = copy.Blocks.Select(b =>
+        var sets = ColourSets.Select(s => new ColourSet
         {
-            if (!measurements.TryGetValue(b.Key, out var m) || m.Count == 0) return b;
-            var merged = new Dictionary<Shade, string>(b.Measured);
-            foreach (var (shade, hex) in m) merged[shade] = hex;
-            return new BlockDefinition
+            Id = s.Id, Name = s.Name, NameEn = s.NameEn, MapColor = s.MapColor, IsCustom = s.IsCustom,
+            Blocks = s.Blocks.Select(b =>
             {
-                Key = b.Key, DisplayName = b.DisplayName, Category = b.Category, Name = b.Name, States = b.States,
-                Version = b.Version, MapColor = b.MapColor, Measured = merged, Source = "in-game-calibration",
-                Verified = true, Gravity = b.Gravity, Flammable = b.Flammable, BiomeTinted = b.BiomeTinted,
-                Rarity = b.Rarity, DefaultEnabled = b.DefaultEnabled, MaxStack = b.MaxStack,
-            };
+                if (!measurements.TryGetValue(b.Key, out var m) || m.Count == 0) return b;
+                var merged = new Dictionary<Shade, string>(b.Measured);
+                foreach (var (shade, hex) in m) merged[shade] = hex;
+                return b.With(merged, "in-game-calibration", true);
+            }).ToList(),
         }).ToList();
-        return new ColorProfile
+        var copy = new ColorProfile
         {
             Id = newId, Name = newName, GameVersion = GameVersion, Updated = DateTime.Now.ToString("yyyy-MM-dd"),
-            Notes = Notes, Shades = Shades, Blocks = blocks,
+            Notes = Notes, Shades = Shades, ColourSets = sets,
         };
+        copy.Link();
+        return copy;
+    }
+
+    /// <summary>Returns a copy with user-defined blocks added (to an existing colour set or to new custom sets).</summary>
+    public ColorProfile WithCustomBlocks(IEnumerable<CustomBlock> custom)
+    {
+        var sets = ColourSets.Select(s => new ColourSet
+        {
+            Id = s.Id, Name = s.Name, NameEn = s.NameEn, MapColor = s.MapColor, IsCustom = s.IsCustom, Blocks = [.. s.Blocks],
+        }).ToList();
+        int nextId = Math.Max(1000, sets.Max(s => s.Id) + 1);
+        foreach (var c in custom)
+        {
+            if (Find(c.Key) != null) continue;
+            var set = c.ColourSetId is int id ? sets.FirstOrDefault(s => s.Id == id) : null;
+            if (set is null)
+            {
+                string color = c.MapColor ?? "#808080";
+                set = sets.FirstOrDefault(s => s.IsCustom && s.MapColor.Equals(color, StringComparison.OrdinalIgnoreCase));
+                if (set is null)
+                {
+                    set = new ColourSet { Id = nextId++, Name = $"カスタム {color}", NameEn = $"Custom {color}", MapColor = color, IsCustom = true };
+                    sets.Add(set);
+                }
+            }
+            set.Blocks.Add(c.ToDefinition(set));
+        }
+        var copy = new ColorProfile
+        {
+            Id = Id, Name = Name, GameVersion = GameVersion, Updated = Updated, Notes = Notes, Shades = Shades, ColourSets = sets,
+        };
+        copy.Link();
+        return copy;
     }
 }
 
-public static class BlockCategories
+/// <summary>A block added by the user (F24), e.g. from a behavior pack's minecraft:map_color component.</summary>
+public sealed class CustomBlock
 {
-    public static readonly IReadOnlyDictionary<string, string> Names = new Dictionary<string, string>
-    {
-        ["wool"] = "羊毛",
-        ["concrete"] = "コンクリート",
-        ["terracotta"] = "テラコッタ",
-        ["wood"] = "木材",
-        ["stone"] = "石材",
-        ["natural"] = "自然ブロック",
-        ["nether"] = "ネザー",
-        ["mineral"] = "鉱石・金属",
-        ["other"] = "その他",
-    };
+    public required string Key { get; init; }
+    public required string Name { get; init; }
+    public string DisplayName { get; init; } = "";
+    public Dictionary<string, JsonElement> States { get; init; } = [];
+    /// <summary>Existing colour set to join; null = create/use a custom set for <see cref="MapColor"/>.</summary>
+    public int? ColourSetId { get; init; }
+    public string? MapColor { get; init; }
+    public bool NeedsSupport { get; init; }
+    public bool Gravity { get; init; }
+    public string Source { get; init; } = "user";
+    public int Version { get; init; } = 18168865;
 
-    public static string Display(string category) => Names.TryGetValue(category, out var n) ? n : category;
+    internal BlockDefinition ToDefinition(ColourSet set) => new()
+    {
+        Key = Key, DisplayName = string.IsNullOrEmpty(DisplayName) ? Name : DisplayName, DisplayNameEn = DisplayName,
+        Name = Name, States = States, Version = Version, MapColor = set.MapColor, ColourSetId = set.Id,
+        NeedsSupport = NeedsSupport, Gravity = Gravity, Source = Source, IsCustom = true,
+    };
 }

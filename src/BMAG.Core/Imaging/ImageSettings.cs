@@ -50,11 +50,35 @@ public sealed record ImageSettings
     /// <summary>Colour used for letterboxing and for compositing transparent pixels.</summary>
     public string BackgroundColor { get; init; } = "#FFFFFF";
 
-    /// <summary>When false, transparent pixels are composited onto the background colour (default, design 5.4).</summary>
-    public bool KeepTransparency { get; init; }
+    /// <summary>What happens to (semi-)transparent pixels (design 5.4). Default: blend onto the background colour.</summary>
+    public TransparencyMode Transparency { get; init; } = TransparencyMode.Smooth;
+
+    /// <summary>Crop mode shown in the UI; <see cref="Crop"/> holds the actual rectangle.</summary>
+    public CropMode CropMode { get; init; } = CropMode.Off;
 
     public int OutputWidth => MapsX * 128;
     public int OutputHeight => MapsY * 128;
 }
 
 public sealed record CropRect(int X, int Y, int Width, int Height);
+
+/// <summary>MapartCraft's "background colour" options plus keeping the alpha channel.</summary>
+public enum TransparencyMode
+{
+    /// <summary>Alpha-blend onto the background colour.</summary>
+    Smooth,
+    /// <summary>Each pixel becomes either the image colour or the background colour, ordered-dithered by its alpha.</summary>
+    Dithered,
+    /// <summary>Keep transparency: transparent pixels get no block / stay transparent on direct maps.</summary>
+    Keep,
+}
+
+public enum CropMode
+{
+    /// <summary>Use the whole image.</summary>
+    Off,
+    /// <summary>Largest centred region with the output aspect ratio.</summary>
+    Center,
+    /// <summary>User-defined rectangle.</summary>
+    Manual,
+}

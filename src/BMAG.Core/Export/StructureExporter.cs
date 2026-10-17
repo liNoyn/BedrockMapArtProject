@@ -42,36 +42,34 @@ public static class StructureExporter
         int ts = options.TileSize;
         int order = 0;
 
-        // Support row pieces (Z = 0), 64 x 1 each.
-        for (int x0 = 0; x0 < layout.Width; x0 += ts)
+        // Bucket every block (visible and support) by horizontal tile.
+        var buckets = new Dictionary<(int Tx, int Tz), List<BlockPlacement>>();
+        foreach (var p in layout.Placements())
         {
-            int w = Math.Min(ts, layout.Width - x0);
-            tiles.AddRange(BuildPieces(layout, x0, 0, w, 1, $"support_{x0 / ts}", mapsX, options, ref order));
+            var key = (p.X / ts, p.Z == 0 ? -1 : (p.Z - 1) / ts); // Tz = -1: the support row
+            if (!buckets.TryGetValue(key, out var list)) buckets[key] = list = [];
+            list.Add(p);
         }
-        // Art pieces.
-        for (int z0 = 1; z0 < layout.Depth; z0 += ts)
-            for (int x0 = 0; x0 < layout.Width; x0 += ts)
-            {
-                int w = Math.Min(ts, layout.Width - x0), d = Math.Min(ts, layout.Depth - z0);
-                tiles.AddRange(BuildPieces(layout, x0, z0, w, d, $"t_{x0 / ts}_{(z0 - 1) / ts}", mapsX, options, ref order));
-            }
+
+        // Support row pieces (Z = 0), 64 x 1 each, then the art pieces row by row.
+        foreach (var key in buckets.Keys.OrderBy(k => k.Tz).ThenBy(k => k.Tx))
+        {
+            int x0 = key.Tx * ts;
+            int z0 = key.Tz < 0 ? 0 : key.Tz * ts + 1;
+            int w = Math.Min(ts, layout.Width - x0);
+            int d = key.Tz < 0 ? 1 : Math.Min(ts, layout.Depth - z0);
+            string id = key.Tz < 0 ? $"support_{key.Tx}" : $"t_{key.Tx}_{key.Tz}";
+            tiles.AddRange(BuildPieces(buckets[key], layout, x0, z0, w, d, id, mapsX, options, ref order));
+        }
         return tiles;
     }
 
-    private static IEnumerable<StructureTile> BuildPieces(BlockLayout layout, int x0, int z0, int w, int d, string id,
-        int mapsX, StructureExportOptions options, ref int order)
+    private static IEnumerable<StructureTile> BuildPieces(List<BlockPlacement> blocks, BlockLayout layout, int x0, int z0,
+        int w, int d, string id, int mapsX, StructureExportOptions options, ref int order)
     {
-        int minY = int.MaxValue, maxY = int.MinValue;
-        for (int z = z0; z < z0 + d; z++)
-            for (int x = x0; x < x0 + w; x++)
-            {
-                if (layout.BlockAt(x, z) is null) continue;
-                int h = layout.HeightAt(x, z);
-                minY = Math.Min(minY, h);
-                maxY = Math.Max(maxY, h);
-            }
         var result = new List<StructureTile>();
-        if (minY == int.MaxValue) return result; // nothing to place
+        if (blocks.Count == 0) return result;
+        int minY = blocks.Min(b => b.Y), maxY = blocks.Max(b => b.Y);
 
         var maps = new SortedSet<int>();
         for (int z = z0; z < z0 + d; z++)
@@ -83,15 +81,12 @@ public static class StructureExporter
         {
             int h = Math.Min(options.MaxTileHeight, maxY - y0 + 1);
             var s = new McStructure(w, h, d);
-            for (int z = 0; z < d; z++)
-                for (int x = 0; x < w; x++)
-                {
-                    var b = layout.BlockAt(x0 + x, z0 + z);
-                    if (b is null) continue;
-                    int y = layout.HeightAt(x0 + x, z0 + z) - y0;
-                    if (y < 0 || y >= h) continue;
-                    s.SetBlock(x, y, z, ToPaletteBlock(b));
-                }
+            foreach (var b in blocks)
+            {
+                int y = b.Y - y0;
+                if (y < 0 || y >= h) continue;
+                s.SetBlock(b.X - x0, y, b.Z - z0, ToPaletteBlock(b.Block));
+            }
             result.Add(new StructureTile
             {
                 Id = maxY - minY < options.MaxTileHeight ? id : $"{id}_y{part}",

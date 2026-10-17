@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using BMAG.Bedrock.LevelDb;
 using BMAG.Bedrock.World;
 using BMAG.Imaging;
@@ -13,7 +13,9 @@ if (args.Length == 0)
           worlds                         検出したワールドを一覧表示
           info <worldFolder>             LevelDB の概要（キー数の内訳）を表示（読み取り専用）
           maps <worldFolder> [outDir]    地図を一覧し、outDir があれば PNG で書き出す（読み取り専用）
-          build <image> <outDir> [--maps 2x2] [--dither fs|atkinson|bayer4|none] [--staircase] [--origin mapX,mapZ,y] [--name n]
+          build <image> <outDir> [--maps 2x2] [--dither none|fs|jjn|burkes|sierra|stucki|atkinson|bayer2|bayer4|ordered3]
+                [--staircase flat|classic|valley|dark|bright] [--support none|important|all|double] [--preset 0-7]
+                [--origin mapX,mapZ,y] [--name n]
                                          ブロック建築データ（ガイド・構造物・ビヘイビアパック）を出力
           direct <image> <worldFolder> [--maps 2x2] [--name n] [--yes]
                                          ワールドのコピーを作り、画像を地図として追加（--yes なしは計画表示のみ）
@@ -60,7 +62,8 @@ try
 
         case "build":
         {
-            // build <image> <outDir> [--maps 2x2] [--dither fs|atkinson|bayer4|none] [--staircase] [--origin mapX,mapZ,y] [--name n]
+            // build <image> <outDir> [--maps 2x2] [--dither <mode>] [--staircase flat|classic|valley|dark|bright]
+            //       [--support none|important|all|double] [--preset <index>] [--origin mapX,mapZ,y] [--name n]
             var opts = ParseOptions(args.Skip(3));
             var (mx, my) = ParseGrid(opts.GetValueOrDefault("maps", "1x1"));
             var settings = new ImageSettings { MapsX = mx, MapsY = my };
@@ -71,14 +74,36 @@ try
                 Dither = opts.GetValueOrDefault("dither", "none") switch
                 {
                     "fs" => BMAG.BlockEngine.DitherMode.FloydSteinberg,
+                    "jjn" => BMAG.BlockEngine.DitherMode.JarvisJudiceNinke,
+                    "burkes" => BMAG.BlockEngine.DitherMode.Burkes,
+                    "sierra" => BMAG.BlockEngine.DitherMode.SierraLite,
+                    "stucki" => BMAG.BlockEngine.DitherMode.Stucki,
                     "atkinson" => BMAG.BlockEngine.DitherMode.Atkinson,
+                    "bayer2" => BMAG.BlockEngine.DitherMode.Bayer2,
                     "bayer4" => BMAG.BlockEngine.DitherMode.Bayer4,
+                    "ordered3" => BMAG.BlockEngine.DitherMode.Ordered3,
                     _ => BMAG.BlockEngine.DitherMode.None,
                 },
-                Mode = opts.ContainsKey("staircase") ? BMAG.BlockEngine.BuildMode.Staircase : BMAG.BlockEngine.BuildMode.Flat,
+                Mode = opts.GetValueOrDefault("staircase", "flat") switch
+                {
+                    "classic" => BMAG.BlockEngine.StaircaseMode.Classic,
+                    "valley" or "true" => BMAG.BlockEngine.StaircaseMode.Valley,
+                    "dark" => BMAG.BlockEngine.StaircaseMode.FullDark,
+                    "bright" => BMAG.BlockEngine.StaircaseMode.FullBright,
+                    _ => BMAG.BlockEngine.StaircaseMode.Flat,
+                },
             };
-            var q = BMAG.BlockEngine.ColorQuantizer.Quantize(img, profile, new BMAG.BlockEngine.PaletteSelection(), qopt);
-            var layout = BMAG.BlockEngine.BlockLayout.Generate(q, profile.Find("cobblestone")!, 380);
+            var support = opts.GetValueOrDefault("support", "important") switch
+            {
+                "none" => BMAG.BlockEngine.SupportMode.None,
+                "all" => BMAG.BlockEngine.SupportMode.AllOptimized,
+                "double" => BMAG.BlockEngine.SupportMode.AllDouble,
+                _ => BMAG.BlockEngine.SupportMode.Important,
+            };
+            var presets = BMAG.BlockEngine.BlockPreset.BuiltIns(profile);
+            var preset = presets[int.Parse(opts.GetValueOrDefault("preset", "0"))];
+            var q = BMAG.BlockEngine.ColorQuantizer.Quantize(img, profile, preset.ToSelection(), qopt);
+            var layout = BMAG.BlockEngine.BlockLayout.Generate(q, profile.Find("cobblestone")!, 380, support);
             var materials = BMAG.BlockEngine.MaterialCalculator.Calculate(layout, mx);
             BMAG.BlockEngine.WorldOrigin? origin = null;
             if (opts.TryGetValue("origin", out var o))
@@ -106,6 +131,17 @@ try
             if (!opts.ContainsKey("yes")) { Console.WriteLine("--yes を付けると実行します。"); break; }
             var res = SafeWorldExporter.Execute(plan, new Progress<string>(Console.WriteLine));
             Console.WriteLine(res.Instructions);
+            break;
+        }
+
+        case "textures":
+        {
+            // textures [cacheDir]: downloads block textures from Mojang's bedrock-samples (Minecraft EULA applies).
+            Console.WriteLine("Downloading block textures from github.com/Mojang/bedrock-samples (© Mojang AB, Minecraft EULA applies).");
+            var provider = new BMAG.Textures.BlockTextureProvider(args.Length > 1 ? args[1] : null);
+            int n = await provider.DownloadAsync(BMAG.Palette.ColorProfile.LoadBuiltIn().Blocks, new Progress<string>(Console.WriteLine));
+            var missing = BMAG.Palette.ColorProfile.LoadBuiltIn().Blocks.Where(b => provider.GetIcon(b) is null).Select(b => b.Key).ToList();
+            Console.WriteLine($"textures={n} cache={provider.CacheDirectory} missing={missing.Count} {string.Join(",", missing)}");
             break;
         }
 

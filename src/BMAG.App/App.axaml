@@ -1,13 +1,20 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:BMAG.App.ViewModels"
              x:Class="BMAG.App.App"
              RequestedThemeVariant="Default">
+  <Application.DataTemplates>
+    <!-- Language-aware combo box options -->
+    <DataTemplate DataType="vm:LocOptionBase">
+      <TextBlock Text="{Binding Label}" />
+    </DataTemplate>
+  </Application.DataTemplates>
   <Application.Styles>
     <FluentTheme />
     <Style Selector="TabItem">
-      <Setter Property="FontSize" Value="15" />
-      <Setter Property="MinHeight" Value="36" />
-      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="8,0" />
     </Style>
     <Style Selector="TextBlock.h">
       <Setter Property="FontWeight" Value="SemiBold" />
@@ -22,6 +29,35 @@
       <Setter Property="Foreground" Value="#C05000" />
       <Setter Property="FontSize" Value="12" />
       <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <!-- MapartCraft-style block buttons: dark tiles, green frame when selected -->
+    <Style Selector="ToggleButton.blk">
+      <Setter Property="Padding" Value="2" />
+      <Setter Property="Margin" Value="2" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="CornerRadius" Value="2" />
+      <Setter Property="Background" Value="#3A3A3A" />
+      <Setter Property="BorderBrush" Value="#3A3A3A" />
+      <Setter Property="BorderThickness" Value="2" />
+    </Style>
+    <Style Selector="ToggleButton.blk:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#555555" />
+      <Setter Property="BorderBrush" Value="#888888" />
+    </Style>
+    <Style Selector="ToggleButton.blk:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#2E5A2E" />
+      <Setter Property="BorderBrush" Value="#5BE35B" />
+    </Style>
+    <Style Selector="ToggleButton.blk:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#3C703C" />
+      <Setter Property="BorderBrush" Value="#8BFF8B" />
+    </Style>
+    <Style Selector="Border.palette">
+      <Setter Property="Background" Value="#2A2A2A" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="4" />
     </Style>
   </Application.Styles>
 </Application>

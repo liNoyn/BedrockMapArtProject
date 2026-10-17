@@ -8,25 +8,49 @@ public enum DitherMode
 {
     None,
     FloydSteinberg,
-    Atkinson,
+    /// <summary>Jarvis–Judice–Ninke ("minimized average error").</summary>
     JarvisJudiceNinke,
+    Burkes,
+    SierraLite,
+    Stucki,
+    Atkinson,
+    Bayer2,
     Bayer4,
     Bayer8,
+    Ordered3,
 }
 
-public enum BuildMode
+/// <summary>How heights are used for shading (MapartCraft's "3D" setting).</summary>
+public enum StaircaseMode
 {
-    /// <summary>All blocks at one height: only the "normal" shade is available.</summary>
+    /// <summary>Flat: every block at one height, normal shade only.</summary>
     Flat,
-    /// <summary>Uses height differences for three shades. Experimental until calibrated (design 6.6).</summary>
-    Staircase,
+    /// <summary>Three shades; each column climbs/descends continuously from the support row.</summary>
+    Classic,
+    /// <summary>Three shades; columns drop back to the lowest possible height whenever they can (lower build).</summary>
+    Valley,
+    /// <summary>Dark shade only (every block one lower than its northern neighbour).</summary>
+    FullDark,
+    /// <summary>Bright shade only (every block one higher than its northern neighbour).</summary>
+    FullBright,
+}
+
+public static class StaircaseModes
+{
+    public static Shade[] Shades(StaircaseMode mode) => mode switch
+    {
+        StaircaseMode.Flat => [Shade.Normal],
+        StaircaseMode.FullDark => [Shade.Dark],
+        StaircaseMode.FullBright => [Shade.Bright],
+        _ => [Shade.Dark, Shade.Normal, Shade.Bright],
+    };
 }
 
 public sealed record QuantizeOptions
 {
     public ColorMetric Metric { get; init; } = ColorMetric.Lab;
     public DitherMode Dither { get; init; } = DitherMode.None;
-    public BuildMode Mode { get; init; } = BuildMode.Flat;
+    public StaircaseMode Mode { get; init; } = StaircaseMode.Flat;
     /// <summary>Pixels with alpha below this become empty (no block). Only relevant when transparency is kept.</summary>
     public int AlphaThreshold { get; init; } = 128;
 }
@@ -44,6 +68,7 @@ public sealed class QuantizeResult
     public required List<PaletteEntry> Entries { get; init; }
     /// <summary>Predicted map colours ("Block Map" preview, design 11.3).</summary>
     public required RgbaImage Preview { get; init; }
+    public StaircaseMode Mode { get; init; }
 
     public int Get(int x, int y) => EntryIndex[y * Width + x];
     public Shade GetShade(int x, int y) => Shades[y * Width + x];
@@ -52,12 +77,11 @@ public sealed class QuantizeResult
 /// <summary>Converts an image into block map colours (ColorQuantizer, design 12.1). Deterministic for the same input.</summary>
 public static class ColorQuantizer
 {
-    public static List<Candidate> BuildCandidates(ColorProfile profile, List<PaletteEntry> entries, BuildMode mode)
+    public static List<Candidate> BuildCandidates(ColorProfile profile, List<PaletteEntry> entries, StaircaseMode mode)
     {
-        var shades = mode == BuildMode.Flat ? [Shade.Normal] : new[] { Shade.Dark, Shade.Normal, Shade.Bright };
         var list = new List<Candidate>();
         for (int i = 0; i < entries.Count; i++)
-            foreach (var s in shades)
+            foreach (var s in StaircaseModes.Shades(mode))
                 list.Add(new Candidate(i, s, profile.ColorOf(entries[i].Block, s)));
         return list;
     }
@@ -66,10 +90,10 @@ public static class ColorQuantizer
         QuantizeOptions options, CancellationToken ct = default)
     {
         var entries = selection.Resolve(profile);
-        if (entries.Count == 0) throw new InvalidOperationException("使用できるブロックがありません。パレット設定を確認してください。");
+        if (entries.Count == 0) throw new InvalidOperationException("使用できるブロックがありません。パレットでブロックを選んでください。");
 
         var result = QuantizeWith(image, profile, entries, options, ct);
-        // Survival limit: drop the least used block until the number of block types fits (design 6.8).
+        // Survival limit: drop the least used blocks until the number of block types fits (design 6.8).
         if (selection.MaxBlockTypes > 0)
         {
             while (true)
@@ -78,10 +102,9 @@ public static class ColorQuantizer
                 foreach (int e in result.EntryIndex) if (e >= 0) counts[e]++;
                 int used = counts.Count(c => c > 0);
                 if (used <= selection.MaxBlockTypes) break;
-                var keep = Enumerable.Range(0, entries.Count).Where(i => counts[i] > 0)
-                    .OrderByDescending(i => counts[i]).Take(Math.Max(selection.MaxBlockTypes, used - Math.Max(1, (used - selection.MaxBlockTypes) / 2)))
-                    .OrderBy(i => i).Select(i => entries[i]).ToList();
-                entries = keep;
+                int keepCount = Math.Max(selection.MaxBlockTypes, used - Math.Max(1, (used - selection.MaxBlockTypes) / 2));
+                entries = Enumerable.Range(0, entries.Count).Where(i => counts[i] > 0)
+                    .OrderByDescending(i => counts[i]).Take(keepCount).OrderBy(i => i).Select(i => entries[i]).ToList();
                 result = QuantizeWith(image, profile, entries, options, ct);
             }
         }
@@ -92,7 +115,6 @@ public static class ColorQuantizer
         QuantizeOptions options, CancellationToken ct)
     {
         var candidates = BuildCandidates(profile, entries, options.Mode);
-        var matcher = new NearestMatcher(candidates, options.Metric);
         int w = image.Width, h = image.Height, n = w * h;
         var idx = new int[n];
         var shades = new Shade[n];
@@ -111,56 +133,69 @@ public static class ColorQuantizer
 
         bool IsEmpty(int i) => image.Pixels[i * 4 + 3] < options.AlphaThreshold;
 
-        switch (options.Dither)
+        var ordered = OrderedMatrix(options.Dither);
+        if (options.Dither == DitherMode.None || ordered != null)
         {
-            case DitherMode.None:
-            case DitherMode.Bayer4:
-            case DitherMode.Bayer8:
+            int size = ordered is null ? 1 : (int)Math.Sqrt(ordered.Length);
+            const double spread = 32; // roughly the typical distance between neighbouring palette colours
+            Parallel.For(0, h, new ParallelOptions { CancellationToken = ct }, () => new NearestMatcher(candidates, options.Metric), (y, _, local) =>
             {
-                int size = options.Dither == DitherMode.Bayer8 ? 8 : 4;
-                var bayer = options.Dither == DitherMode.None ? null : BayerMatrix(size);
-                // Ordered dithering spread: roughly the typical distance between palette colours.
-                double spread = 32;
-                Parallel.For(0, h, new ParallelOptions { CancellationToken = ct }, () => new NearestMatcher(candidates, options.Metric), (y, _, local) =>
+                for (int x = 0; x < w; x++)
                 {
-                    for (int x = 0; x < w; x++)
+                    int i = y * w + x;
+                    if (IsEmpty(i)) { idx[i] = -1; shades[i] = Shade.Normal; continue; }
+                    double r = image.Pixels[i * 4], g = image.Pixels[i * 4 + 1], b = image.Pixels[i * 4 + 2];
+                    if (ordered != null)
                     {
-                        int i = y * w + x;
-                        if (IsEmpty(i)) { idx[i] = -1; shades[i] = Shade.Normal; continue; }
-                        double r = image.Pixels[i * 4], g = image.Pixels[i * 4 + 1], b = image.Pixels[i * 4 + 2];
-                        if (bayer != null)
-                        {
-                            double t = (bayer[(y % size) * size + x % size] + 0.5) / (size * size) - 0.5;
-                            r += t * spread; g += t * spread; b += t * spread;
-                        }
-                        Assign(i, local.Find(r, g, b));
+                        double t = (ordered[(y % size) * size + x % size] + 0.5) / ordered.Length - 0.5;
+                        r += t * spread; g += t * spread; b += t * spread;
                     }
-                    return local;
-                }, _ => { });
-                break;
-            }
-            default:
-                ErrorDiffuse(image, w, h, options, matcher, candidates, IsEmpty, idx, shades, Assign, ct);
-                break;
+                    Assign(i, local.Find(r, g, b));
+                }
+                return local;
+            }, _ => { });
+        }
+        else
+        {
+            ErrorDiffuse(image, w, h, options, new NearestMatcher(candidates, options.Metric), candidates, IsEmpty, idx, shades, Assign, ct);
         }
 
-        return new QuantizeResult { Width = w, Height = h, EntryIndex = idx, Shades = shades, Entries = entries, Preview = preview };
+        return new QuantizeResult
+        {
+            Width = w, Height = h, EntryIndex = idx, Shades = shades, Entries = entries, Preview = preview, Mode = options.Mode,
+        };
+    }
+
+    /// <summary>Threshold matrix (values 0..n-1) for ordered dithering, or null for error diffusion.</summary>
+    internal static int[]? OrderedMatrix(DitherMode mode) => mode switch
+    {
+        DitherMode.Bayer2 => BayerMatrix(2),
+        DitherMode.Bayer4 => BayerMatrix(4),
+        DitherMode.Bayer8 => BayerMatrix(8),
+        DitherMode.Ordered3 => [0, 6, 3, 4, 7, 2, 5, 1, 8],
+        _ => null,
+    };
+
+    internal static (int dx, int dy, double weight)[] DiffusionKernel(DitherMode mode)
+    {
+        (int, int, double)[] K(double div, params (int, int, double)[] k) => k.Select(t => (t.Item1, t.Item2, t.Item3 / div)).ToArray();
+        return mode switch
+        {
+            DitherMode.Atkinson => K(8, (1, 0, 1), (2, 0, 1), (-1, 1, 1), (0, 1, 1), (1, 1, 1), (0, 2, 1)),
+            DitherMode.JarvisJudiceNinke => K(48, (1, 0, 7), (2, 0, 5), (-2, 1, 3), (-1, 1, 5), (0, 1, 7), (1, 1, 5), (2, 1, 3),
+                (-2, 2, 1), (-1, 2, 3), (0, 2, 5), (1, 2, 3), (2, 2, 1)),
+            DitherMode.Burkes => K(32, (1, 0, 8), (2, 0, 4), (-2, 1, 2), (-1, 1, 4), (0, 1, 8), (1, 1, 4), (2, 1, 2)),
+            DitherMode.SierraLite => K(4, (1, 0, 2), (-1, 1, 1), (0, 1, 1)),
+            DitherMode.Stucki => K(42, (1, 0, 8), (2, 0, 4), (-2, 1, 2), (-1, 1, 4), (0, 1, 8), (1, 1, 4), (2, 1, 2),
+                (-2, 2, 1), (-1, 2, 2), (0, 2, 4), (1, 2, 2), (2, 2, 1)),
+            _ => K(16, (1, 0, 7), (-1, 1, 3), (0, 1, 5), (1, 1, 1)),
+        };
     }
 
     private static void ErrorDiffuse(RgbaImage image, int w, int h, QuantizeOptions options, NearestMatcher matcher,
         List<Candidate> candidates, Func<int, bool> isEmpty, int[] idx, Shade[] shades, Action<int, int> assign, CancellationToken ct)
     {
-        (int dx, int dy, double weight)[] kernel = options.Dither switch
-        {
-            DitherMode.Atkinson => [(1, 0, 1 / 8.0), (2, 0, 1 / 8.0), (-1, 1, 1 / 8.0), (0, 1, 1 / 8.0), (1, 1, 1 / 8.0), (0, 2, 1 / 8.0)],
-            DitherMode.JarvisJudiceNinke =>
-            [
-                (1, 0, 7 / 48.0), (2, 0, 5 / 48.0),
-                (-2, 1, 3 / 48.0), (-1, 1, 5 / 48.0), (0, 1, 7 / 48.0), (1, 1, 5 / 48.0), (2, 1, 3 / 48.0),
-                (-2, 2, 1 / 48.0), (-1, 2, 3 / 48.0), (0, 2, 5 / 48.0), (1, 2, 3 / 48.0), (2, 2, 1 / 48.0),
-            ],
-            _ => [(1, 0, 7 / 16.0), (-1, 1, 3 / 16.0), (0, 1, 5 / 16.0), (1, 1, 1 / 16.0)],
-        };
+        var kernel = DiffusionKernel(options.Dither);
         var buf = new float[w * h * 3];
         for (int i = 0; i < w * h; i++)
         {
@@ -193,7 +228,7 @@ public static class ColorQuantizer
         }
     }
 
-    private static int[] BayerMatrix(int size)
+    internal static int[] BayerMatrix(int size)
     {
         int[] m = [0];
         int n = 1;
