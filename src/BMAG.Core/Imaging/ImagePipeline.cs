@@ -6,7 +6,15 @@ public static class ImagePipeline
     public static RgbaImage Process(RgbaImage source, ImageSettings s, CancellationToken ct = default)
     {
         var src = source;
-        if (s.Crop is { } c)
+        if (s.CropMode == CropMode.Center)
+        {
+            double target = (double)s.OutputWidth / s.OutputHeight;
+            int cw = source.Width, ch = source.Height;
+            if ((double)cw / ch > target) cw = Math.Max(1, (int)Math.Round(ch * target));
+            else ch = Math.Max(1, (int)Math.Round(cw / target));
+            src = source.Crop((source.Width - cw) / 2, (source.Height - ch) / 2, cw, ch);
+        }
+        else if (s.CropMode == CropMode.Manual && s.Crop is { } c)
         {
             int x = Math.Clamp(c.X, 0, source.Width - 1), y = Math.Clamp(c.Y, 0, source.Height - 1);
             int w = Math.Clamp(c.Width, 1, source.Width - x), h = Math.Clamp(c.Height, 1, source.Height - y);
@@ -39,8 +47,12 @@ public static class ImagePipeline
         ct.ThrowIfCancellationRequested();
         ApplyAdjustments(img, s);
         if (s.Sharpen > 0) img = Sharpen(img, s.Sharpen);
-        if (!s.KeepTransparency) CompositeOnto(img, Rgba.FromHex(s.BackgroundColor));
-        else FillLetterboxOnly(img);
+        switch (s.Transparency)
+        {
+            case TransparencyMode.Keep: FillLetterboxOnly(img); break;
+            case TransparencyMode.Dithered: DitherAlphaOnto(img, Rgba.FromHex(s.BackgroundColor)); break;
+            default: CompositeOnto(img, Rgba.FromHex(s.BackgroundColor)); break;
+        }
         return img;
     }
 
@@ -117,6 +129,25 @@ public static class ImagePipeline
             p[i + 2] = (byte)((p[i + 2] * a + bg.B * (255 - a) + 127) / 255);
             p[i + 3] = 255;
         }
+    }
+
+    /// <summary>Per pixel: image colour if alpha beats a 4x4 Bayer threshold, otherwise the background colour.</summary>
+    public static void DitherAlphaOnto(RgbaImage img, Rgba bg)
+    {
+        int[] bayer = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+        for (int y = 0; y < img.Height; y++)
+            for (int x = 0; x < img.Width; x++)
+            {
+                int i = (y * img.Width + x) * 4;
+                int a = img.Pixels[i + 3];
+                if (a == 255) continue;
+                double threshold = (bayer[(y & 3) * 4 + (x & 3)] + 0.5) / 16 * 255;
+                if (a <= threshold)
+                {
+                    img.Pixels[i] = bg.R; img.Pixels[i + 1] = bg.G; img.Pixels[i + 2] = bg.B;
+                }
+                img.Pixels[i + 3] = 255;
+            }
     }
 
     /// <summary>Normalises fully transparent pixels to transparent black so hashes stay stable.</summary>

@@ -5,15 +5,19 @@ using BMAG.BlockEngine;
 using BMAG.ColorEngine;
 using BMAG.Imaging;
 using BMAG.MapData;
+using BMAG.Palette;
 
 namespace BMAG.Project;
 
 public enum ExportMode { BlockConstruction, DirectMap }
 
+/// <summary>Build progress state (design 7.3).</summary>
+public enum ProgressState { NotStarted, InProgress, Done, Skipped, NeedsFix }
+
 /// <summary>Saved project (ProjectCore, design 13.1). Stored as JSON (*.bmag.json).</summary>
 public sealed class BmagProject
 {
-    public int FormatVersion { get; set; } = 1;
+    public int FormatVersion { get; set; } = 2;
     public string ProjectId { get; set; } = Guid.NewGuid().ToString("N");
     public string ProjectName { get; set; } = "新しいマップアート";
 
@@ -21,20 +25,23 @@ public sealed class BmagProject
     public string? SourceImagePath { get; set; }
     public string? SourceImageHash { get; set; }
     public bool ImageCopiedIntoProject { get; set; }
+    /// <summary>Animation frame / TIFF page.</summary>
+    public int SourceFrame { get; set; }
+    /// <summary>Position in a video source, in seconds.</summary>
+    public double SourceVideoSeconds { get; set; }
 
     public ImageSettings Image { get; set; } = new();
     public ExportMode Mode { get; set; } = ExportMode.BlockConstruction;
     public string TargetGameVersion { get; set; } = "1.26";
 
     // Block construction
-    public string ColorProfileId { get; set; } = "bedrock-estimate-v1";
+    public string ColorProfileId { get; set; } = ColorProfile.DefaultId;
     public ColorMetric Metric { get; set; } = ColorMetric.Lab;
     public DitherMode Dither { get; set; } = DitherMode.None;
-    public BuildMode BuildMode { get; set; } = BuildMode.Flat;
-    public List<string>? EnabledBlocks { get; set; }
-    public bool ExcludeGravity { get; set; } = true;
-    public bool ExcludeFlammable { get; set; }
-    public int MaxRarity { get; set; } = 3;
+    public StaircaseMode Staircase { get; set; } = StaircaseMode.Flat;
+    public SupportMode Supports { get; set; } = SupportMode.Important;
+    /// <summary>Colour set id → chosen block key.</summary>
+    public Dictionary<int, string>? Selection { get; set; }
     public int MaxBlockTypes { get; set; }
     public string SupportBlockKey { get; set; } = "cobblestone";
     public int? OriginX { get; set; }
@@ -47,8 +54,12 @@ public sealed class BmagProject
     public ItemDelivery Delivery { get; set; } = ItemDelivery.ChestAndFrameWall;
     public bool GlowFrames { get; set; }
 
-    /// <summary>Build progress per map number (design 7.3).</summary>
-    public Dictionary<int, string> MapProgress { get; set; } = [];
+    /// <summary>Build progress per map number (1-based).</summary>
+    public Dictionary<int, ProgressState> MapProgress { get; set; } = [];
+    /// <summary>Finished 16x16 chunks as "mapNumber:chunkX:chunkZ".</summary>
+    public HashSet<string> DoneChunks { get; set; } = [];
+    /// <summary>Blocks the player already has, by block key (material list "owned" column).</summary>
+    public Dictionary<string, int> OwnedMaterials { get; set; } = [];
 
     private static readonly JsonSerializerOptions Options = new()
     {

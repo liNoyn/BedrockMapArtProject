@@ -1,6 +1,5 @@
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Platform.Storage;
 using BMAG.App.ViewModels;
@@ -32,6 +31,18 @@ public partial class MainWindow : Window, IDialogService
             if (e.PropertyName == nameof(MainViewModel.LogText) && this.FindControl<TextBox>("LogBox") is { } box)
                 box.CaretIndex = box.Text?.Length ?? 0;
         };
+        if (this.FindControl<Image>("BuildImage") is { } img)
+        {
+            img.PointerMoved += (_, e) => ForwardPointer(img, e, false);
+            img.PointerPressed += (_, e) => ForwardPointer(img, e, true);
+        }
+    }
+
+    private void ForwardPointer(Image img, PointerEventArgs e, bool click)
+    {
+        var p = e.GetPosition(img);
+        if (img.Bounds.Width <= 0 || img.Bounds.Height <= 0) return;
+        _vm.OnPreviewPointer(p.X / img.Bounds.Width, p.Y / img.Bounds.Height, click);
     }
 
     private async void OnDrop(object? sender, DragEventArgs e)
@@ -72,13 +83,9 @@ public partial class MainWindow : Window, IDialogService
     public async Task<bool> ConfirmAsync(string title, string message)
     {
         bool result = false;
-        var dialog = new Window
-        {
-            Title = title, Width = 620, SizeToContent = SizeToContent.Height, MaxHeight = 700,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner, CanResize = false,
-        };
-        var ok = new Button { Content = "実行する", Classes = { "accent" } };
-        var cancel = new Button { Content = "キャンセル" };
+        var dialog = MakeDialog(title);
+        var ok = new Button { Content = _vm.L["Run"], Classes = { "accent" } };
+        var cancel = new Button { Content = _vm.L["Cancel"] };
         ok.Click += (_, _) => { result = true; dialog.Close(); };
         cancel.Click += (_, _) => dialog.Close();
         dialog.Content = new StackPanel
@@ -93,4 +100,34 @@ public partial class MainWindow : Window, IDialogService
         await dialog.ShowDialog(this);
         return result;
     }
+
+    public async Task<string?> PromptAsync(string title, string message, string initial)
+    {
+        string? result = null;
+        var dialog = MakeDialog(title);
+        var box = new TextBox { Text = initial };
+        var ok = new Button { Content = "OK", Classes = { "accent" } };
+        var cancel = new Button { Content = _vm.L["Cancel"] };
+        ok.Click += (_, _) => { result = box.Text; dialog.Close(); };
+        cancel.Click += (_, _) => dialog.Close();
+        dialog.Content = new StackPanel
+        {
+            Margin = new Avalonia.Thickness(16), Spacing = 10,
+            Children =
+            {
+                new TextBlock { Text = message },
+                box,
+                new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, Children = { cancel, ok } },
+            },
+        };
+        dialog.Opened += (_, _) => box.Focus();
+        await dialog.ShowDialog(this);
+        return result;
+    }
+
+    private static Window MakeDialog(string title) => new()
+    {
+        Title = title, Width = 620, SizeToContent = SizeToContent.Height, MaxHeight = 720,
+        WindowStartupLocation = WindowStartupLocation.CenterOwner, CanResize = false,
+    };
 }

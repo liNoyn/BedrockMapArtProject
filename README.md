@@ -5,15 +5,58 @@
 > リリース版はまだありません。ソースからビルドしてお使いください。
 
 画像から Minecraft 統合版（Bedrock Edition）のマップアートを作る Windows 用デスクトップアプリです。
-MapartCraft（Java 版向け）の統合版版にあたります。2 つの方式に対応しています。
+[MapartCraft](https://github.com/rebane2001/mapartcraft)（Java 版向け Web アプリ）の機能を統合版向けに作り直したもので、
+2 つの方式に対応しています。
 
-- **ブロック建築型** — 画像をブロックの地図色に減色し、建築ガイド（配置図 PNG・行ごとの手順・素材 CSV）と、
+- **ブロック建築型** — 画像をブロックの地図色に減色し、建築ガイド（テクスチャ付き配置図・行ごとの手順・素材 CSV）と、
   64×64 に分割した `.mcstructure` を含むビヘイビアパック（`.mcpack`）を出力します。
 - **地図データ直接生成型** — 画像を RGBA の地図データ（`map_<ID>`）として **ワールドのコピー** に書き込み、
-  地図入りのチェストや額縁の壁を構造物として一緒に保存します。元のワールドには書き込みません。
+  地図入りのチェストや額縁の壁（構造物）、必要ならプレイヤーのインベントリにも入れます。元のワールドには書き込みません。
 
-技術: C# / .NET 8 / Avalonia 11（GUI）、SkiaSharp（画像の読み書き）。LevelDB（Bedrock の zlib raw 圧縮）、
+UI は日本語と英語に対応しています（表示 → 言語）。
+
+技術: C# / .NET 8 / Avalonia 11（GUI）、SkiaSharp（画像処理）。LevelDB（Bedrock の zlib raw 圧縮）、
 Little-Endian NBT、`.mcstructure` は外部ライブラリを使わずに自前で実装しています。
+
+## 主な機能
+
+**ブロック選択（MapartCraft と同じ方式）**
+- Minecraft の地図色ごとに 60 の色セット、合計 323 ブロック（MapartCraft の全ブロックに対応する統合版ブロック）。
+  各色につき 1 ブロックを選びます。行の左には暗・通常・明の 3 段階の地図色が出ます。
+- ブロックの識別子と状態は Mojang 公式のブロックメタデータ（Bedrock 1.26）で検証し、全状態を出力します。
+- プリセット: すべて / サバイバル向け / 支え不要 / カーペット / コンクリート / 羊毛 / グレースケール / なし、
+  ユーザー定義プリセットの保存。
+- カスタムブロック: 手入力、またはビヘイビアパック（フォルダ / `.mcpack` / `.mcaddon`）の `minecraft:map_color` から読み込み。
+- **ブロックのアイコン**: 「Minecraft のテクスチャを取得」で Mojang 公式の
+  [bedrock-samples](https://github.com/Mojang/bedrock-samples) からテクスチャを PC にダウンロードして表示します
+  （Minecraft EULA が適用されます。テクスチャは本リポジトリには含まれず、再配布もしません）。
+  手持ちのリソースパックのフォルダを指定することもできます。未取得のときは地図色で表示します。
+
+**変換・建築**
+- 画像: PNG / JPEG / WebP / BMP / GIF / TIFF。アニメーション GIF・WebP と複数ページ TIFF はフレームを選択可能。
+  動画（mp4 など）は ffmpeg があれば指定した秒数のフレームを取り込みます。
+- 切り抜き（なし / 中央 / 手動）、Fit / Fill / Stretch、Lanczos / バイリニア / 最近傍、明るさ・コントラスト・彩度・ガンマ・シャープ。
+- 透明部分: 背景色となめらかに合成 / ディザ合成 / 透明を保持（ブロックなし）。
+- 色差: CIELAB ΔE76 / CIEDE2000 / 重み付き RGB / RGB。
+- ディザリング: Floyd–Steinberg、Jarvis–Judice–Ninke（MinAvgErr）、Burkes、Sierra Lite、Stucki、Atkinson、
+  Bayer 2×2 / 4×4 / 8×8、Ordered 3×3。
+- 3D（階段）: なし（平面）/ Classic / Valley / 全面暗 / 全面明。
+- 支えブロック: なし / 必要なブロックの下だけ / すべて（サバイバル向け・最適化）/ すべて（二重）。
+- ブロック種類の上限、支えブロックの種類、地図の範囲に合わせたワールド座標。
+
+**プレビュー・ガイド**
+- 元画像 / 地図直接（RGBA）/ ブロック地図色（予測）/ 差分 / 建築ビュー 2D（テクスチャ・高さ・チャンク境界・マウスで
+  ブロックと座標を表示）/ 建築ビュー 3D（アイソメトリック、回転、支えブロックの表示切替）。
+- 素材リスト: マップ別、スタック数、代替ブロック、**所持数と不足数**、CSV 保存。
+- 建築の進捗: マップごとの状態（未着手 / 作業中 / 完了 / スキップ / 要修正）と、2D ビューのクリックでチャンク単位の完了記録。
+  プロジェクトファイルに保存されます。
+- 出力: 配置図 PNG（色・テクスチャ）、行ごとの手順、`placements.csv`、`materials.csv`、64×64 分割の `.mcstructure`、
+  読み込み用ファンクション入りのビヘイビアパック。
+
+**地図データ直接生成・地図閲覧・校正**
+- ワールドの自動検出 / フォルダ指定、使用中の地図 ID の回避、チェスト・額縁の壁の構造物、インベントリの空きスロットへの追加。
+- ワールド内の地図の一覧・PNG 保存・元画像としての利用。
+- 色の校正: 全ブロックのテストパッドを出力 → ゲームで地図を作る → その地図から実際の地図色を測定し、実測プロファイルとして保存。
 
 ## ビルドと起動
 
@@ -34,49 +77,37 @@ dotnet test tests/BMAG.Tests
 | プロジェクト | 内容 |
 |---|---|
 | `src/BMAG.Core` | UI に依存しない処理一式（下表） |
-| `src/BMAG.App` | Avalonia GUI（日本語） |
-| `src/BMAG.Cli` | コマンドライン（`build` / `direct` / `maps` / `info` ほか） |
-| `tests/BMAG.Tests` | xUnit テスト（34 件） |
+| `src/BMAG.App` | Avalonia GUI（日本語 / 英語） |
+| `src/BMAG.Cli` | コマンドライン（`build` / `direct` / `textures` / `maps` / `info` ほか。引数なしで使い方を表示） |
+| `tests/BMAG.Tests` | xUnit テスト |
+| `tools/PaletteGen` | `tools/PaletteGen/blocks.txt` から `palettes/bedrock-full-v2.json` を生成（Mojang のメタデータで検証） |
 | `palettes/` | 色プロファイル（JSON、Core に埋め込み） |
-
-設計書の各コンポーネントは、プロジェクトを細かく分けずに `BMAG.Core` 内の名前空間として実装しています。
 
 | 設計書 | 実装 |
 |---|---|
-| ImageCore | `Imaging/`（デコード、クロップ、Fit/Fill/Stretch、Lanczos/バイリニア/最近傍、補正、分割） |
-| ColorEngine | `ColorEngine/ColorMath.cs`（RGB、重み付き RGB、CIELAB、CIEDE2000） |
-| BlockPaletteEngine | `Palette/BlockPalette.cs` + `palettes/*.json` |
-| ColorQuantizer | `BlockEngine/ColorQuantizer.cs`（なし / Floyd–Steinberg / Atkinson / JJN / Bayer） |
-| BlockLayoutGenerator | `BlockEngine/BlockLayout.cs`（Flat、Staircase は実験的） |
+| ImageCore | `Imaging/`（デコード、TIFF・フレーム・動画、切り抜き、リサイズ、補正、分割） |
+| ColorEngine | `ColorEngine/ColorMath.cs` |
+| BlockPaletteEngine | `Palette/`（色セット、カスタムブロック）, `BlockEngine/PaletteSelection.cs`（選択・プリセット） |
+| ColorQuantizer | `BlockEngine/ColorQuantizer.cs` |
+| BlockLayoutGenerator | `BlockEngine/BlockLayout.cs`（階段方式・支えブロック） |
 | BuildGuideGenerator | `BlockEngine/BuildGuideGenerator.cs`, `Materials.cs` |
-| StructureExporter | `Export/McStructure.cs`, `StructureExporter.cs`（分割、ビヘイビアパック、再読み込み検証） |
-| MapDataEncoder / MapIdAllocator / MapItemGenerator | `MapData/` |
-| BedrockWorldAdapter | `Bedrock/LevelDb/`（読み取り + WAL 追記による書き込み）, `Bedrock/World/` |
-| SafeWorldExporter | `MapData/SafeWorldExporter.cs` |
-| 色プロファイル校正（F20） | `Calibration/Calibration.cs` |
+| PreviewCore | `Preview/LayoutRenderer.cs`（2D / 3D） |
+| StructureExporter | `Export/` |
+| MapDataEncoder / MapIdAllocator / MapItemGenerator / SafeWorldExporter | `MapData/` |
+| BedrockWorldAdapter | `Bedrock/LevelDb/`, `Bedrock/World/` |
+| テクスチャ | `Textures/`（ダウンロード・リソースパック・TGA） |
+| 色プロファイル校正 | `Calibration/` |
 | ProjectCore | `Project/BmagProject.cs`（`*.bmag.json`） |
 
-## 使い方（GUI）
-
-1. 画像を開く（ドラッグ＆ドロップ可）→ 地図の枚数（横 × 縦）と配置・色補正を調整します。
-2. **ブロック建築** タブ: 色差の計算方法・ディザリング・使うブロック（パレット タブ）を選び、
-   「建築データを出力」で次のファイルを出力します。
-   - `guide/` — マップごとの配置図 PNG（チャンク・構造物境界と座標入り）、行ごとの手順、`materials.csv`、`placements.csv`
-   - `BMAG_<名前>.mcpack` — 構造物と読み込み用ファンクション（`/function bmag/<名前>/all` など）
-3. **地図直接生成** タブ: ワールドを選んで「書き込み内容を確認」→「コピーを作成して地図を追加」。
-   ワールド一覧に「<元の名前> (BMAG …)」が追加されます。ゲーム内でチートを有効にし、
-   `/structure load bmag:<名前>_maps ~1 ~ ~`（チェスト）や `bmag:<名前>_wall`（額縁の壁）で地図を取り出します。
-4. **地図・校正** タブ: ワールド内の地図を一覧・PNG 保存できます。また、テストパッドを使って実際の地図色を測定し、
-   実測プロファイル（`%APPDATA%\BMAG\profiles`）を作れます。
-
-## 安全のための仕組み（設計書 10 章）
+## 安全のための仕組み
 
 - 元のワールドへは書き込みません。コピーを作る前後で元ワールドの全ファイルの SHA-256 を比較し、
   コピーの内容も元と一致することを確認してから、コピー側にだけ書き込みます。
 - Minecraft の起動中は実行しません。`db/LOCK` も排他で取得します。
 - 書き込みは LevelDB の 1 バッチ（ログへの追記）で行い、終了後に読み直して全キーの内容を照合します。
+- プレイヤーデータや `level.dat` は、読み込んで書き戻したときに 1 バイトも変わらないことを確認できた場合だけ変更します。
 - 失敗した場合は未完成のコピーを削除し、成功とは表示しません。ログは `%LOCALAPPDATA%\BMAG\logs` に残ります。
-- 対応表にないゲームバージョンのワールドには書き込みません（閲覧と、ブロック建築・PNG 出力は使えます）。
+- 対応表にないゲームバージョンのワールドには書き込みません。
 
 ## 検証状況（重要）
 
@@ -84,25 +115,27 @@ dotnet test tests/BMAG.Tests
 
 | 項目 | 状況 |
 |---|---|
-| ブロックの地図色 | Java 版の基本地図色を **推定値** として収録（全ブロック `verified: false`）。校正機能で実測値に置き換えられます |
-| 地図色の陰影倍率（180/220/255） | Java 版の値を仮定。Staircase 方式はそのため「実験的」としています |
-| LevelDB の読み取り | 実際のワールド（1.26.33〜1.26.51）のコピー 4 つで読み取りを確認済み。破損や未対応の形式は検出されませんでした |
+| ブロックの地図色 | Minecraft の地図の基本色（Java 版の値）を **推定値** として使用（全ブロック未検証）。校正機能で実測値に置き換えられます |
+| 地図色の陰影倍率（180/220/255） | Java 版の値を仮定。階段系の方式はそのため「実験的」としています |
+| ブロック識別子・状態 | Mojang 公式メタデータ（1.26.50）で全 323 ブロックを検証済み。構造物としての読み込みは未確認 |
+| LevelDB の読み取り | 実際のワールド（1.26.33〜1.26.51）のコピーで確認済み |
 | LevelDB への書き込み | 実ワールドのコピーへ書き込み、BMAG 自身で読み戻せることを確認済み。**ゲームが読み込めるかは未確認** |
-| 地図 NBT | 実ワールドに保存されていた地図と同じフィールド構成であることを確認済み。表示は未確認 |
-| 構造物（チェスト・額縁・ブロック） | 1.18.10 時点の識別子を古いバージョン番号付きで出力し、ゲームの変換機能で現行形式へ変換させる方式です。読み込みは未確認 |
-| 額縁の向き・並び順 | Image Map と同じ配置（西向き、左上が 1 枚目）。ゲーム内では未確認 |
+| 地図 NBT・チェスト・額縁 | 実ワールドに保存されていたデータと同じ形式。表示は未確認 |
 
-最初は **重要でないワールド** で試し、問題があればログ（`%LOCALAPPDATA%\BMAG\logs`）をご確認ください。
+最初は **重要でないワールド** で試し、問題があればログをご確認ください。
 
-## 既知の未対応
+## 既知の制限
 
-- 3D プレビュー、建築進捗の管理 UI（データ構造のみあり）、所持数を入れて不足数を出す機能
-- カスタムブロック（`minecraft:map_color`）の読み込み、TIFF / 動画フレーム
-- プレイヤーのインベントリへ直接地図を入れる方式（設計どおり、チェストと額縁の構造物を優先しています）
-- 英語 UI
+- 3D ビューは回転できるアイソメトリック表示です（自由視点ではありません）。
+- APNG は最初のフレームのみ。動画の読み込みには ffmpeg（PATH 上か BMAG と同じフォルダ）が必要です。
+- 英語 UI でも、エラーメッセージと出力するガイドのテキストの一部は日本語です。
 
-## ライセンス
+## ライセンス・謝辞
 
 [MIT License](LICENSE)
 
-Minecraft は Mojang Studios / Microsoft の商標です。本プロジェクトは Mojang Studios / Microsoft とは関係ありません。
+- ブロックの色セットの分け方と機能の多くは [MapartCraft](https://github.com/rebane2001/mapartcraft)（GPL-3.0）を参考にしています。
+  MapartCraft のコードや画像は含んでいません（独自に実装しています）。
+- 地図直接生成の地図データ形式は [Image Map](https://github.com/tryashtar/image-map) を参考にしています。
+- Minecraft は Mojang Studios / Microsoft の商標です。本プロジェクトは Mojang Studios / Microsoft とは関係ありません。
+  ブロックのテクスチャは利用者の PC にダウンロードされるもので、本プロジェクトには含まれません。

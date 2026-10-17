@@ -5,12 +5,11 @@ namespace BMAG.MapData;
 
 /// <summary>
 /// Creates map items and structures that deliver them in game (MapItemGenerator, design 9.6 / 9.7).
-/// Blocks use 1.18.10 identifiers with their palette version so the game's block upgrader converts them
-/// to the current format (e.g. facing_direction -> minecraft:cardinal_direction for chests).
+/// Blocks use the identifiers, states and palette version that Bedrock 1.26 itself writes into structures.
 /// </summary>
 public static class MapItemGenerator
 {
-    public const int LegacyBlockVersion = 17959425; // 1.18.10
+    public const int BlockVersion = 18168865;
 
     public static NbtCompound CreateMapItem(long mapId, VersionProfile profile) => new()
     {
@@ -27,7 +26,7 @@ public static class MapItemGenerator
         int chests = Math.Max(1, (mapIds.Count + 26) / 27);
         // Leave one block between chests so they never merge into double chests.
         var s = new McStructure(chests * 2 - 1, 1, 1);
-        var chest = new PaletteBlock("minecraft:chest", new NbtCompound { { "facing_direction", new NbtInt(2) } }, LegacyBlockVersion);
+        var chest = new PaletteBlock("minecraft:chest", new NbtCompound { { "minecraft:cardinal_direction", new NbtString("south") } }, BlockVersion);
         for (int c = 0; c < chests; c++)
         {
             var items = new NbtList(NbtType.Compound);
@@ -65,7 +64,7 @@ public static class MapItemGenerator
             { "facing_direction", new NbtInt(4) },
             { "item_frame_map_bit", new NbtByte(1) },
             { "item_frame_photo_bit", new NbtByte(0) },
-        }, LegacyBlockVersion);
+        }, BlockVersion);
         for (int gx = 0; gx < cols; gx++)
             for (int gy = 0; gy < rows; gy++)
             {

@@ -55,7 +55,7 @@ public static class CalibrationPad
         return new BlockLayout
         {
             Width = w, Depth = depth, Cells = cells, Heights = heights, Entries = entries,
-            SupportBlock = supportBlock, Mode = BuildMode.Staircase,
+            SupportBlock = supportBlock, Mode = StaircaseMode.Valley,
         };
     }
 }

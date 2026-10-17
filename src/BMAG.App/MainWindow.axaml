@@ -2,29 +2,35 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:BMAG.App.ViewModels"
         xmlns:pal="using:BMAG.Palette"
+        xmlns:pb="using:BMAG.BlockEngine"
         xmlns:world="using:BMAG.Bedrock.World"
-        xmlns:core="using:BMAG.Palette"
         x:Class="BMAG.App.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="Bedrock Map Art Generator"
-        Width="1440" Height="900" MinWidth="1100" MinHeight="680"
+        Width="1560" Height="940" MinWidth="1200" MinHeight="700"
         DragDrop.AllowDrop="True">
 
   <DockPanel>
     <!-- Menu -->
     <Menu DockPanel.Dock="Top">
-      <MenuItem Header="ファイル(_F)">
-        <MenuItem Header="新規プロジェクト" Command="{Binding NewProjectCommand}" />
-        <MenuItem Header="プロジェクトを開く…" Command="{Binding OpenProjectCommand}" />
-        <MenuItem Header="プロジェクトを保存" Command="{Binding SaveProjectCommand}" InputGesture="Ctrl+S" />
-        <MenuItem Header="名前を付けて保存…" Command="{Binding SaveProjectAsCommand}" />
+      <MenuItem Header="{Binding L[File]}">
+        <MenuItem Header="{Binding L[NewProject]}" Command="{Binding NewProjectCommand}" />
+        <MenuItem Header="{Binding L[OpenProject]}" Command="{Binding OpenProjectCommand}" />
+        <MenuItem Header="{Binding L[SaveProject]}" Command="{Binding SaveProjectCommand}" InputGesture="Ctrl+S" />
+        <MenuItem Header="{Binding L[SaveProjectAs]}" Command="{Binding SaveProjectAsCommand}" />
         <Separator />
-        <MenuItem Header="画像を開く…" Command="{Binding OpenImageCommand}" InputGesture="Ctrl+O" />
+        <MenuItem Header="{Binding L[OpenImage]}" Command="{Binding OpenImageCommand}" InputGesture="Ctrl+O" />
+      </MenuItem>
+      <MenuItem Header="{Binding L[View]}">
+        <MenuItem Header="{Binding L[Language]}">
+          <MenuItem Header="{Binding L[Japanese]}" Command="{Binding SetJapaneseCommand}" />
+          <MenuItem Header="{Binding L[EnglishLang]}" Command="{Binding SetEnglishCommand}" />
+        </MenuItem>
       </MenuItem>
     </Menu>
 
     <!-- Bottom: log -->
-    <Border DockPanel.Dock="Bottom" BorderBrush="#40808080" BorderThickness="0,1,0,0" Height="150">
+    <Border DockPanel.Dock="Bottom" BorderBrush="#40808080" BorderThickness="0,1,0,0" Height="130">
       <DockPanel>
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="8,4">
           <ProgressBar IsIndeterminate="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Width="160" />
@@ -36,18 +42,33 @@
     </Border>
 
     <!-- Left: image settings -->
-    <Border DockPanel.Dock="Left" Width="300" BorderBrush="#40808080" BorderThickness="0,0,1,0">
+    <Border DockPanel.Dock="Left" Width="290" BorderBrush="#40808080" BorderThickness="0,0,1,0">
       <ScrollViewer>
         <StackPanel Margin="12" Spacing="4">
-          <TextBlock Classes="h" Text="プロジェクト" Margin="0,0,0,4" />
+          <TextBlock Classes="h" Text="{Binding L[Project]}" Margin="0,0,0,4" />
           <TextBox Text="{Binding ProjectName}" />
 
-          <TextBlock Classes="h" Text="画像" />
-          <Button Content="画像を開く…" Command="{Binding OpenImageCommand}" HorizontalAlignment="Stretch" />
+          <TextBlock Classes="h" Text="{Binding L[Image]}" />
+          <Button Content="{Binding L[OpenImage]}" Command="{Binding OpenImageCommand}" HorizontalAlignment="Stretch" />
           <TextBlock Classes="note" Text="{Binding SourceInfo}" />
-          <TextBlock Classes="note" Text="ウィンドウに画像をドラッグ＆ドロップしても開けます。" />
+          <TextBlock Classes="note" Text="{Binding L[DropHint]}" />
+          <StackPanel IsVisible="{Binding HasFrames}" Spacing="2">
+            <TextBlock Text="{Binding L[Frame]}" FontSize="12" />
+            <Grid ColumnDefinitions="*,Auto">
+              <NumericUpDown Value="{Binding Frame}" Minimum="0" Maximum="{Binding MaxFrame}" FormatString="0" />
+              <TextBlock Grid.Column="1" Text="{Binding FrameCount, StringFormat=' / {0}'}" VerticalAlignment="Center" />
+            </Grid>
+          </StackPanel>
+          <StackPanel IsVisible="{Binding IsVideo}" Spacing="2">
+            <TextBlock Text="{Binding L[VideoTime]}" FontSize="12" />
+            <NumericUpDown Value="{Binding VideoSeconds}" Minimum="0" Increment="0.5" FormatString="0.##" />
+          </StackPanel>
+          <Button Content="{Binding L[ReloadFrame]}" Command="{Binding ReloadFrameCommand}" HorizontalAlignment="Stretch"
+                  IsVisible="{Binding HasFrames}" />
+          <Button Content="{Binding L[ReloadFrame]}" Command="{Binding ReloadFrameCommand}" HorizontalAlignment="Stretch"
+                  IsVisible="{Binding IsVideo}" />
 
-          <TextBlock Classes="h" Text="地図の枚数" />
+          <TextBlock Classes="h" Text="{Binding L[MapCount]}" />
           <Grid ColumnDefinitions="*,Auto,*">
             <ComboBox ItemsSource="{Binding GridSizes}" SelectedItem="{Binding MapsX}" HorizontalAlignment="Stretch" />
             <TextBlock Grid.Column="1" Text=" × " VerticalAlignment="Center" />
@@ -55,46 +76,161 @@
           </Grid>
           <TextBlock Classes="note" Text="{Binding OutputSizeText}" />
 
-          <TextBlock Classes="h" Text="配置" />
+          <TextBlock Classes="h" Text="{Binding L[Crop]}" />
+          <ComboBox ItemsSource="{Binding CropModes}" SelectedItem="{Binding CropModeOption}" HorizontalAlignment="Stretch" />
+          <Grid ColumnDefinitions="*,*,*,*" IsVisible="{Binding IsManualCrop}">
+            <NumericUpDown Value="{Binding CropX}" FormatString="0" Minimum="0" Maximum="100000" ShowButtonSpinner="False" ToolTip.Tip="X" />
+            <NumericUpDown Grid.Column="1" Value="{Binding CropY}" FormatString="0" Minimum="0" Maximum="100000" ShowButtonSpinner="False" ToolTip.Tip="Y" />
+            <NumericUpDown Grid.Column="2" Value="{Binding CropW}" FormatString="0" Minimum="1" Maximum="100000" ShowButtonSpinner="False" ToolTip.Tip="W" />
+            <NumericUpDown Grid.Column="3" Value="{Binding CropH}" FormatString="0" Minimum="1" Maximum="100000" ShowButtonSpinner="False" ToolTip.Tip="H" />
+          </Grid>
+
+          <TextBlock Classes="h" Text="{Binding L[Placement]}" />
           <ComboBox ItemsSource="{Binding FitModes}" SelectedItem="{Binding Fit}" HorizontalAlignment="Stretch" />
           <ComboBox ItemsSource="{Binding Interpolations}" SelectedItem="{Binding Interp}" HorizontalAlignment="Stretch" />
-          <TextBlock Text="{Binding Zoom, StringFormat='拡大 {0:0.00}x'}" />
+          <TextBlock><Run Text="{Binding L[Zoom]}" /><Run Text="{Binding Zoom, StringFormat=' {0:0.00}x'}" /></TextBlock>
           <Slider Minimum="0.25" Maximum="4" Value="{Binding Zoom}" />
-          <TextBlock Text="{Binding OffsetX, StringFormat='横位置 {0:0.00}'}" />
+          <TextBlock><Run Text="{Binding L[OffsetX]}" /><Run Text="{Binding OffsetX, StringFormat=' {0:0.00}'}" /></TextBlock>
           <Slider Minimum="-1" Maximum="1" Value="{Binding OffsetX}" />
-          <TextBlock Text="{Binding OffsetY, StringFormat='縦位置 {0:0.00}'}" />
+          <TextBlock><Run Text="{Binding L[OffsetY]}" /><Run Text="{Binding OffsetY, StringFormat=' {0:0.00}'}" /></TextBlock>
           <Slider Minimum="-1" Maximum="1" Value="{Binding OffsetY}" />
 
-          <TextBlock Classes="h" Text="色の補正" />
-          <TextBlock Text="{Binding Brightness, StringFormat='明るさ {0:0.00}'}" />
+          <TextBlock Classes="h" Text="{Binding L[Adjust]}" />
+          <TextBlock><Run Text="{Binding L[Brightness]}" /><Run Text="{Binding Brightness, StringFormat=' {0:0.00}'}" /></TextBlock>
           <Slider Minimum="-1" Maximum="1" Value="{Binding Brightness}" />
-          <TextBlock Text="{Binding Contrast, StringFormat='コントラスト {0:0.00}'}" />
+          <TextBlock><Run Text="{Binding L[Contrast]}" /><Run Text="{Binding Contrast, StringFormat=' {0:0.00}'}" /></TextBlock>
           <Slider Minimum="-1" Maximum="1" Value="{Binding Contrast}" />
-          <TextBlock Text="{Binding Saturation, StringFormat='彩度 {0:0.00}'}" />
+          <TextBlock><Run Text="{Binding L[Saturation]}" /><Run Text="{Binding Saturation, StringFormat=' {0:0.00}'}" /></TextBlock>
           <Slider Minimum="-1" Maximum="1" Value="{Binding Saturation}" />
-          <TextBlock Text="{Binding Gamma, StringFormat='ガンマ {0:0.00}'}" />
+          <TextBlock><Run Text="{Binding L[Gamma]}" /><Run Text="{Binding Gamma, StringFormat=' {0:0.00}'}" /></TextBlock>
           <Slider Minimum="0.3" Maximum="3" Value="{Binding Gamma}" />
-          <TextBlock Text="{Binding Sharpen, StringFormat='シャープ {0:0.00}'}" />
+          <TextBlock><Run Text="{Binding L[Sharpen]}" /><Run Text="{Binding Sharpen, StringFormat=' {0:0.00}'}" /></TextBlock>
           <Slider Minimum="0" Maximum="2" Value="{Binding Sharpen}" />
 
-          <TextBlock Classes="h" Text="背景・透明" />
+          <TextBlock Classes="h" Text="{Binding L[Background]}" />
           <TextBox Text="{Binding BackgroundColor}" Watermark="#FFFFFF" />
-          <CheckBox Content="透明を保持する（地図直接生成向け・未検証）" IsChecked="{Binding KeepTransparency}" />
-          <TextBlock Classes="note" Text="オフのとき透明部分は背景色と合成します。" />
+          <ComboBox ItemsSource="{Binding TransparencyModes}" SelectedItem="{Binding Transparency}" HorizontalAlignment="Stretch" />
         </StackPanel>
       </ScrollViewer>
     </Border>
 
-    <!-- Right: modes -->
-    <Border DockPanel.Dock="Right" Width="470" BorderBrush="#40808080" BorderThickness="1,0,0,0">
+    <!-- Right: tabs -->
+    <Border DockPanel.Dock="Right" Width="610" BorderBrush="#40808080" BorderThickness="1,0,0,0">
       <TabControl Padding="0">
 
-        <!-- Block construction -->
-        <TabItem Header="ブロック建築">
+        <!-- Block selection (MapartCraft-style) -->
+        <TabItem Header="{Binding L[TabPalette]}">
+          <DockPanel Margin="10">
+            <StackPanel DockPanel.Dock="Top" Spacing="6">
+              <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" >
+                <TextBlock Text="{Binding L[Preset]}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <ComboBox Grid.Column="1" ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}" HorizontalAlignment="Stretch">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="pb:BlockPreset">
+                      <TextBlock Text="{Binding Label}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <Button Grid.Column="2" Content="{Binding L[Apply]}" Command="{Binding ApplyPresetCommand}" Margin="4,0,0,0" Classes="accent" />
+                <Button Grid.Column="3" Content="{Binding L[SavePreset]}" Command="{Binding SavePresetCommand}" Margin="4,0,0,0" />
+                <Button Grid.Column="4" Content="{Binding L[DeletePreset]}" Command="{Binding DeletePresetCommand}" Margin="4,0,0,0" />
+              </Grid>
+              <Grid ColumnDefinitions="Auto,Auto,*">
+                <Button Content="{Binding L[DownloadTextures]}" Command="{Binding DownloadTexturesCommand}" />
+                <Button Grid.Column="1" Content="{Binding L[UseResourcePack]}" Command="{Binding UseResourcePackCommand}" Margin="4,0" />
+                <TextBlock Grid.Column="2" Classes="note" Text="{Binding TextureStatus}" VerticalAlignment="Center" />
+              </Grid>
+              <TextBlock Classes="note" Text="{Binding L[PaletteHint]}" />
+              <TextBlock Classes="note" Text="{Binding PaletteSummary}" FontWeight="SemiBold" />
+            </StackPanel>
+
+            <Expander DockPanel.Dock="Bottom" Header="{Binding L[CustomBlocks]}" Margin="0,8,0,0">
+              <StackPanel Spacing="6">
+                <TextBox Text="{Binding CustomId}" Watermark="{Binding L[CustomId]}" />
+                <TextBox Text="{Binding CustomStates}" Watermark="{Binding L[CustomStates]}" />
+                <Grid ColumnDefinitions="*,8,*">
+                  <ComboBox ItemsSource="{Binding ColourSetsForCustom}" SelectedItem="{Binding CustomSet}" HorizontalAlignment="Stretch"
+                            PlaceholderText="{Binding L[CustomSet]}">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="pal:ColourSet">
+                        <TextBlock Text="{Binding Label}" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                  <TextBox Grid.Column="2" Text="{Binding CustomColor}" Watermark="{Binding L[CustomColor]}" />
+                </Grid>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <CheckBox Content="{Binding L[CustomSupport]}" IsChecked="{Binding CustomSupport}" />
+                  <Button Content="{Binding L[AddCustom]}" Command="{Binding AddCustomCommand}" />
+                  <Button Content="{Binding L[ImportBp]}" Command="{Binding ImportBpFolderCommand}" />
+                  <Button Content="{Binding L[ImportBpFile]}" Command="{Binding ImportBpFileCommand}" />
+                </StackPanel>
+                <ItemsControl ItemsSource="{Binding CustomBlocks}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:CustomBlockViewModel">
+                      <Grid ColumnDefinitions="*,Auto" Margin="0,1">
+                        <TextBlock Text="{Binding Text}" VerticalAlignment="Center" FontSize="12" />
+                        <Button Grid.Column="1" Content="✕" Command="{Binding RemoveCommand}" Padding="6,0" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Expander>
+
+            <Border Classes="palette">
+              <ScrollViewer>
+                <ItemsControl ItemsSource="{Binding Rows}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ColourSetRowViewModel">
+                      <Grid ColumnDefinitions="22,Auto,*" Margin="0,1">
+                        <Border Width="18" Height="36" CornerRadius="2" ClipToBounds="True" VerticalAlignment="Top" Margin="0,2,0,0"
+                                ToolTip.Tip="{Binding Name}">
+                          <StackPanel>
+                            <Border Height="12" Background="{Binding BrightBrush}" />
+                            <Border Height="12" Background="{Binding NormalBrush}" />
+                            <Border Height="12" Background="{Binding DarkBrush}" />
+                          </StackPanel>
+                        </Border>
+                        <ToggleButton Grid.Column="1" Classes="blk" IsChecked="{Binding IsNone}" VerticalAlignment="Top"
+                                      ToolTip.Tip="{Binding Loc[NoneBlock]}">
+                          <Panel Width="32" Height="32">
+                            <Ellipse Width="24" Height="24" Stroke="#E03030" StrokeThickness="3" />
+                            <Line StartPoint="8,24" EndPoint="24,8" Stroke="#E03030" StrokeThickness="3" />
+                          </Panel>
+                        </ToggleButton>
+                        <ItemsControl Grid.Column="2" ItemsSource="{Binding Blocks}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                              <WrapPanel />
+                            </ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:BlockChoiceViewModel">
+                              <ToggleButton Classes="blk" IsChecked="{Binding IsSelected}" ToolTip.Tip="{Binding Tooltip}">
+                                <Panel Width="32" Height="32">
+                                  <Border Background="{Binding Swatch}" IsVisible="{Binding !HasIcon}" CornerRadius="1" />
+                                  <Image Source="{Binding Icon}" IsVisible="{Binding HasIcon}" RenderOptions.BitmapInterpolationMode="None" />
+                                </Panel>
+                              </ToggleButton>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </Border>
+          </DockPanel>
+        </TabItem>
+
+        <!-- Build settings -->
+        <TabItem Header="{Binding L[TabBuild]}">
           <ScrollViewer>
             <StackPanel Margin="12" Spacing="4">
-              <TextBlock Classes="h" Text="色プロファイル" Margin="0" />
-              <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" HorizontalAlignment="Stretch">
+              <TextBlock Classes="h" Text="{Binding L[ColorProfile]}" Margin="0" />
+              <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedBaseProfile}" HorizontalAlignment="Stretch">
                 <ComboBox.ItemTemplate>
                   <DataTemplate x:DataType="pal:ColorProfile">
                     <TextBlock Text="{Binding Name}" />
@@ -103,81 +239,121 @@
               </ComboBox>
               <TextBlock Classes="note" Text="{Binding ProfileNote}" />
 
-              <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" Margin="0,6,0,0">
-                <TextBlock Text="色差の計算" VerticalAlignment="Center" />
+              <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" Margin="0,6,0,0">
+                <TextBlock Text="{Binding L[Metric]}" VerticalAlignment="Center" />
                 <ComboBox Grid.Column="1" ItemsSource="{Binding Metrics}" SelectedItem="{Binding Metric}" HorizontalAlignment="Stretch" Margin="0,2" />
-                <TextBlock Grid.Row="1" Text="ディザリング" VerticalAlignment="Center" />
+                <TextBlock Grid.Row="1" Text="{Binding L[Dither]}" VerticalAlignment="Center" />
                 <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Dithers}" SelectedItem="{Binding Dither}" HorizontalAlignment="Stretch" Margin="0,2" />
-                <TextBlock Grid.Row="2" Text="建築方式" VerticalAlignment="Center" />
-                <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding BuildModes}" SelectedItem="{Binding BuildModeOption}" HorizontalAlignment="Stretch" Margin="0,2" />
-                <TextBlock Grid.Row="3" Text="希少度" VerticalAlignment="Center" />
-                <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding Rarities}" SelectedItem="{Binding MaxRarity}" HorizontalAlignment="Stretch" Margin="0,2" />
-                <TextBlock Grid.Row="4" Text="種類の上限" VerticalAlignment="Center" />
-                <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding MaxBlockTypes}" Minimum="0" Maximum="200" FormatString="0" Margin="0,2" />
-                <TextBlock Grid.Row="5" Text="支えブロック" VerticalAlignment="Center" />
-                <ComboBox Grid.Row="5" Grid.Column="1" ItemsSource="{Binding SupportBlocks}" SelectedItem="{Binding SelectedSupportBlock}" HorizontalAlignment="Stretch" Margin="0,2">
+                <TextBlock Grid.Row="2" Text="{Binding L[Staircase]}" VerticalAlignment="Center" />
+                <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Staircases}" SelectedItem="{Binding StaircaseOption}" HorizontalAlignment="Stretch" Margin="0,2" />
+                <TextBlock Grid.Row="3" Text="{Binding L[SupportMode]}" VerticalAlignment="Center" />
+                <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding SupportModes}" SelectedItem="{Binding SupportModeOption}" HorizontalAlignment="Stretch" Margin="0,2" />
+                <TextBlock Grid.Row="4" Text="{Binding L[SupportBlock]}" VerticalAlignment="Center" />
+                <ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{Binding SupportBlocks}" SelectedItem="{Binding SelectedSupportBlock}" HorizontalAlignment="Stretch" Margin="0,2">
                   <ComboBox.ItemTemplate>
                     <DataTemplate x:DataType="pal:BlockDefinition">
-                      <TextBlock Text="{Binding DisplayName}" />
+                      <TextBlock Text="{Binding Label}" />
                     </DataTemplate>
                   </ComboBox.ItemTemplate>
                 </ComboBox>
+                <TextBlock Grid.Row="5" Text="{Binding L[MaxTypes]}" VerticalAlignment="Center" />
+                <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding MaxBlockTypes}" Minimum="0" Maximum="400" FormatString="0" Margin="0,2" />
               </Grid>
-              <TextBlock Classes="warn" IsVisible="{Binding IsStaircase}"
-                         Text="Staircase は Java 版の陰影規則を仮定した実験機能です。Bedrock の陰影は「地図・校正」タブで実測してから使ってください。" />
-              <CheckBox Content="重力ブロック（砂など）を使わない" IsChecked="{Binding ExcludeGravity}" />
-              <CheckBox Content="燃えるブロックを使わない" IsChecked="{Binding ExcludeFlammable}" />
-              <TextBlock Classes="note" Text="0 = 種類の上限なし。使えるブロックの選択は「パレット」タブで行います。" />
+              <TextBlock Classes="note" Text="{Binding L[MaxTypesHint]}" />
+              <TextBlock Classes="warn" IsVisible="{Binding IsStaircase}" Text="{Binding L[StairWarn]}" />
 
-              <TextBlock Classes="h" Text="建築位置（ワールド座標）" />
-              <CheckBox Content="地図の範囲に合わせた座標を出力する" IsChecked="{Binding UseOrigin}" />
+              <TextBlock Classes="h" Text="{Binding L[WorldPos]}" />
+              <CheckBox Content="{Binding L[UseOrigin]}" IsChecked="{Binding UseOrigin}" />
               <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*" IsEnabled="{Binding UseOrigin}">
-                <TextBlock Text="地図X" VerticalAlignment="Center" Margin="0,0,4,0" />
+                <TextBlock Text="{Binding L[MapX]}" VerticalAlignment="Center" Margin="0,0,4,0" />
                 <NumericUpDown Grid.Column="1" Value="{Binding OriginMapX}" FormatString="0" Minimum="-100000" Maximum="100000" />
-                <TextBlock Grid.Column="2" Text="地図Z" VerticalAlignment="Center" Margin="6,0,4,0" />
+                <TextBlock Grid.Column="2" Text="{Binding L[MapZ]}" VerticalAlignment="Center" Margin="6,0,4,0" />
                 <NumericUpDown Grid.Column="3" Value="{Binding OriginMapZ}" FormatString="0" Minimum="-100000" Maximum="100000" />
                 <TextBlock Grid.Column="4" Text="Y" VerticalAlignment="Center" Margin="6,0,4,0" />
                 <NumericUpDown Grid.Column="5" Value="{Binding OriginY}" FormatString="0" Minimum="-64" Maximum="319" />
               </Grid>
               <TextBlock Classes="note" Text="{Binding OriginText}" />
 
-              <TextBlock Classes="h" Text="結果" />
+              <TextBlock Classes="h" Text="{Binding L[Result]}" />
               <TextBlock Text="{Binding BlockSummary}" TextWrapping="Wrap" />
-              <Button Content="建築データを出力（ガイド・構造物・ビヘイビアパック）…" Command="{Binding ExportBlockCommand}"
-                      Classes="accent" HorizontalAlignment="Stretch" Margin="0,6" />
+              <Button Content="{Binding L[ExportBuild]}" Command="{Binding ExportBlockCommand}" Classes="accent" HorizontalAlignment="Stretch" Margin="0,6" />
+            </StackPanel>
+          </ScrollViewer>
+        </TabItem>
 
-              <TextBlock Classes="h" Text="必要素材" />
+        <!-- Materials & progress -->
+        <TabItem Header="{Binding L[TabMaterials]}">
+          <DockPanel Margin="12">
+            <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto">
+              <TextBlock Text="{Binding L[MaterialsFor]}" VerticalAlignment="Center" Margin="0,0,6,0" />
+              <ComboBox Grid.Column="1" ItemsSource="{Binding MaterialAreas}" SelectedItem="{Binding MaterialArea}" HorizontalAlignment="Stretch">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ViewAreaOption">
+                    <TextBlock Text="{Binding Label}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <Button Grid.Column="2" Content="{Binding L[ExportMaterials]}" Command="{Binding ExportMaterialsCommand}" Margin="6,0,0,0" />
+            </Grid>
+            <Expander DockPanel.Dock="Bottom" Header="{Binding L[Progress]}" Margin="0,8,0,0" IsExpanded="True">
+              <ScrollViewer MaxHeight="220">
+                <ItemsControl ItemsSource="{Binding MapProgress}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:MapProgressViewModel">
+                      <Grid ColumnDefinitions="50,170,*" Margin="0,2">
+                        <TextBlock Text="{Binding Title}" VerticalAlignment="Center" FontWeight="SemiBold" />
+                        <ComboBox Grid.Column="1" ItemsSource="{Binding Options}" SelectedItem="{Binding State}" HorizontalAlignment="Stretch" />
+                        <TextBlock Grid.Column="2" Text="{Binding ChunksText}" VerticalAlignment="Center" Margin="8,0" Classes="note" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </Expander>
+            <Grid DockPanel.Dock="Top" ColumnDefinitions="40,*,90,110,110" Margin="0,8,0,4">
+              <TextBlock Grid.Column="1" Text="{Binding L[Image]}" Classes="note" Opacity="0" />
+              <TextBlock Grid.Column="2" Text="{Binding L[Need]}" Classes="note" HorizontalAlignment="Right" />
+              <TextBlock Grid.Column="3" Text="{Binding L[Owned]}" Classes="note" HorizontalAlignment="Center" />
+              <TextBlock Grid.Column="4" Text="{Binding L[Missing]}" Classes="note" HorizontalAlignment="Right" />
+            </Grid>
+            <ScrollViewer>
               <ItemsControl ItemsSource="{Binding Materials}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:MaterialViewModel">
-                    <Grid ColumnDefinitions="18,*,Auto" Margin="0,2">
-                      <Border Width="14" Height="14" Background="{Binding Swatch}" BorderBrush="Gray" BorderThickness="1" VerticalAlignment="Top" Margin="0,2,0,0" />
+                    <Grid ColumnDefinitions="40,*,90,110,110" Margin="0,2">
+                      <Panel Width="32" Height="32" VerticalAlignment="Top">
+                        <Border Background="{Binding Swatch}" IsVisible="{Binding !HasIcon}" CornerRadius="2" />
+                        <Image Source="{Binding Icon}" IsVisible="{Binding HasIcon}" RenderOptions.BitmapInterpolationMode="None" />
+                      </Panel>
                       <StackPanel Grid.Column="1" Margin="4,0">
-                        <TextBlock>
-                          <Run Text="{Binding Name}" />
-                          <Run Text="{Binding Kind, StringFormat=' ({0})'}" Foreground="Gray" FontSize="11" />
-                        </TextBlock>
-                        <TextBlock Classes="note" Text="{Binding Maps, StringFormat='マップ {0}'}" />
+                        <TextBlock Text="{Binding Name}" TextWrapping="Wrap" />
+                        <TextBlock Classes="note" Text="{Binding Maps}" />
                         <TextBlock Classes="note" Text="{Binding Alternatives}" />
                       </StackPanel>
                       <StackPanel Grid.Column="2" HorizontalAlignment="Right">
-                        <TextBlock Text="{Binding Count, StringFormat='{}{0:N0} 個'}" HorizontalAlignment="Right" />
+                        <TextBlock Text="{Binding Count, StringFormat='{}{0:N0}'}" HorizontalAlignment="Right" />
                         <TextBlock Classes="note" Text="{Binding Stacks}" HorizontalAlignment="Right" />
+                      </StackPanel>
+                      <NumericUpDown Grid.Column="3" Value="{Binding Owned}" Minimum="0" Maximum="10000000" FormatString="0"
+                                     ShowButtonSpinner="False" Margin="6,0" VerticalAlignment="Top" />
+                      <StackPanel Grid.Column="4" HorizontalAlignment="Right">
+                        <TextBlock Text="{Binding MissingText}" HorizontalAlignment="Right" />
+                        <TextBlock Classes="note" Text="{Binding MissingStacks}" HorizontalAlignment="Right" />
                       </StackPanel>
                     </Grid>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-            </StackPanel>
-          </ScrollViewer>
+            </ScrollViewer>
+          </DockPanel>
         </TabItem>
 
         <!-- Direct map -->
-        <TabItem Header="地図直接生成">
+        <TabItem Header="{Binding L[TabDirect]}">
           <ScrollViewer>
             <StackPanel Margin="12" Spacing="6">
-              <TextBlock Classes="note" Text="画像をそのまま地図データ（RGBA）としてワールドのコピーへ追加します。元のワールドは変更しません。Minecraft は終了しておいてください。" />
-              <TextBlock Classes="h" Text="ワールド" />
+              <TextBlock Classes="note" Text="{Binding L[DirectHint]}" />
+              <TextBlock Classes="h" Text="{Binding L[World]}" />
               <ComboBox ItemsSource="{Binding Worlds}" SelectedItem="{Binding SelectedWorld}" HorizontalAlignment="Stretch">
                 <ComboBox.ItemTemplate>
                   <DataTemplate x:DataType="world:WorldInfo">
@@ -186,59 +362,60 @@
                 </ComboBox.ItemTemplate>
               </ComboBox>
               <StackPanel Orientation="Horizontal" Spacing="6">
-                <Button Content="再検出" Command="{Binding RefreshWorldsCommand}" />
-                <Button Content="フォルダを選択…" Command="{Binding BrowseWorldCommand}" />
+                <Button Content="{Binding L[Rescan]}" Command="{Binding RefreshWorldsCommand}" />
+                <Button Content="{Binding L[BrowseFolder]}" Command="{Binding BrowseWorldCommand}" />
               </StackPanel>
               <TextBlock Classes="note" Text="{Binding WorldDetails}" />
 
-              <TextBlock Classes="h" Text="設定" />
-              <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto">
-                <TextBlock Text="開始 ID" VerticalAlignment="Center" />
+              <TextBlock Classes="h" Text="{Binding L[Settings]}" />
+              <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto">
+                <TextBlock Text="{Binding L[StartId]}" VerticalAlignment="Center" />
                 <TextBox Grid.Column="1" Text="{Binding StartId}" Margin="0,2" />
-                <TextBlock Grid.Row="1" Text="受け取り方法" VerticalAlignment="Center" />
+                <TextBlock Grid.Row="1" Text="{Binding L[Delivery]}" VerticalAlignment="Center" />
                 <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Deliveries}" SelectedItem="{Binding Delivery}" HorizontalAlignment="Stretch" Margin="0,2" />
               </Grid>
-              <CheckBox Content="輝く額縁を使う" IsChecked="{Binding GlowFrames}" />
-              <CheckBox Content="額縁の後ろに壁を付ける" IsChecked="{Binding BackingWall}" />
-              <TextBlock Classes="note" Text="使用中の ID は自動的に避けます。地図・チェスト・額縁は構造物としてコピー内に保存され、/structure load で取り出せます。" />
+              <CheckBox Content="{Binding L[GlowFrames]}" IsChecked="{Binding GlowFrames}" />
+              <CheckBox Content="{Binding L[BackingWall]}" IsChecked="{Binding BackingWall}" />
+              <CheckBox Content="{Binding L[AddToInventory]}" IsChecked="{Binding AddToInventory}" />
+              <TextBlock Classes="note" Text="{Binding L[DirectNote]}" />
 
               <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,6,0,0">
-                <Button Content="書き込み内容を確認" Command="{Binding PlanWorldExportCommand}" />
-                <Button Content="コピーを作成して地図を追加…" Command="{Binding ExecuteWorldExportCommand}" Classes="accent" />
+                <Button Content="{Binding L[PlanExport]}" Command="{Binding PlanWorldExportCommand}" />
+                <Button Content="{Binding L[RunExport]}" Command="{Binding ExecuteWorldExportCommand}" Classes="accent" />
               </StackPanel>
-              <Button Content="地図画像を PNG で出力…" Command="{Binding ExportTilesCommand}" HorizontalAlignment="Left" />
+              <Button Content="{Binding L[ExportPng]}" Command="{Binding ExportTilesCommand}" HorizontalAlignment="Left" />
               <SelectableTextBlock Text="{Binding PlanText}" TextWrapping="Wrap" FontSize="12" Margin="0,6,0,0" />
             </StackPanel>
           </ScrollViewer>
         </TabItem>
 
         <!-- Maps & calibration -->
-        <TabItem Header="地図・校正">
+        <TabItem Header="{Binding L[TabMaps]}">
           <DockPanel Margin="12">
             <StackPanel DockPanel.Dock="Top" Spacing="6">
-              <TextBlock Classes="note" Text="「地図直接生成」タブで選んだワールドの地図を読み取り専用で表示します。" />
+              <TextBlock Classes="note" Text="{Binding L[MapsHint]}" />
               <StackPanel Orientation="Horizontal" Spacing="6">
-                <Button Content="地図を読み込む" Command="{Binding LoadMapsCommand}" />
-                <Button Content="PNG で保存…" Command="{Binding ExportMapPngCommand}" />
-                <Button Content="元画像として使う" Command="{Binding UseMapAsSourceCommand}" />
+                <Button Content="{Binding L[LoadMaps]}" Command="{Binding LoadMapsCommand}" />
+                <Button Content="{Binding L[SavePng]}" Command="{Binding ExportMapPngCommand}" />
+                <Button Content="{Binding L[UseAsSource]}" Command="{Binding UseMapAsSourceCommand}" />
               </StackPanel>
             </StackPanel>
-            <Expander DockPanel.Dock="Bottom" Header="色の校正（実機測定）" Margin="0,8,0,0">
+            <Expander DockPanel.Dock="Bottom" Header="{Binding L[Calibration]}" Margin="0,8,0,0">
               <StackPanel Spacing="6">
-                <TextBlock Classes="note" Text="全ブロックを並べたテストパッドをゲーム内に置いて地図を作り、その地図から実際の地図色を測定します。" />
+                <TextBlock Classes="note" Text="{Binding L[CalibrationHint]}" />
                 <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*">
-                  <TextBlock Text="地図X" VerticalAlignment="Center" Margin="0,0,4,0" />
+                  <TextBlock Text="{Binding L[MapX]}" VerticalAlignment="Center" Margin="0,0,4,0" />
                   <NumericUpDown Grid.Column="1" Value="{Binding CalibrationMapX}" FormatString="0" Minimum="-100000" Maximum="100000" />
-                  <TextBlock Grid.Column="2" Text="地図Z" VerticalAlignment="Center" Margin="6,0,4,0" />
+                  <TextBlock Grid.Column="2" Text="{Binding L[MapZ]}" VerticalAlignment="Center" Margin="6,0,4,0" />
                   <NumericUpDown Grid.Column="3" Value="{Binding CalibrationMapZ}" FormatString="0" Minimum="-100000" Maximum="100000" />
                   <TextBlock Grid.Column="4" Text="Y" VerticalAlignment="Center" Margin="6,0,4,0" />
                   <NumericUpDown Grid.Column="5" Value="{Binding CalibrationY}" FormatString="0" Minimum="-64" Maximum="319" />
                 </Grid>
                 <TextBlock Classes="note" Text="{Binding CalibrationText}" />
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <Button Content="テストパッドを出力…" Command="{Binding ExportCalibrationPackCommand}" />
-                  <Button Content="選択した地図で測定" Command="{Binding MeasureCalibrationCommand}" />
-                  <Button Content="実測プロファイルとして保存" Command="{Binding SaveCalibratedProfileCommand}" Classes="accent" />
+                  <Button Content="{Binding L[ExportPad]}" Command="{Binding ExportCalibrationPackCommand}" />
+                  <Button Content="{Binding L[Measure]}" Command="{Binding MeasureCalibrationCommand}" />
+                  <Button Content="{Binding L[SaveMeasured]}" Command="{Binding SaveCalibratedProfileCommand}" Classes="accent" />
                 </StackPanel>
                 <ScrollViewer MaxHeight="220">
                   <SelectableTextBlock Text="{Binding CalibrationResult}" TextWrapping="Wrap" FontSize="12" />
@@ -262,57 +439,43 @@
             </ListBox>
           </DockPanel>
         </TabItem>
-
-        <!-- Palette -->
-        <TabItem Header="パレット">
-          <DockPanel Margin="12">
-            <StackPanel DockPanel.Dock="Top" Spacing="6">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <Button Content="すべて使う" Command="{Binding PaletteAllCommand}" />
-                <Button Content="すべて外す" Command="{Binding PaletteNoneCommand}" />
-                <Button Content="初期設定" Command="{Binding PaletteDefaultCommand}" />
-              </StackPanel>
-              <TextBlock Classes="note" Text="{Binding PaletteSummary}" />
-            </StackPanel>
-            <ListBox ItemsSource="{Binding PaletteItems}">
-              <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:PaletteItemViewModel">
-                  <Grid ColumnDefinitions="Auto,22,*">
-                    <CheckBox IsChecked="{Binding IsEnabled}" MinWidth="0" />
-                    <Border Grid.Column="1" Width="16" Height="16" Background="{Binding Swatch}" BorderBrush="Gray" BorderThickness="1" />
-                    <StackPanel Grid.Column="2" Margin="6,0">
-                      <TextBlock>
-                        <Run Text="{Binding Name}" />
-                        <Run Text="{Binding Category, StringFormat=' · {0}'}" Foreground="Gray" FontSize="11" />
-                      </TextBlock>
-                      <TextBlock Classes="note">
-                        <Run Text="{Binding ColorText}" />
-                        <Run Text="{Binding Status, StringFormat=' · {0}'}" />
-                      </TextBlock>
-                      <TextBlock Classes="note" Text="{Binding Identifier}" />
-                    </StackPanel>
-                  </Grid>
-                </DataTemplate>
-              </ListBox.ItemTemplate>
-            </ListBox>
-          </DockPanel>
-        </TabItem>
       </TabControl>
     </Border>
 
     <!-- Center: preview -->
     <DockPanel ClipToBounds="True">
-      <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,Auto,*" Margin="10,8">
-        <ComboBox ItemsSource="{Binding PreviewModes}" SelectedItem="{Binding SelectedPreviewMode}" Width="230" />
-        <CheckBox Grid.Column="1" Content="地図・構造物の境界を表示" IsChecked="{Binding ShowGrid}" Margin="10,0" />
-        <TextBlock Grid.Column="2" Text="{Binding PreviewInfo}" ToolTip.Tip="{Binding PreviewInfo}" VerticalAlignment="Center"
-                   FontSize="12" Opacity="0.7" TextTrimming="CharacterEllipsis" />
-      </Grid>
-      <Border Background="#18808080" Margin="10,0,10,10">
+      <WrapPanel DockPanel.Dock="Top" Margin="10,8,10,0">
+        <ComboBox ItemsSource="{Binding PreviewModes}" SelectedItem="{Binding SelectedPreviewMode}" Width="250" Margin="0,0,10,4" />
+          <CheckBox Content="{Binding L[ShowGrid]}" IsChecked="{Binding ShowGrid}" IsVisible="{Binding IsImageView}" />
+          <WrapPanel Orientation="Horizontal" IsVisible="{Binding IsBuildView}">
+            <ComboBox ItemsSource="{Binding ViewAreas}" SelectedItem="{Binding ViewArea}" MinWidth="110" Margin="0,0,8,4">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:ViewAreaOption">
+                  <TextBlock Text="{Binding Label}" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+            <TextBlock Text="{Binding L[CellSize]}" VerticalAlignment="Center" Margin="0,0,4,0" />
+            <Slider Minimum="1" Maximum="24" Value="{Binding CellSize}" Width="110" IsSnapToTickEnabled="True" TickFrequency="1" Margin="0,0,8,0" />
+            <Button Content="{Binding L[Rotate]}" Command="{Binding RotateCommand}" IsVisible="{Binding IsBuild3D}" Margin="0,0,8,4" />
+            <CheckBox Content="{Binding L[ShowSupports]}" IsChecked="{Binding ShowSupports}" IsVisible="{Binding IsBuild3D}" Margin="0,0,8,0" />
+            <CheckBox Content="{Binding L[ShowHeights]}" IsChecked="{Binding ShowHeights}" IsVisible="{Binding !IsBuild3D}" Margin="0,0,8,0" />
+            <CheckBox Content="{Binding L[EditProgress]}" IsChecked="{Binding EditProgress}" IsVisible="{Binding !IsBuild3D}" />
+          </WrapPanel>
+      </WrapPanel>
+      <TextBlock DockPanel.Dock="Top" Text="{Binding PreviewInfo}" FontSize="12" Opacity="0.7" Margin="12,4" TextTrimming="CharacterEllipsis" />
+      <TextBlock DockPanel.Dock="Bottom" Text="{Binding HoverInfo}" FontSize="12" Margin="12,2,12,6" TextTrimming="CharacterEllipsis"
+                 IsVisible="{Binding IsBuildView}" />
+      <Border Background="#18808080" Margin="10,0,10,6">
         <Grid>
-          <Image Source="{Binding Preview}" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="None" Margin="8" />
-          <TextBlock Text="画像を開くか、ここにドロップしてください" HorizontalAlignment="Center" VerticalAlignment="Center"
-                     Opacity="0.5" IsVisible="{Binding Preview, Converter={x:Static ObjectConverters.IsNull}}" />
+          <Image Source="{Binding Preview}" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="None" Margin="8"
+                 IsVisible="{Binding IsImageView}" />
+          <ScrollViewer IsVisible="{Binding IsBuildView}" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+            <Image x:Name="BuildImage" Source="{Binding Preview}" Stretch="None" RenderOptions.BitmapInterpolationMode="None"
+                   HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" />
+          </ScrollViewer>
+          <TextBlock Text="{Binding L[DropHere]}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                     Opacity="0.5" IsVisible="{Binding !HasPreview}" />
         </Grid>
       </Border>
     </DockPanel>

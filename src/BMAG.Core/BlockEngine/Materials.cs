@@ -29,11 +29,13 @@ public sealed class MaterialLine
 public static class MaterialCalculator
 {
     /// <summary>Counts blocks. Support blocks are listed separately from the art itself.</summary>
-    public static List<MaterialLine> Calculate(BlockLayout layout, int mapsX)
+    /// <param name="onlyMap">1-based map number to count, or null for everything.</param>
+    public static List<MaterialLine> Calculate(BlockLayout layout, int mapsX, int? onlyMap = null)
     {
         var lines = new Dictionary<(string, bool), MaterialLine>();
         foreach (var p in layout.Placements())
         {
+            if (onlyMap is int m && MapNumberOf(p.X, p.Z, mapsX) != m) continue;
             if (!lines.TryGetValue((p.Block.Key, p.IsSupport), out var line))
             {
                 var entry = layout.Entries.FirstOrDefault(e => e.Block.Key == p.Block.Key);
@@ -45,10 +47,15 @@ public static class MaterialCalculator
                 lines[(p.Block.Key, p.IsSupport)] = line;
             }
             line.Count++;
-            int mapX = Math.Max(0, p.SourcePixelX) / 128;
-            int mapY = Math.Max(0, p.SourcePixelY) / 128;
-            line.MapNumbers.Add(mapY * mapsX + mapX + 1);
+            line.MapNumbers.Add(MapNumberOf(p.X, p.Z, mapsX));
         }
         return lines.Values.OrderBy(l => l.IsSupport).ThenByDescending(l => l.Count).ToList();
     }
+
+    /// <summary>1-based map number of a layout position (the support row belongs to the top maps).</summary>
+    public static int MapNumberOf(int x, int z, int mapsX) => Math.Max(0, z - 1) / 128 * mapsX + x / 128 + 1;
+
+    /// <summary>Progress key of the 16x16 chunk (inside its map) that contains a layout position.</summary>
+    public static string ChunkKey(int x, int z, int mapsX) =>
+        $"{MapNumberOf(x, z, mapsX)}:{x % 128 / 16}:{Math.Max(0, z - 1) % 128 / 16}";
 }

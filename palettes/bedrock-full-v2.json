@@ -1,0 +1,3675 @@
+{
+  "formatVersion": 2,
+  "id": "bedrock-full-v2",
+  "name": "Bedrock 全ブロック / All blocks（推定色・未検証 / estimated colours）",
+  "gameVersion": "1.26",
+  "updated": "2026-10-17",
+  "notes": "色セットと地図の基本色は Minecraft の地図色（Java 版の値）を初期値にした推定値で、Bedrock 実機では未検証です。ブロック識別子と状態は Bedrock 1.26 の公式メタデータで検証済み。",
+  "shades": {
+    "dark": 180,
+    "normal": 220,
+    "bright": 255,
+    "verified": false
+  },
+  "colourSets": [
+    {
+      "id": 0,
+      "nameEn": "Grass",
+      "name": "草",
+      "mapColor": "#7FB238",
+      "blocks": [
+        {
+          "key": "grass_block",
+          "displayName": "草ブロック",
+          "displayNameEn": "Grass Block",
+          "name": "minecraft:grass_block",
+          "states": {},
+          "version": 18168865,
+          "biomeTinted": true
+        },
+        {
+          "key": "slime_block",
+          "displayName": "スライムブロック",
+          "displayNameEn": "Slime Block",
+          "name": "minecraft:slime",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "nameEn": "Sand",
+      "name": "砂",
+      "mapColor": "#F7E9A3",
+      "blocks": [
+        {
+          "key": "sand",
+          "displayName": "砂",
+          "displayNameEn": "Sand",
+          "name": "minecraft:sand",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "gravity": true
+        },
+        {
+          "key": "sandstone",
+          "displayName": "砂岩",
+          "displayNameEn": "Sandstone",
+          "name": "minecraft:sandstone",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "sandstone_slab",
+          "displayName": "砂岩のハーフブロック",
+          "displayNameEn": "Sandstone Slab",
+          "name": "minecraft:sandstone_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "birch_log_y",
+          "displayName": "シラカバの原木（縦）",
+          "displayNameEn": "Birch Log (vertical)",
+          "name": "minecraft:birch_log",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "birch_planks",
+          "displayName": "シラカバの板材",
+          "displayNameEn": "Birch Planks",
+          "name": "minecraft:birch_planks",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "birch_slab",
+          "displayName": "シラカバのハーフブロック",
+          "displayNameEn": "Birch Slab",
+          "name": "minecraft:birch_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "glowstone",
+          "displayName": "グロウストーン",
+          "displayNameEn": "Glowstone",
+          "name": "minecraft:glowstone",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "end_stone",
+          "displayName": "エンドストーン",
+          "displayNameEn": "End Stone",
+          "name": "minecraft:end_stone",
+          "states": {},
+          "version": 18168865,
+          "rarity": 2
+        },
+        {
+          "key": "end_stone_bricks",
+          "displayName": "エンドストーンレンガ",
+          "displayNameEn": "End Stone Bricks",
+          "name": "minecraft:end_bricks",
+          "states": {},
+          "version": 18168865,
+          "rarity": 2
+        },
+        {
+          "key": "end_stone_brick_slab",
+          "displayName": "エンドストーンレンガのハーフブロック",
+          "displayNameEn": "End Stone Brick Slab",
+          "name": "minecraft:end_stone_brick_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "rarity": 2
+        },
+        {
+          "key": "bone_block",
+          "displayName": "骨ブロック",
+          "displayNameEn": "Bone Block",
+          "name": "minecraft:bone_block",
+          "states": {
+            "deprecated": 0,
+            "pillar_axis": "y"
+          },
+          "version": 18168865
+        },
+        {
+          "key": "birch_pressure_plate",
+          "displayName": "シラカバの感圧板",
+          "displayNameEn": "Birch Pressure Plate",
+          "name": "minecraft:birch_pressure_plate",
+          "states": {
+            "redstone_signal": 0
+          },
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "ochre_froglight",
+          "displayName": "黄土色のフロッグライト",
+          "displayNameEn": "Ochre Froglight",
+          "name": "minecraft:ochre_froglight",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "rarity": 2
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "nameEn": "Cobweb",
+      "name": "クモの巣",
+      "mapColor": "#C7C7C7",
+      "blocks": [
+        {
+          "key": "cobweb",
+          "displayName": "クモの巣",
+          "displayNameEn": "Cobweb",
+          "name": "minecraft:web",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "mushroom_stem",
+          "displayName": "キノコの柄",
+          "displayNameEn": "Mushroom Stem",
+          "name": "minecraft:mushroom_stem",
+          "states": {
+            "huge_mushroom_bits": 0
+          },
+          "version": 18168865
+        },
+        {
+          "key": "white_candle",
+          "displayName": "白色のろうそく",
+          "displayNameEn": "White Candle",
+          "name": "minecraft:white_candle",
+          "states": {
+            "candles": 0,
+            "lit": false
+          },
+          "version": 18168865,
+          "needsSupport": true
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "nameEn": "TNT / Redstone",
+      "name": "TNT・レッドストーン",
+      "mapColor": "#FF0000",
+      "blocks": [
+        {
+          "key": "tnt",
+          "displayName": "TNT",
+          "displayNameEn": "TNT",
+          "name": "minecraft:tnt",
+          "states": {
+            "explode_bit": false
+          },
+          "version": 18168865,
+          "flammable": true,
+          "defaultEnabled": false
+        },
+        {
+          "key": "redstone_block",
+          "displayName": "レッドストーンブロック",
+          "displayNameEn": "Block of Redstone",
+          "name": "minecraft:redstone_block",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "nameEn": "Ice",
+      "name": "氷",
+      "mapColor": "#A0A0FF",
+      "blocks": [
+        {
+          "key": "ice",
+          "displayName": "氷",
+          "displayNameEn": "Ice",
+          "name": "minecraft:ice",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "packed_ice",
+          "displayName": "氷塊",
+          "displayNameEn": "Packed Ice",
+          "name": "minecraft:packed_ice",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "blue_ice",
+          "displayName": "青氷",
+          "displayNameEn": "Blue Ice",
+          "name": "minecraft:blue_ice",
+          "states": {},
+          "version": 18168865,
+          "rarity": 2
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "nameEn": "Iron",
+      "name": "鉄",
+      "mapColor": "#A7A7A7",
+      "blocks": [
+        {
+          "key": "iron_block",
+          "displayName": "鉄ブロック",
+          "displayNameEn": "Block of Iron",
+          "name": "minecraft:iron_block",
+          "states": {},
+          "version": 18168865,
+          "rarity": 2
+        },
+        {
+          "key": "iron_trapdoor",
+          "displayName": "鉄のトラップドア",
+          "displayNameEn": "Iron Trapdoor",
+          "name": "minecraft:iron_trapdoor",
+          "states": {
+            "direction": 0,
+            "open_bit": false,
+            "upside_down_bit": false
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "rarity": 1
+        },
+        {
+          "key": "iron_bars",
+          "displayName": "鉄格子",
+          "displayNameEn": "Iron Bars",
+          "name": "minecraft:iron_bars",
+          "states": {
+            "minecraft:connection_east": false,
+            "minecraft:connection_north": false,
+            "minecraft:connection_south": false,
+            "minecraft:connection_west": false
+          },
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "heavy_weighted_pressure_plate",
+          "displayName": "重量感圧板（重）",
+          "displayNameEn": "Heavy Weighted Pressure Plate",
+          "name": "minecraft:heavy_weighted_pressure_plate",
+          "states": {
+            "redstone_signal": 0
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "rarity": 1
+        },
+        {
+          "key": "brewing_stand",
+          "displayName": "醸造台",
+          "displayNameEn": "Brewing Stand",
+          "name": "minecraft:brewing_stand",
+          "states": {
+            "brewing_stand_slot_a_bit": false,
+            "brewing_stand_slot_b_bit": false,
+            "brewing_stand_slot_c_bit": false
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "rarity": 1
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "nameEn": "Leaves",
+      "name": "葉",
+      "mapColor": "#007C00",
+      "blocks": [
+        {
+          "key": "oak_leaves",
+          "displayName": "オークの葉",
+          "displayNameEn": "Oak Leaves",
+          "name": "minecraft:oak_leaves",
+          "states": {
+            "persistent_bit": true,
+            "update_bit": false
+          },
+          "version": 18168865,
+          "flammable": true,
+          "biomeTinted": true
+        },
+        {
+          "key": "spruce_leaves",
+          "displayName": "トウヒの葉",
+          "displayNameEn": "Spruce Leaves",
+          "name": "minecraft:spruce_leaves",
+          "states": {
+            "persistent_bit": true,
+            "update_bit": false
+          },
+          "version": 18168865,
+          "flammable": true,
+          "biomeTinted": true
+        },
+        {
+          "key": "birch_leaves",
+          "displayName": "シラカバの葉",
+          "displayNameEn": "Birch Leaves",
+          "name": "minecraft:birch_leaves",
+          "states": {
+            "persistent_bit": true,
+            "update_bit": false
+          },
+          "version": 18168865,
+          "flammable": true,
+          "biomeTinted": true
+        },
+        {
+          "key": "jungle_leaves",
+          "displayName": "ジャングルの葉",
+          "displayNameEn": "Jungle Leaves",
+          "name": "minecraft:jungle_leaves",
+          "states": {
+            "persistent_bit": true,
+            "update_bit": false
+          },
+          "version": 18168865,
+          "flammable": true,
+          "biomeTinted": true
+        },
+        {
+          "key": "acacia_leaves",
+          "displayName": "アカシアの葉",
+          "displayNameEn": "Acacia Leaves",
+          "name": "minecraft:acacia_leaves",
+          "states": {
+            "persistent_bit": true,
+            "update_bit": false
+          },
+          "version": 18168865,
+          "flammable": true,
+          "biomeTinted": true
+        },
+        {
+          "key": "dark_oak_leaves",
+          "displayName": "ダークオークの葉",
+          "displayNameEn": "Dark Oak Leaves",
+          "name": "minecraft:dark_oak_leaves",
+          "states": {
+            "persistent_bit": true,
+            "update_bit": false
+          },
+          "version": 18168865,
+          "flammable": true,
+          "biomeTinted": true
+        },
+        {
+          "key": "azalea_leaves",
+          "displayName": "ツツジの葉",
+          "displayNameEn": "Azalea Leaves",
+          "name": "minecraft:azalea_leaves",
+          "states": {
+            "persistent_bit": true,
+            "update_bit": false
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "bamboo_block_x",
+          "displayName": "竹ブロック（横）",
+          "displayNameEn": "Block of Bamboo (horizontal)",
+          "name": "minecraft:bamboo_block",
+          "states": {
+            "pillar_axis": "x"
+          },
+          "version": 18168865,
+          "flammable": true
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "nameEn": "Clay",
+      "name": "粘土",
+      "mapColor": "#A4A8B8",
+      "blocks": [
+        {
+          "key": "clay",
+          "displayName": "粘土ブロック",
+          "displayNameEn": "Clay",
+          "name": "minecraft:clay",
+          "states": {},
+          "version": 18168865
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "nameEn": "Dirt",
+      "name": "土",
+      "mapColor": "#976D4D",
+      "blocks": [
+        {
+          "key": "jungle_log_y",
+          "displayName": "ジャングルの原木（縦）",
+          "displayNameEn": "Jungle Log (vertical)",
+          "name": "minecraft:jungle_log",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "jungle_planks",
+          "displayName": "ジャングルの板材",
+          "displayNameEn": "Jungle Planks",
+          "name": "minecraft:jungle_planks",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "jungle_slab",
+          "displayName": "ジャングルのハーフブロック",
+          "displayNameEn": "Jungle Slab",
+          "name": "minecraft:jungle_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "dirt",
+          "displayName": "土",
+          "displayNameEn": "Dirt",
+          "name": "minecraft:dirt",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "coarse_dirt",
+          "displayName": "粗い土",
+          "displayNameEn": "Coarse Dirt",
+          "name": "minecraft:coarse_dirt",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "rooted_dirt",
+          "displayName": "根付いた土",
+          "displayNameEn": "Rooted Dirt",
+          "name": "minecraft:dirt_with_roots",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "jukebox",
+          "displayName": "ジュークボックス",
+          "displayNameEn": "Jukebox",
+          "name": "minecraft:jukebox",
+          "states": {},
+          "version": 18168865,
+          "rarity": 2
+        },
+        {
+          "key": "granite",
+          "displayName": "花崗岩",
+          "displayNameEn": "Granite",
+          "name": "minecraft:granite",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "granite_slab",
+          "displayName": "花崗岩のハーフブロック",
+          "displayNameEn": "Granite Slab",
+          "name": "minecraft:granite_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "jungle_pressure_plate",
+          "displayName": "ジャングルの感圧板",
+          "displayNameEn": "Jungle Pressure Plate",
+          "name": "minecraft:jungle_pressure_plate",
+          "states": {
+            "redstone_signal": 0
+          },
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "packed_mud",
+          "displayName": "固めた泥",
+          "displayNameEn": "Packed Mud",
+          "name": "minecraft:packed_mud",
+          "states": {},
+          "version": 18168865
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "nameEn": "Stone",
+      "name": "石",
+      "mapColor": "#707070",
+      "blocks": [
+        {
+          "key": "cobblestone",
+          "displayName": "丸石",
+          "displayNameEn": "Cobblestone",
+          "name": "minecraft:cobblestone",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "cobblestone_slab",
+          "displayName": "丸石のハーフブロック",
+          "displayNameEn": "Cobblestone Slab",
+          "name": "minecraft:cobblestone_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "mossy_cobblestone",
+          "displayName": "苔むした丸石",
+          "displayNameEn": "Mossy Cobblestone",
+          "name": "minecraft:mossy_cobblestone",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "mossy_cobblestone_slab",
+          "displayName": "苔むした丸石のハーフブロック",
+          "displayNameEn": "Mossy Cobblestone Slab",
+          "name": "minecraft:mossy_cobblestone_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "stone",
+          "displayName": "石",
+          "displayNameEn": "Stone",
+          "name": "minecraft:stone",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "stone_slab",
+          "displayName": "石のハーフブロック",
+          "displayNameEn": "Stone Slab",
+          "name": "minecraft:normal_stone_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "smooth_stone_slab",
+          "displayName": "滑らかな石のハーフブロック",
+          "displayNameEn": "Smooth Stone Slab",
+          "name": "minecraft:smooth_stone_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "stone_bricks",
+          "displayName": "石レンガ",
+          "displayNameEn": "Stone Bricks",
+          "name": "minecraft:stone_bricks",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "stone_brick_slab",
+          "displayName": "石レンガのハーフブロック",
+          "displayNameEn": "Stone Brick Slab",
+          "name": "minecraft:stone_brick_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "andesite",
+          "displayName": "安山岩",
+          "displayNameEn": "Andesite",
+          "name": "minecraft:andesite",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "andesite_slab",
+          "displayName": "安山岩のハーフブロック",
+          "displayNameEn": "Andesite Slab",
+          "name": "minecraft:andesite_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "bedrock",
+          "displayName": "岩盤",
+          "displayNameEn": "Bedrock",
+          "name": "minecraft:bedrock",
+          "states": {
+            "infiniburn_bit": false
+          },
+          "version": 18168865,
+          "defaultEnabled": false,
+          "rarity": 3
+        },
+        {
+          "key": "acacia_log_x",
+          "displayName": "アカシアの原木（横）",
+          "displayNameEn": "Acacia Log (horizontal)",
+          "name": "minecraft:acacia_log",
+          "states": {
+            "pillar_axis": "x"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "gravel",
+          "displayName": "砂利",
+          "displayNameEn": "Gravel",
+          "name": "minecraft:gravel",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "gravity": true
+        },
+        {
+          "key": "stone_pressure_plate",
+          "displayName": "石の感圧板",
+          "displayNameEn": "Stone Pressure Plate",
+          "name": "minecraft:stone_pressure_plate",
+          "states": {
+            "redstone_signal": 0
+          },
+          "version": 18168865,
+          "needsSupport": true
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "nameEn": "Oak",
+      "name": "オーク",
+      "mapColor": "#8F7748",
+      "blocks": [
+        {
+          "key": "oak_log_y",
+          "displayName": "オークの原木（縦）",
+          "displayNameEn": "Oak Log (vertical)",
+          "name": "minecraft:oak_log",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "oak_planks",
+          "displayName": "オークの板材",
+          "displayNameEn": "Oak Planks",
+          "name": "minecraft:oak_planks",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "oak_slab",
+          "displayName": "オークのハーフブロック",
+          "displayNameEn": "Oak Slab",
+          "name": "minecraft:oak_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "crafting_table",
+          "displayName": "作業台",
+          "displayNameEn": "Crafting Table",
+          "name": "minecraft:crafting_table",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "oak_pressure_plate",
+          "displayName": "オークの感圧板",
+          "displayNameEn": "Oak Pressure Plate",
+          "name": "minecraft:wooden_pressure_plate",
+          "states": {
+            "redstone_signal": 0
+          },
+          "version": 18168865,
+          "needsSupport": true
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "nameEn": "Quartz",
+      "name": "クォーツ",
+      "mapColor": "#FFFCF5",
+      "blocks": [
+        {
+          "key": "birch_log_x",
+          "displayName": "シラカバの原木（横）",
+          "displayNameEn": "Birch Log (horizontal)",
+          "name": "minecraft:birch_log",
+          "states": {
+            "pillar_axis": "x"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "diorite",
+          "displayName": "閃緑岩",
+          "displayNameEn": "Diorite",
+          "name": "minecraft:diorite",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "diorite_slab",
+          "displayName": "閃緑岩のハーフブロック",
+          "displayNameEn": "Diorite Slab",
+          "name": "minecraft:diorite_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "quartz_block",
+          "displayName": "クォーツブロック",
+          "displayNameEn": "Block of Quartz",
+          "name": "minecraft:quartz_block",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "quartz_slab",
+          "displayName": "クォーツのハーフブロック",
+          "displayNameEn": "Quartz Slab",
+          "name": "minecraft:quartz_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "rarity": 1
+        },
+        {
+          "key": "sea_lantern",
+          "displayName": "シーランタン",
+          "displayNameEn": "Sea Lantern",
+          "name": "minecraft:sea_lantern",
+          "states": {},
+          "version": 18168865,
+          "rarity": 2
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "nameEn": "White",
+      "name": "白色",
+      "mapColor": "#FFFFFF",
+      "blocks": [
+        {
+          "key": "white_wool",
+          "displayName": "白色の羊毛",
+          "displayNameEn": "White Wool",
+          "name": "minecraft:white_wool",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "white_carpet",
+          "displayName": "白色のカーペット",
+          "displayNameEn": "White Carpet",
+          "name": "minecraft:white_carpet",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "white_stained_glass",
+          "displayName": "白色の色付きガラス",
+          "displayNameEn": "White Stained Glass",
+          "name": "minecraft:white_stained_glass",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "white_concrete",
+          "displayName": "白色のコンクリート",
+          "displayNameEn": "White Concrete",
+          "name": "minecraft:white_concrete",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "white_concrete_powder",
+          "displayName": "白色のコンクリートパウダー",
+          "displayNameEn": "White Concrete Powder",
+          "name": "minecraft:white_concrete_powder",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "gravity": true
+        },
+        {
+          "key": "white_glazed_terracotta",
+          "displayName": "白色の彩釉テラコッタ",
+          "displayNameEn": "White Glazed Terracotta",
+          "name": "minecraft:white_glazed_terracotta",
+          "states": {
+            "facing_direction": 2
+          },
+          "version": 18168865
+        },
+        {
+          "key": "snow_block",
+          "displayName": "雪ブロック",
+          "displayNameEn": "Snow Block",
+          "name": "minecraft:snow",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "snow_layer",
+          "displayName": "雪",
+          "displayNameEn": "Snow",
+          "name": "minecraft:snow_layer",
+          "states": {
+            "covered_bit": false,
+            "height": 0
+          },
+          "version": 18168865,
+          "needsSupport": true
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "nameEn": "Orange",
+      "name": "橙色",
+      "mapColor": "#D87F33",
+      "blocks": [
+        {
+          "key": "orange_wool",
+          "displayName": "橙色の羊毛",
+          "displayNameEn": "Orange Wool",
+          "name": "minecraft:orange_wool",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "orange_carpet",
+          "displayName": "橙色のカーペット",
+          "displayNameEn": "Orange Carpet",
+          "name": "minecraft:orange_carpet",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "orange_stained_glass",
+          "displayName": "橙色の色付きガラス",
+          "displayNameEn": "Orange Stained Glass",
+          "name": "minecraft:orange_stained_glass",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "orange_concrete",
+          "displayName": "橙色のコンクリート",
+          "displayNameEn": "Orange Concrete",
+          "name": "minecraft:orange_concrete",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "orange_concrete_powder",
+          "displayName": "橙色のコンクリートパウダー",
+          "displayNameEn": "Orange Concrete Powder",
+          "name": "minecraft:orange_concrete_powder",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "gravity": true
+        },
+        {
+          "key": "orange_glazed_terracotta",
+          "displayName": "橙色の彩釉テラコッタ",
+          "displayNameEn": "Orange Glazed Terracotta",
+          "name": "minecraft:orange_glazed_terracotta",
+          "states": {
+            "facing_direction": 2
+          },
+          "version": 18168865
+        },
+        {
+          "key": "pumpkin",
+          "displayName": "カボチャ",
+          "displayNameEn": "Pumpkin",
+          "name": "minecraft:pumpkin",
+          "states": {
+            "minecraft:cardinal_direction": "south"
+          },
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "acacia_log_y",
+          "displayName": "アカシアの原木（縦）",
+          "displayNameEn": "Acacia Log (vertical)",
+          "name": "minecraft:acacia_log",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "acacia_planks",
+          "displayName": "アカシアの板材",
+          "displayNameEn": "Acacia Planks",
+          "name": "minecraft:acacia_planks",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "acacia_slab",
+          "displayName": "アカシアのハーフブロック",
+          "displayNameEn": "Acacia Slab",
+          "name": "minecraft:acacia_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "red_sand",
+          "displayName": "赤い砂",
+          "displayNameEn": "Red Sand",
+          "name": "minecraft:red_sand",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "gravity": true
+        },
+        {
+          "key": "red_sandstone",
+          "displayName": "赤い砂岩",
+          "displayNameEn": "Red Sandstone",
+          "name": "minecraft:red_sandstone",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "red_sandstone_slab",
+          "displayName": "赤い砂岩のハーフブロック",
+          "displayNameEn": "Red Sandstone Slab",
+          "name": "minecraft:red_sandstone_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "terracotta",
+          "displayName": "テラコッタ",
+          "displayNameEn": "Terracotta",
+          "name": "minecraft:hardened_clay",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "honey_block",
+          "displayName": "ハチミツブロック",
+          "displayNameEn": "Honey Block",
+          "name": "minecraft:honey_block",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "honeycomb_block",
+          "displayName": "ハニカムブロック",
+          "displayNameEn": "Honeycomb Block",
+          "name": "minecraft:honeycomb_block",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "raw_copper_block",
+          "displayName": "銅の原石ブロック",
+          "displayNameEn": "Block of Raw Copper",
+          "name": "minecraft:raw_copper_block",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "waxed_copper_block",
+          "displayName": "錆止めされた銅ブロック",
+          "displayNameEn": "Waxed Block of Copper",
+          "name": "minecraft:waxed_copper",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "waxed_cut_copper_slab",
+          "displayName": "錆止めされた切り込み入りの銅のハーフブロック",
+          "displayNameEn": "Waxed Cut Copper Slab",
+          "name": "minecraft:waxed_cut_copper_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "rarity": 1
+        },
+        {
+          "key": "acacia_pressure_plate",
+          "displayName": "アカシアの感圧板",
+          "displayNameEn": "Acacia Pressure Plate",
+          "name": "minecraft:acacia_pressure_plate",
+          "states": {
+            "redstone_signal": 0
+          },
+          "version": 18168865,
+          "needsSupport": true
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "nameEn": "Magenta",
+      "name": "赤紫色",
+      "mapColor": "#B24CD8",
+      "blocks": [
+        {
+          "key": "magenta_wool",
+          "displayName": "赤紫色の羊毛",
+          "displayNameEn": "Magenta Wool",
+          "name": "minecraft:magenta_wool",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "magenta_carpet",
+          "displayName": "赤紫色のカーペット",
+          "displayNameEn": "Magenta Carpet",
+          "name": "minecraft:magenta_carpet",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "magenta_stained_glass",
+          "displayName": "赤紫色の色付きガラス",
+          "displayNameEn": "Magenta Stained Glass",
+          "name": "minecraft:magenta_stained_glass",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "magenta_concrete",
+          "displayName": "赤紫色のコンクリート",
+          "displayNameEn": "Magenta Concrete",
+          "name": "minecraft:magenta_concrete",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "magenta_concrete_powder",
+          "displayName": "赤紫色のコンクリートパウダー",
+          "displayNameEn": "Magenta Concrete Powder",
+          "name": "minecraft:magenta_concrete_powder",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "gravity": true
+        },
+        {
+          "key": "magenta_glazed_terracotta",
+          "displayName": "赤紫色の彩釉テラコッタ",
+          "displayNameEn": "Magenta Glazed Terracotta",
+          "name": "minecraft:magenta_glazed_terracotta",
+          "states": {
+            "facing_direction": 2
+          },
+          "version": 18168865
+        },
+        {
+          "key": "purpur_block",
+          "displayName": "プルプァブロック",
+          "displayNameEn": "Purpur Block",
+          "name": "minecraft:purpur_block",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "rarity": 2
+        },
+        {
+          "key": "purpur_slab",
+          "displayName": "プルプァのハーフブロック",
+          "displayNameEn": "Purpur Slab",
+          "name": "minecraft:purpur_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "rarity": 2
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "nameEn": "Light Blue",
+      "name": "空色",
+      "mapColor": "#6699D8",
+      "blocks": [
+        {
+          "key": "light_blue_wool",
+          "displayName": "空色の羊毛",
+          "displayNameEn": "Light Blue Wool",
+          "name": "minecraft:light_blue_wool",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "light_blue_carpet",
+          "displayName": "空色のカーペット",
+          "displayNameEn": "Light Blue Carpet",
+          "name": "minecraft:light_blue_carpet",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "light_blue_stained_glass",
+          "displayName": "空色の色付きガラス",
+          "displayNameEn": "Light Blue Stained Glass",
+          "name": "minecraft:light_blue_stained_glass",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "light_blue_concrete",
+          "displayName": "空色のコンクリート",
+          "displayNameEn": "Light Blue Concrete",
+          "name": "minecraft:light_blue_concrete",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "light_blue_concrete_powder",
+          "displayName": "空色のコンクリートパウダー",
+          "displayNameEn": "Light Blue Concrete Powder",
+          "name": "minecraft:light_blue_concrete_powder",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "gravity": true
+        },
+        {
+          "key": "light_blue_glazed_terracotta",
+          "displayName": "空色の彩釉テラコッタ",
+          "displayNameEn": "Light Blue Glazed Terracotta",
+          "name": "minecraft:light_blue_glazed_terracotta",
+          "states": {
+            "facing_direction": 2
+          },
+          "version": 18168865
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "nameEn": "Yellow",
+      "name": "黄色",
+      "mapColor": "#E5E533",
+      "blocks": [
+        {
+          "key": "yellow_wool",
+          "displayName": "黄色の羊毛",
+          "displayNameEn": "Yellow Wool",
+          "name": "minecraft:yellow_wool",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "yellow_carpet",
+          "displayName": "黄色のカーペット",
+          "displayNameEn": "Yellow Carpet",
+          "name": "minecraft:yellow_carpet",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "yellow_stained_glass",
+          "displayName": "黄色の色付きガラス",
+          "displayNameEn": "Yellow Stained Glass",
+          "name": "minecraft:yellow_stained_glass",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "yellow_concrete",
+          "displayName": "黄色のコンクリート",
+          "displayNameEn": "Yellow Concrete",
+          "name": "minecraft:yellow_concrete",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "yellow_concrete_powder",
+          "displayName": "黄色のコンクリートパウダー",
+          "displayNameEn": "Yellow Concrete Powder",
+          "name": "minecraft:yellow_concrete_powder",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "gravity": true
+        },
+        {
+          "key": "yellow_glazed_terracotta",
+          "displayName": "黄色の彩釉テラコッタ",
+          "displayNameEn": "Yellow Glazed Terracotta",
+          "name": "minecraft:yellow_glazed_terracotta",
+          "states": {
+            "facing_direction": 2
+          },
+          "version": 18168865
+        },
+        {
+          "key": "hay_block",
+          "displayName": "干草の俵",
+          "displayNameEn": "Hay Bale",
+          "name": "minecraft:hay_block",
+          "states": {
+            "deprecated": 0,
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "sponge",
+          "displayName": "スポンジ",
+          "displayNameEn": "Sponge",
+          "name": "minecraft:sponge",
+          "states": {},
+          "version": 18168865,
+          "rarity": 3
+        },
+        {
+          "key": "bamboo_block_y",
+          "displayName": "竹ブロック（縦）",
+          "displayNameEn": "Block of Bamboo (vertical)",
+          "name": "minecraft:bamboo_block",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "bamboo_planks",
+          "displayName": "竹の板材",
+          "displayNameEn": "Bamboo Planks",
+          "name": "minecraft:bamboo_planks",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "bamboo_slab",
+          "displayName": "竹のハーフブロック",
+          "displayNameEn": "Bamboo Slab",
+          "name": "minecraft:bamboo_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "bamboo_mosaic",
+          "displayName": "竹の寄木細工",
+          "displayNameEn": "Bamboo Mosaic",
+          "name": "minecraft:bamboo_mosaic",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "bamboo_mosaic_slab",
+          "displayName": "竹の寄木細工のハーフブロック",
+          "displayNameEn": "Bamboo Mosaic Slab",
+          "name": "minecraft:bamboo_mosaic_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "bamboo_pressure_plate",
+          "displayName": "竹の感圧板",
+          "displayNameEn": "Bamboo Pressure Plate",
+          "name": "minecraft:bamboo_pressure_plate",
+          "states": {
+            "redstone_signal": 0
+          },
+          "version": 18168865,
+          "needsSupport": true
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "nameEn": "Lime",
+      "name": "黄緑色",
+      "mapColor": "#7FCC19",
+      "blocks": [
+        {
+          "key": "lime_wool",
+          "displayName": "黄緑色の羊毛",
+          "displayNameEn": "Lime Wool",
+          "name": "minecraft:lime_wool",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "lime_carpet",
+          "displayName": "黄緑色のカーペット",
+          "displayNameEn": "Lime Carpet",
+          "name": "minecraft:lime_carpet",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "lime_stained_glass",
+          "displayName": "黄緑色の色付きガラス",
+          "displayNameEn": "Lime Stained Glass",
+          "name": "minecraft:lime_stained_glass",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "lime_concrete",
+          "displayName": "黄緑色のコンクリート",
+          "displayNameEn": "Lime Concrete",
+          "name": "minecraft:lime_concrete",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "lime_concrete_powder",
+          "displayName": "黄緑色のコンクリートパウダー",
+          "displayNameEn": "Lime Concrete Powder",
+          "name": "minecraft:lime_concrete_powder",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "gravity": true
+        },
+        {
+          "key": "lime_glazed_terracotta",
+          "displayName": "黄緑色の彩釉テラコッタ",
+          "displayNameEn": "Lime Glazed Terracotta",
+          "name": "minecraft:lime_glazed_terracotta",
+          "states": {
+            "facing_direction": 2
+          },
+          "version": 18168865
+        },
+        {
+          "key": "melon",
+          "displayName": "スイカ",
+          "displayNameEn": "Melon",
+          "name": "minecraft:melon_block",
+          "states": {},
+          "version": 18168865
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "nameEn": "Pink",
+      "name": "桃色",
+      "mapColor": "#F27FA5",
+      "blocks": [
+        {
+          "key": "pink_wool",
+          "displayName": "桃色の羊毛",
+          "displayNameEn": "Pink Wool",
+          "name": "minecraft:pink_wool",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "pink_carpet",
+          "displayName": "桃色のカーペット",
+          "displayNameEn": "Pink Carpet",
+          "name": "minecraft:pink_carpet",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "pink_stained_glass",
+          "displayName": "桃色の色付きガラス",
+          "displayNameEn": "Pink Stained Glass",
+          "name": "minecraft:pink_stained_glass",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "pink_concrete",
+          "displayName": "桃色のコンクリート",
+          "displayNameEn": "Pink Concrete",
+          "name": "minecraft:pink_concrete",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "pink_concrete_powder",
+          "displayName": "桃色のコンクリートパウダー",
+          "displayNameEn": "Pink Concrete Powder",
+          "name": "minecraft:pink_concrete_powder",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "gravity": true
+        },
+        {
+          "key": "pink_glazed_terracotta",
+          "displayName": "桃色の彩釉テラコッタ",
+          "displayNameEn": "Pink Glazed Terracotta",
+          "name": "minecraft:pink_glazed_terracotta",
+          "states": {
+            "facing_direction": 2
+          },
+          "version": 18168865
+        },
+        {
+          "key": "pearlescent_froglight",
+          "displayName": "真珠色のフロッグライト",
+          "displayNameEn": "Pearlescent Froglight",
+          "name": "minecraft:pearlescent_froglight",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "rarity": 2
+        },
+        {
+          "key": "cherry_leaves",
+          "displayName": "サクラの葉",
+          "displayNameEn": "Cherry Leaves",
+          "name": "minecraft:cherry_leaves",
+          "states": {
+            "persistent_bit": true,
+            "update_bit": false
+          },
+          "version": 18168865,
+          "flammable": true
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "nameEn": "Gray",
+      "name": "灰色",
+      "mapColor": "#4C4C4C",
+      "blocks": [
+        {
+          "key": "gray_wool",
+          "displayName": "灰色の羊毛",
+          "displayNameEn": "Gray Wool",
+          "name": "minecraft:gray_wool",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "gray_carpet",
+          "displayName": "灰色のカーペット",
+          "displayNameEn": "Gray Carpet",
+          "name": "minecraft:gray_carpet",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "gray_stained_glass",
+          "displayName": "灰色の色付きガラス",
+          "displayNameEn": "Gray Stained Glass",
+          "name": "minecraft:gray_stained_glass",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "gray_concrete",
+          "displayName": "灰色のコンクリート",
+          "displayNameEn": "Gray Concrete",
+          "name": "minecraft:gray_concrete",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "gray_concrete_powder",
+          "displayName": "灰色のコンクリートパウダー",
+          "displayNameEn": "Gray Concrete Powder",
+          "name": "minecraft:gray_concrete_powder",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "gravity": true
+        },
+        {
+          "key": "gray_glazed_terracotta",
+          "displayName": "灰色の彩釉テラコッタ",
+          "displayNameEn": "Gray Glazed Terracotta",
+          "name": "minecraft:gray_glazed_terracotta",
+          "states": {
+            "facing_direction": 2
+          },
+          "version": 18168865
+        },
+        {
+          "key": "dead_tube_coral_block",
+          "displayName": "死んだクダサンゴブロック",
+          "displayNameEn": "Dead Tube Coral Block",
+          "name": "minecraft:dead_tube_coral_block",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "dead_brain_coral_block",
+          "displayName": "死んだノウサンゴブロック",
+          "displayNameEn": "Dead Brain Coral Block",
+          "name": "minecraft:dead_brain_coral_block",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "dead_bubble_coral_block",
+          "displayName": "死んだミズタマサンゴブロック",
+          "displayNameEn": "Dead Bubble Coral Block",
+          "name": "minecraft:dead_bubble_coral_block",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "dead_fire_coral_block",
+          "displayName": "死んだミレポラサンゴブロック",
+          "displayNameEn": "Dead Fire Coral Block",
+          "name": "minecraft:dead_fire_coral_block",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "dead_horn_coral_block",
+          "displayName": "死んだシカツノサンゴブロック",
+          "displayNameEn": "Dead Horn Coral Block",
+          "name": "minecraft:dead_horn_coral_block",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "tinted_glass",
+          "displayName": "遮光ガラス",
+          "displayNameEn": "Tinted Glass",
+          "name": "minecraft:tinted_glass",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "nameEn": "Light Gray",
+      "name": "薄灰色",
+      "mapColor": "#999999",
+      "blocks": [
+        {
+          "key": "light_gray_wool",
+          "displayName": "薄灰色の羊毛",
+          "displayNameEn": "Light Gray Wool",
+          "name": "minecraft:light_gray_wool",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "light_gray_carpet",
+          "displayName": "薄灰色のカーペット",
+          "displayNameEn": "Light Gray Carpet",
+          "name": "minecraft:light_gray_carpet",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "light_gray_stained_glass",
+          "displayName": "薄灰色の色付きガラス",
+          "displayNameEn": "Light Gray Stained Glass",
+          "name": "minecraft:light_gray_stained_glass",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "light_gray_concrete",
+          "displayName": "薄灰色のコンクリート",
+          "displayNameEn": "Light Gray Concrete",
+          "name": "minecraft:light_gray_concrete",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "light_gray_concrete_powder",
+          "displayName": "薄灰色のコンクリートパウダー",
+          "displayNameEn": "Light Gray Concrete Powder",
+          "name": "minecraft:light_gray_concrete_powder",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "gravity": true
+        },
+        {
+          "key": "light_gray_glazed_terracotta",
+          "displayName": "薄灰色の彩釉テラコッタ",
+          "displayNameEn": "Light Gray Glazed Terracotta",
+          "name": "minecraft:silver_glazed_terracotta",
+          "states": {
+            "facing_direction": 2
+          },
+          "version": 18168865
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "nameEn": "Cyan",
+      "name": "青緑色",
+      "mapColor": "#4C7F99",
+      "blocks": [
+        {
+          "key": "cyan_wool",
+          "displayName": "青緑色の羊毛",
+          "displayNameEn": "Cyan Wool",
+          "name": "minecraft:cyan_wool",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "cyan_carpet",
+          "displayName": "青緑色のカーペット",
+          "displayNameEn": "Cyan Carpet",
+          "name": "minecraft:cyan_carpet",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "cyan_stained_glass",
+          "displayName": "青緑色の色付きガラス",
+          "displayNameEn": "Cyan Stained Glass",
+          "name": "minecraft:cyan_stained_glass",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "cyan_concrete",
+          "displayName": "青緑色のコンクリート",
+          "displayNameEn": "Cyan Concrete",
+          "name": "minecraft:cyan_concrete",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "cyan_concrete_powder",
+          "displayName": "青緑色のコンクリートパウダー",
+          "displayNameEn": "Cyan Concrete Powder",
+          "name": "minecraft:cyan_concrete_powder",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "gravity": true
+        },
+        {
+          "key": "cyan_glazed_terracotta",
+          "displayName": "青緑色の彩釉テラコッタ",
+          "displayNameEn": "Cyan Glazed Terracotta",
+          "name": "minecraft:cyan_glazed_terracotta",
+          "states": {
+            "facing_direction": 2
+          },
+          "version": 18168865
+        },
+        {
+          "key": "prismarine",
+          "displayName": "プリズマリン",
+          "displayNameEn": "Prismarine",
+          "name": "minecraft:prismarine",
+          "states": {},
+          "version": 18168865,
+          "rarity": 2
+        },
+        {
+          "key": "prismarine_slab",
+          "displayName": "プリズマリンのハーフブロック",
+          "displayNameEn": "Prismarine Slab",
+          "name": "minecraft:prismarine_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "rarity": 2
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "nameEn": "Purple",
+      "name": "紫色",
+      "mapColor": "#7F3FB2",
+      "blocks": [
+        {
+          "key": "purple_wool",
+          "displayName": "紫色の羊毛",
+          "displayNameEn": "Purple Wool",
+          "name": "minecraft:purple_wool",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "purple_carpet",
+          "displayName": "紫色のカーペット",
+          "displayNameEn": "Purple Carpet",
+          "name": "minecraft:purple_carpet",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "purple_stained_glass",
+          "displayName": "紫色の色付きガラス",
+          "displayNameEn": "Purple Stained Glass",
+          "name": "minecraft:purple_stained_glass",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "purple_concrete",
+          "displayName": "紫色のコンクリート",
+          "displayNameEn": "Purple Concrete",
+          "name": "minecraft:purple_concrete",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "purple_concrete_powder",
+          "displayName": "紫色のコンクリートパウダー",
+          "displayNameEn": "Purple Concrete Powder",
+          "name": "minecraft:purple_concrete_powder",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "gravity": true
+        },
+        {
+          "key": "purple_glazed_terracotta",
+          "displayName": "紫色の彩釉テラコッタ",
+          "displayNameEn": "Purple Glazed Terracotta",
+          "name": "minecraft:purple_glazed_terracotta",
+          "states": {
+            "facing_direction": 2
+          },
+          "version": 18168865
+        },
+        {
+          "key": "mycelium",
+          "displayName": "菌糸",
+          "displayNameEn": "Mycelium",
+          "name": "minecraft:mycelium",
+          "states": {},
+          "version": 18168865,
+          "rarity": 2
+        },
+        {
+          "key": "amethyst_block",
+          "displayName": "アメジストブロック",
+          "displayNameEn": "Amethyst Block",
+          "name": "minecraft:amethyst_block",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "nameEn": "Blue",
+      "name": "青色",
+      "mapColor": "#334CB2",
+      "blocks": [
+        {
+          "key": "blue_wool",
+          "displayName": "青色の羊毛",
+          "displayNameEn": "Blue Wool",
+          "name": "minecraft:blue_wool",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "blue_carpet",
+          "displayName": "青色のカーペット",
+          "displayNameEn": "Blue Carpet",
+          "name": "minecraft:blue_carpet",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "blue_stained_glass",
+          "displayName": "青色の色付きガラス",
+          "displayNameEn": "Blue Stained Glass",
+          "name": "minecraft:blue_stained_glass",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "blue_concrete",
+          "displayName": "青色のコンクリート",
+          "displayNameEn": "Blue Concrete",
+          "name": "minecraft:blue_concrete",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "blue_concrete_powder",
+          "displayName": "青色のコンクリートパウダー",
+          "displayNameEn": "Blue Concrete Powder",
+          "name": "minecraft:blue_concrete_powder",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "gravity": true
+        },
+        {
+          "key": "blue_glazed_terracotta",
+          "displayName": "青色の彩釉テラコッタ",
+          "displayNameEn": "Blue Glazed Terracotta",
+          "name": "minecraft:blue_glazed_terracotta",
+          "states": {
+            "facing_direction": 2
+          },
+          "version": 18168865
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "nameEn": "Brown",
+      "name": "茶色",
+      "mapColor": "#664C33",
+      "blocks": [
+        {
+          "key": "brown_wool",
+          "displayName": "茶色の羊毛",
+          "displayNameEn": "Brown Wool",
+          "name": "minecraft:brown_wool",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "brown_carpet",
+          "displayName": "茶色のカーペット",
+          "displayNameEn": "Brown Carpet",
+          "name": "minecraft:brown_carpet",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "brown_stained_glass",
+          "displayName": "茶色の色付きガラス",
+          "displayNameEn": "Brown Stained Glass",
+          "name": "minecraft:brown_stained_glass",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "brown_concrete",
+          "displayName": "茶色のコンクリート",
+          "displayNameEn": "Brown Concrete",
+          "name": "minecraft:brown_concrete",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "brown_concrete_powder",
+          "displayName": "茶色のコンクリートパウダー",
+          "displayNameEn": "Brown Concrete Powder",
+          "name": "minecraft:brown_concrete_powder",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "gravity": true
+        },
+        {
+          "key": "brown_glazed_terracotta",
+          "displayName": "茶色の彩釉テラコッタ",
+          "displayNameEn": "Brown Glazed Terracotta",
+          "name": "minecraft:brown_glazed_terracotta",
+          "states": {
+            "facing_direction": 2
+          },
+          "version": 18168865
+        },
+        {
+          "key": "dark_oak_log_y",
+          "displayName": "ダークオークの原木",
+          "displayNameEn": "Dark Oak Log",
+          "name": "minecraft:dark_oak_log",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "dark_oak_planks",
+          "displayName": "ダークオークの板材",
+          "displayNameEn": "Dark Oak Planks",
+          "name": "minecraft:dark_oak_planks",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "dark_oak_slab",
+          "displayName": "ダークオークのハーフブロック",
+          "displayNameEn": "Dark Oak Slab",
+          "name": "minecraft:dark_oak_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "spruce_log_x",
+          "displayName": "トウヒの原木（横）",
+          "displayNameEn": "Spruce Log (horizontal)",
+          "name": "minecraft:spruce_log",
+          "states": {
+            "pillar_axis": "x"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "soul_sand",
+          "displayName": "ソウルサンド",
+          "displayNameEn": "Soul Sand",
+          "name": "minecraft:soul_sand",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "soul_soil",
+          "displayName": "ソウルソイル",
+          "displayNameEn": "Soul Soil",
+          "name": "minecraft:soul_soil",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "dark_oak_pressure_plate",
+          "displayName": "ダークオークの感圧板",
+          "displayNameEn": "Dark Oak Pressure Plate",
+          "name": "minecraft:dark_oak_pressure_plate",
+          "states": {
+            "redstone_signal": 0
+          },
+          "version": 18168865,
+          "needsSupport": true
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "nameEn": "Green",
+      "name": "緑色",
+      "mapColor": "#667F33",
+      "blocks": [
+        {
+          "key": "green_wool",
+          "displayName": "緑色の羊毛",
+          "displayNameEn": "Green Wool",
+          "name": "minecraft:green_wool",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "green_carpet",
+          "displayName": "緑色のカーペット",
+          "displayNameEn": "Green Carpet",
+          "name": "minecraft:green_carpet",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "green_stained_glass",
+          "displayName": "緑色の色付きガラス",
+          "displayNameEn": "Green Stained Glass",
+          "name": "minecraft:green_stained_glass",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "green_concrete",
+          "displayName": "緑色のコンクリート",
+          "displayNameEn": "Green Concrete",
+          "name": "minecraft:green_concrete",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "green_concrete_powder",
+          "displayName": "緑色のコンクリートパウダー",
+          "displayNameEn": "Green Concrete Powder",
+          "name": "minecraft:green_concrete_powder",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "gravity": true
+        },
+        {
+          "key": "green_glazed_terracotta",
+          "displayName": "緑色の彩釉テラコッタ",
+          "displayNameEn": "Green Glazed Terracotta",
+          "name": "minecraft:green_glazed_terracotta",
+          "states": {
+            "facing_direction": 2
+          },
+          "version": 18168865
+        },
+        {
+          "key": "dried_kelp_block",
+          "displayName": "乾燥した昆布ブロック",
+          "displayNameEn": "Dried Kelp Block",
+          "name": "minecraft:dried_kelp_block",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "nameEn": "Red",
+      "name": "赤色",
+      "mapColor": "#993333",
+      "blocks": [
+        {
+          "key": "red_wool",
+          "displayName": "赤色の羊毛",
+          "displayNameEn": "Red Wool",
+          "name": "minecraft:red_wool",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "red_carpet",
+          "displayName": "赤色のカーペット",
+          "displayNameEn": "Red Carpet",
+          "name": "minecraft:red_carpet",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "red_stained_glass",
+          "displayName": "赤色の色付きガラス",
+          "displayNameEn": "Red Stained Glass",
+          "name": "minecraft:red_stained_glass",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "red_concrete",
+          "displayName": "赤色のコンクリート",
+          "displayNameEn": "Red Concrete",
+          "name": "minecraft:red_concrete",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "red_concrete_powder",
+          "displayName": "赤色のコンクリートパウダー",
+          "displayNameEn": "Red Concrete Powder",
+          "name": "minecraft:red_concrete_powder",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "gravity": true
+        },
+        {
+          "key": "red_glazed_terracotta",
+          "displayName": "赤色の彩釉テラコッタ",
+          "displayNameEn": "Red Glazed Terracotta",
+          "name": "minecraft:red_glazed_terracotta",
+          "states": {
+            "facing_direction": 2
+          },
+          "version": 18168865
+        },
+        {
+          "key": "bricks",
+          "displayName": "レンガ",
+          "displayNameEn": "Bricks",
+          "name": "minecraft:brick_block",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "brick_slab",
+          "displayName": "レンガのハーフブロック",
+          "displayNameEn": "Brick Slab",
+          "name": "minecraft:brick_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "nether_wart_block",
+          "displayName": "ネザーウォートブロック",
+          "displayNameEn": "Nether Wart Block",
+          "name": "minecraft:nether_wart_block",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "shroomlight",
+          "displayName": "シュルームライト",
+          "displayNameEn": "Shroomlight",
+          "name": "minecraft:shroomlight",
+          "states": {},
+          "version": 18168865,
+          "rarity": 2
+        },
+        {
+          "key": "mangrove_log_y",
+          "displayName": "マングローブの原木（縦）",
+          "displayNameEn": "Mangrove Log (vertical)",
+          "name": "minecraft:mangrove_log",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "mangrove_planks",
+          "displayName": "マングローブの板材",
+          "displayNameEn": "Mangrove Planks",
+          "name": "minecraft:mangrove_planks",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "mangrove_slab",
+          "displayName": "マングローブのハーフブロック",
+          "displayNameEn": "Mangrove Slab",
+          "name": "minecraft:mangrove_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "mangrove_pressure_plate",
+          "displayName": "マングローブの感圧板",
+          "displayNameEn": "Mangrove Pressure Plate",
+          "name": "minecraft:mangrove_pressure_plate",
+          "states": {
+            "redstone_signal": 0
+          },
+          "version": 18168865,
+          "needsSupport": true
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "nameEn": "Black",
+      "name": "黒色",
+      "mapColor": "#191919",
+      "blocks": [
+        {
+          "key": "black_wool",
+          "displayName": "黒色の羊毛",
+          "displayNameEn": "Black Wool",
+          "name": "minecraft:black_wool",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "black_carpet",
+          "displayName": "黒色のカーペット",
+          "displayNameEn": "Black Carpet",
+          "name": "minecraft:black_carpet",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "black_stained_glass",
+          "displayName": "黒色の色付きガラス",
+          "displayNameEn": "Black Stained Glass",
+          "name": "minecraft:black_stained_glass",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "black_concrete",
+          "displayName": "黒色のコンクリート",
+          "displayNameEn": "Black Concrete",
+          "name": "minecraft:black_concrete",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "black_concrete_powder",
+          "displayName": "黒色のコンクリートパウダー",
+          "displayNameEn": "Black Concrete Powder",
+          "name": "minecraft:black_concrete_powder",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "gravity": true
+        },
+        {
+          "key": "black_glazed_terracotta",
+          "displayName": "黒色の彩釉テラコッタ",
+          "displayNameEn": "Black Glazed Terracotta",
+          "name": "minecraft:black_glazed_terracotta",
+          "states": {
+            "facing_direction": 2
+          },
+          "version": 18168865
+        },
+        {
+          "key": "coal_block",
+          "displayName": "石炭ブロック",
+          "displayNameEn": "Block of Coal",
+          "name": "minecraft:coal_block",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "obsidian",
+          "displayName": "黒曜石",
+          "displayNameEn": "Obsidian",
+          "name": "minecraft:obsidian",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "crying_obsidian",
+          "displayName": "泣く黒曜石",
+          "displayNameEn": "Crying Obsidian",
+          "name": "minecraft:crying_obsidian",
+          "states": {},
+          "version": 18168865,
+          "rarity": 2
+        },
+        {
+          "key": "blackstone",
+          "displayName": "ブラックストーン",
+          "displayNameEn": "Blackstone",
+          "name": "minecraft:blackstone",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "blackstone_slab",
+          "displayName": "ブラックストーンのハーフブロック",
+          "displayNameEn": "Blackstone Slab",
+          "name": "minecraft:blackstone_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "basalt",
+          "displayName": "玄武岩",
+          "displayNameEn": "Basalt",
+          "name": "minecraft:basalt",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865
+        },
+        {
+          "key": "netherite_block",
+          "displayName": "ネザライトブロック",
+          "displayNameEn": "Block of Netherite",
+          "name": "minecraft:netherite_block",
+          "states": {},
+          "version": 18168865,
+          "rarity": 3
+        },
+        {
+          "key": "polished_blackstone_pressure_plate",
+          "displayName": "磨かれたブラックストーンの感圧板",
+          "displayNameEn": "Polished Blackstone Pressure Plate",
+          "name": "minecraft:polished_blackstone_pressure_plate",
+          "states": {
+            "redstone_signal": 0
+          },
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "sculk",
+          "displayName": "スカルク",
+          "displayNameEn": "Sculk",
+          "name": "minecraft:sculk",
+          "states": {},
+          "version": 18168865,
+          "rarity": 2
+        },
+        {
+          "key": "sculk_catalyst",
+          "displayName": "スカルクカタリスト",
+          "displayNameEn": "Sculk Catalyst",
+          "name": "minecraft:sculk_catalyst",
+          "states": {
+            "bloom": false
+          },
+          "version": 18168865,
+          "rarity": 3
+        },
+        {
+          "key": "sculk_shrieker",
+          "displayName": "スカルクシュリーカー",
+          "displayNameEn": "Sculk Shrieker",
+          "name": "minecraft:sculk_shrieker",
+          "states": {
+            "active": false,
+            "can_summon": false
+          },
+          "version": 18168865,
+          "rarity": 3
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "nameEn": "Gold",
+      "name": "金",
+      "mapColor": "#FAEE4D",
+      "blocks": [
+        {
+          "key": "gold_block",
+          "displayName": "金ブロック",
+          "displayNameEn": "Block of Gold",
+          "name": "minecraft:gold_block",
+          "states": {},
+          "version": 18168865,
+          "rarity": 3
+        },
+        {
+          "key": "light_weighted_pressure_plate",
+          "displayName": "重量感圧板（軽）",
+          "displayNameEn": "Light Weighted Pressure Plate",
+          "name": "minecraft:light_weighted_pressure_plate",
+          "states": {
+            "redstone_signal": 0
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "rarity": 2
+        },
+        {
+          "key": "raw_gold_block",
+          "displayName": "金の原石ブロック",
+          "displayNameEn": "Block of Raw Gold",
+          "name": "minecraft:raw_gold_block",
+          "states": {},
+          "version": 18168865,
+          "rarity": 3
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "nameEn": "Diamond",
+      "name": "ダイヤモンド",
+      "mapColor": "#5CDBD5",
+      "blocks": [
+        {
+          "key": "diamond_block",
+          "displayName": "ダイヤモンドブロック",
+          "displayNameEn": "Block of Diamond",
+          "name": "minecraft:diamond_block",
+          "states": {},
+          "version": 18168865,
+          "rarity": 3
+        },
+        {
+          "key": "prismarine_bricks",
+          "displayName": "プリズマリンレンガ",
+          "displayNameEn": "Prismarine Bricks",
+          "name": "minecraft:prismarine_bricks",
+          "states": {},
+          "version": 18168865,
+          "rarity": 2
+        },
+        {
+          "key": "prismarine_brick_slab",
+          "displayName": "プリズマリンレンガのハーフブロック",
+          "displayNameEn": "Prismarine Brick Slab",
+          "name": "minecraft:prismarine_brick_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "rarity": 2
+        },
+        {
+          "key": "dark_prismarine",
+          "displayName": "ダークプリズマリン",
+          "displayNameEn": "Dark Prismarine",
+          "name": "minecraft:dark_prismarine",
+          "states": {},
+          "version": 18168865,
+          "rarity": 2
+        },
+        {
+          "key": "dark_prismarine_slab",
+          "displayName": "ダークプリズマリンのハーフブロック",
+          "displayNameEn": "Dark Prismarine Slab",
+          "name": "minecraft:dark_prismarine_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "rarity": 2
+        },
+        {
+          "key": "beacon",
+          "displayName": "ビーコン",
+          "displayNameEn": "Beacon",
+          "name": "minecraft:beacon",
+          "states": {},
+          "version": 18168865,
+          "needsSupport": true,
+          "rarity": 3
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "nameEn": "Lapis",
+      "name": "ラピスラズリ",
+      "mapColor": "#4A80FF",
+      "blocks": [
+        {
+          "key": "lapis_block",
+          "displayName": "ラピスラズリブロック",
+          "displayNameEn": "Block of Lapis Lazuli",
+          "name": "minecraft:lapis_block",
+          "states": {},
+          "version": 18168865,
+          "rarity": 2
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "nameEn": "Emerald",
+      "name": "エメラルド",
+      "mapColor": "#00D93A",
+      "blocks": [
+        {
+          "key": "emerald_block",
+          "displayName": "エメラルドブロック",
+          "displayNameEn": "Block of Emerald",
+          "name": "minecraft:emerald_block",
+          "states": {},
+          "version": 18168865,
+          "rarity": 3
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "nameEn": "Spruce / Podzol",
+      "name": "トウヒ・ポドゾル",
+      "mapColor": "#815631",
+      "blocks": [
+        {
+          "key": "spruce_log_y",
+          "displayName": "トウヒの原木（縦）",
+          "displayNameEn": "Spruce Log (vertical)",
+          "name": "minecraft:spruce_log",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "spruce_planks",
+          "displayName": "トウヒの板材",
+          "displayNameEn": "Spruce Planks",
+          "name": "minecraft:spruce_planks",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "spruce_slab",
+          "displayName": "トウヒのハーフブロック",
+          "displayNameEn": "Spruce Slab",
+          "name": "minecraft:spruce_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "oak_log_x",
+          "displayName": "オークの原木（横）",
+          "displayNameEn": "Oak Log (horizontal)",
+          "name": "minecraft:oak_log",
+          "states": {
+            "pillar_axis": "x"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "jungle_log_x",
+          "displayName": "ジャングルの原木（横）",
+          "displayNameEn": "Jungle Log (horizontal)",
+          "name": "minecraft:jungle_log",
+          "states": {
+            "pillar_axis": "x"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "podzol",
+          "displayName": "ポドゾル",
+          "displayNameEn": "Podzol",
+          "name": "minecraft:podzol",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "spruce_pressure_plate",
+          "displayName": "トウヒの感圧板",
+          "displayNameEn": "Spruce Pressure Plate",
+          "name": "minecraft:spruce_pressure_plate",
+          "states": {
+            "redstone_signal": 0
+          },
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "mangrove_log_x",
+          "displayName": "マングローブの原木（横）",
+          "displayNameEn": "Mangrove Log (horizontal)",
+          "name": "minecraft:mangrove_log",
+          "states": {
+            "pillar_axis": "x"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "mangrove_roots",
+          "displayName": "マングローブの根",
+          "displayNameEn": "Mangrove Roots",
+          "name": "minecraft:mangrove_roots",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "nameEn": "Nether",
+      "name": "ネザー",
+      "mapColor": "#700200",
+      "blocks": [
+        {
+          "key": "netherrack",
+          "displayName": "ネザーラック",
+          "displayNameEn": "Netherrack",
+          "name": "minecraft:netherrack",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "nether_bricks",
+          "displayName": "ネザーレンガ",
+          "displayNameEn": "Nether Bricks",
+          "name": "minecraft:nether_brick",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "nether_brick_slab",
+          "displayName": "ネザーレンガのハーフブロック",
+          "displayNameEn": "Nether Brick Slab",
+          "name": "minecraft:nether_brick_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true
+        },
+        {
+          "key": "magma_block",
+          "displayName": "マグマブロック",
+          "displayNameEn": "Magma Block",
+          "name": "minecraft:magma",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "red_nether_bricks",
+          "displayName": "赤いネザーレンガ",
+          "displayNameEn": "Red Nether Bricks",
+          "name": "minecraft:red_nether_brick",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "red_nether_brick_slab",
+          "displayName": "赤いネザーレンガのハーフブロック",
+          "displayNameEn": "Red Nether Brick Slab",
+          "name": "minecraft:red_nether_brick_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "rarity": 1
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "nameEn": "White Terracotta",
+      "name": "白色のテラコッタ",
+      "mapColor": "#D1B1A1",
+      "blocks": [
+        {
+          "key": "white_terracotta",
+          "displayName": "白色のテラコッタ",
+          "displayNameEn": "White Terracotta",
+          "name": "minecraft:white_terracotta",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "calcite",
+          "displayName": "方解石",
+          "displayNameEn": "Calcite",
+          "name": "minecraft:calcite",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "cherry_planks",
+          "displayName": "サクラの板材",
+          "displayNameEn": "Cherry Planks",
+          "name": "minecraft:cherry_planks",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "cherry_slab",
+          "displayName": "サクラのハーフブロック",
+          "displayNameEn": "Cherry Slab",
+          "name": "minecraft:cherry_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true
+        },
+        {
+          "key": "cherry_log_y",
+          "displayName": "サクラの原木（縦）",
+          "displayNameEn": "Cherry Log (vertical)",
+          "name": "minecraft:cherry_log",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "stripped_cherry_log_y",
+          "displayName": "樹皮を剥いだサクラの原木（縦）",
+          "displayNameEn": "Stripped Cherry Log (vertical)",
+          "name": "minecraft:stripped_cherry_log",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "cherry_pressure_plate",
+          "displayName": "サクラの感圧板",
+          "displayNameEn": "Cherry Pressure Plate",
+          "name": "minecraft:cherry_pressure_plate",
+          "states": {
+            "redstone_signal": 0
+          },
+          "version": 18168865,
+          "needsSupport": true
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "nameEn": "Orange Terracotta",
+      "name": "橙色のテラコッタ",
+      "mapColor": "#9F5224",
+      "blocks": [
+        {
+          "key": "orange_terracotta",
+          "displayName": "橙色のテラコッタ",
+          "displayNameEn": "Orange Terracotta",
+          "name": "minecraft:orange_terracotta",
+          "states": {},
+          "version": 18168865
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "nameEn": "Magenta Terracotta",
+      "name": "赤紫色のテラコッタ",
+      "mapColor": "#95576C",
+      "blocks": [
+        {
+          "key": "magenta_terracotta",
+          "displayName": "赤紫色のテラコッタ",
+          "displayNameEn": "Magenta Terracotta",
+          "name": "minecraft:magenta_terracotta",
+          "states": {},
+          "version": 18168865
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "nameEn": "Light Blue Terracotta",
+      "name": "空色のテラコッタ",
+      "mapColor": "#706C8A",
+      "blocks": [
+        {
+          "key": "light_blue_terracotta",
+          "displayName": "空色のテラコッタ",
+          "displayNameEn": "Light Blue Terracotta",
+          "name": "minecraft:light_blue_terracotta",
+          "states": {},
+          "version": 18168865
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "nameEn": "Yellow Terracotta",
+      "name": "黄色のテラコッタ",
+      "mapColor": "#BA8524",
+      "blocks": [
+        {
+          "key": "yellow_terracotta",
+          "displayName": "黄色のテラコッタ",
+          "displayNameEn": "Yellow Terracotta",
+          "name": "minecraft:yellow_terracotta",
+          "states": {},
+          "version": 18168865
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "nameEn": "Lime Terracotta",
+      "name": "黄緑色のテラコッタ",
+      "mapColor": "#677535",
+      "blocks": [
+        {
+          "key": "lime_terracotta",
+          "displayName": "黄緑色のテラコッタ",
+          "displayNameEn": "Lime Terracotta",
+          "name": "minecraft:lime_terracotta",
+          "states": {},
+          "version": 18168865
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "nameEn": "Pink Terracotta",
+      "name": "桃色のテラコッタ",
+      "mapColor": "#A04D4E",
+      "blocks": [
+        {
+          "key": "pink_terracotta",
+          "displayName": "桃色のテラコッタ",
+          "displayNameEn": "Pink Terracotta",
+          "name": "minecraft:pink_terracotta",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "stripped_cherry_log_x",
+          "displayName": "樹皮を剥いだサクラの原木（横）",
+          "displayNameEn": "Stripped Cherry Log (horizontal)",
+          "name": "minecraft:stripped_cherry_log",
+          "states": {
+            "pillar_axis": "x"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "stripped_cherry_wood",
+          "displayName": "樹皮を剥いだサクラの木",
+          "displayNameEn": "Stripped Cherry Wood",
+          "name": "minecraft:stripped_cherry_wood",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "nameEn": "Gray Terracotta",
+      "name": "灰色のテラコッタ",
+      "mapColor": "#392923",
+      "blocks": [
+        {
+          "key": "gray_terracotta",
+          "displayName": "灰色のテラコッタ",
+          "displayNameEn": "Gray Terracotta",
+          "name": "minecraft:gray_terracotta",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "tuff",
+          "displayName": "凝灰岩",
+          "displayNameEn": "Tuff",
+          "name": "minecraft:tuff",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "cherry_log_x",
+          "displayName": "サクラの原木（横）",
+          "displayNameEn": "Cherry Log (horizontal)",
+          "name": "minecraft:cherry_log",
+          "states": {
+            "pillar_axis": "x"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "cherry_wood",
+          "displayName": "サクラの木",
+          "displayNameEn": "Cherry Wood",
+          "name": "minecraft:cherry_wood",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "nameEn": "Light Gray Terracotta",
+      "name": "薄灰色のテラコッタ",
+      "mapColor": "#876B62",
+      "blocks": [
+        {
+          "key": "light_gray_terracotta",
+          "displayName": "薄灰色のテラコッタ",
+          "displayNameEn": "Light Gray Terracotta",
+          "name": "minecraft:light_gray_terracotta",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "waxed_exposed_copper",
+          "displayName": "錆止めされた風化した銅",
+          "displayNameEn": "Waxed Exposed Copper",
+          "name": "minecraft:waxed_exposed_copper",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "waxed_exposed_cut_copper_slab",
+          "displayName": "錆止めされた風化した切り込み入りの銅のハーフブロック",
+          "displayNameEn": "Waxed Exposed Cut Copper Slab",
+          "name": "minecraft:waxed_exposed_cut_copper_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "rarity": 1
+        },
+        {
+          "key": "mud_bricks",
+          "displayName": "泥レンガ",
+          "displayNameEn": "Mud Bricks",
+          "name": "minecraft:mud_bricks",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "mud_brick_slab",
+          "displayName": "泥レンガのハーフブロック",
+          "displayNameEn": "Mud Brick Slab",
+          "name": "minecraft:mud_brick_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "nameEn": "Cyan Terracotta",
+      "name": "青緑色のテラコッタ",
+      "mapColor": "#575C5C",
+      "blocks": [
+        {
+          "key": "cyan_terracotta",
+          "displayName": "青緑色のテラコッタ",
+          "displayNameEn": "Cyan Terracotta",
+          "name": "minecraft:cyan_terracotta",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "mud",
+          "displayName": "泥",
+          "displayNameEn": "Mud",
+          "name": "minecraft:mud",
+          "states": {},
+          "version": 18168865
+        }
+      ]
+    },
+    {
+      "id": 45,
+      "nameEn": "Purple Terracotta",
+      "name": "紫色のテラコッタ",
+      "mapColor": "#7A4958",
+      "blocks": [
+        {
+          "key": "purple_terracotta",
+          "displayName": "紫色のテラコッタ",
+          "displayNameEn": "Purple Terracotta",
+          "name": "minecraft:purple_terracotta",
+          "states": {},
+          "version": 18168865
+        }
+      ]
+    },
+    {
+      "id": 46,
+      "nameEn": "Blue Terracotta",
+      "name": "青色のテラコッタ",
+      "mapColor": "#4C3E5C",
+      "blocks": [
+        {
+          "key": "blue_terracotta",
+          "displayName": "青色のテラコッタ",
+          "displayNameEn": "Blue Terracotta",
+          "name": "minecraft:blue_terracotta",
+          "states": {},
+          "version": 18168865
+        }
+      ]
+    },
+    {
+      "id": 47,
+      "nameEn": "Brown Terracotta",
+      "name": "茶色のテラコッタ",
+      "mapColor": "#4C3223",
+      "blocks": [
+        {
+          "key": "brown_terracotta",
+          "displayName": "茶色のテラコッタ",
+          "displayNameEn": "Brown Terracotta",
+          "name": "minecraft:brown_terracotta",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "dripstone_block",
+          "displayName": "鍾乳石ブロック",
+          "displayNameEn": "Dripstone Block",
+          "name": "minecraft:dripstone_block",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "pointed_dripstone",
+          "displayName": "鍾乳石",
+          "displayNameEn": "Pointed Dripstone",
+          "name": "minecraft:pointed_dripstone",
+          "states": {
+            "dripstone_thickness": "tip",
+            "hanging": false
+          },
+          "version": 18168865,
+          "needsSupport": true
+        }
+      ]
+    },
+    {
+      "id": 48,
+      "nameEn": "Green Terracotta",
+      "name": "緑色のテラコッタ",
+      "mapColor": "#4C522A",
+      "blocks": [
+        {
+          "key": "green_terracotta",
+          "displayName": "緑色のテラコッタ",
+          "displayNameEn": "Green Terracotta",
+          "name": "minecraft:green_terracotta",
+          "states": {},
+          "version": 18168865
+        }
+      ]
+    },
+    {
+      "id": 49,
+      "nameEn": "Red Terracotta",
+      "name": "赤色のテラコッタ",
+      "mapColor": "#8E3C2E",
+      "blocks": [
+        {
+          "key": "red_terracotta",
+          "displayName": "赤色のテラコッタ",
+          "displayNameEn": "Red Terracotta",
+          "name": "minecraft:red_terracotta",
+          "states": {},
+          "version": 18168865
+        }
+      ]
+    },
+    {
+      "id": 50,
+      "nameEn": "Black Terracotta",
+      "name": "黒色のテラコッタ",
+      "mapColor": "#251610",
+      "blocks": [
+        {
+          "key": "black_terracotta",
+          "displayName": "黒色のテラコッタ",
+          "displayNameEn": "Black Terracotta",
+          "name": "minecraft:black_terracotta",
+          "states": {},
+          "version": 18168865
+        }
+      ]
+    },
+    {
+      "id": 51,
+      "nameEn": "Crimson Nylium",
+      "name": "真紅のナイリウム",
+      "mapColor": "#BD3031",
+      "blocks": [
+        {
+          "key": "crimson_nylium",
+          "displayName": "真紅のナイリウム",
+          "displayNameEn": "Crimson Nylium",
+          "name": "minecraft:crimson_nylium",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        }
+      ]
+    },
+    {
+      "id": 52,
+      "nameEn": "Crimson Stem",
+      "name": "真紅の幹",
+      "mapColor": "#943F61",
+      "blocks": [
+        {
+          "key": "crimson_stem",
+          "displayName": "真紅の幹",
+          "displayNameEn": "Crimson Stem",
+          "name": "minecraft:crimson_stem",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "stripped_crimson_stem",
+          "displayName": "表皮を剥いだ真紅の幹",
+          "displayNameEn": "Stripped Crimson Stem",
+          "name": "minecraft:stripped_crimson_stem",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "crimson_planks",
+          "displayName": "真紅の板材",
+          "displayNameEn": "Crimson Planks",
+          "name": "minecraft:crimson_planks",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "crimson_slab",
+          "displayName": "真紅のハーフブロック",
+          "displayNameEn": "Crimson Slab",
+          "name": "minecraft:crimson_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "rarity": 1
+        },
+        {
+          "key": "crimson_pressure_plate",
+          "displayName": "真紅の感圧板",
+          "displayNameEn": "Crimson Pressure Plate",
+          "name": "minecraft:crimson_pressure_plate",
+          "states": {
+            "redstone_signal": 0
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "rarity": 1
+        }
+      ]
+    },
+    {
+      "id": 53,
+      "nameEn": "Crimson Hyphae",
+      "name": "真紅の菌糸",
+      "mapColor": "#5C191D",
+      "blocks": [
+        {
+          "key": "crimson_hyphae",
+          "displayName": "真紅の菌糸",
+          "displayNameEn": "Crimson Hyphae",
+          "name": "minecraft:crimson_hyphae",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "stripped_crimson_hyphae",
+          "displayName": "表皮を剥いだ真紅の菌糸",
+          "displayNameEn": "Stripped Crimson Hyphae",
+          "name": "minecraft:stripped_crimson_hyphae",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "rarity": 1
+        }
+      ]
+    },
+    {
+      "id": 54,
+      "nameEn": "Warped Nylium",
+      "name": "歪んだナイリウム",
+      "mapColor": "#167E86",
+      "blocks": [
+        {
+          "key": "warped_nylium",
+          "displayName": "歪んだナイリウム",
+          "displayNameEn": "Warped Nylium",
+          "name": "minecraft:warped_nylium",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "waxed_oxidized_copper",
+          "displayName": "錆止めされた酸化した銅",
+          "displayNameEn": "Waxed Oxidized Copper",
+          "name": "minecraft:waxed_oxidized_copper",
+          "states": {},
+          "version": 18168865,
+          "rarity": 2
+        },
+        {
+          "key": "waxed_oxidized_cut_copper_slab",
+          "displayName": "錆止めされた酸化した切り込み入りの銅のハーフブロック",
+          "displayNameEn": "Waxed Oxidized Cut Copper Slab",
+          "name": "minecraft:waxed_oxidized_cut_copper_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "rarity": 2
+        }
+      ]
+    },
+    {
+      "id": 55,
+      "nameEn": "Warped Stem",
+      "name": "歪んだ幹",
+      "mapColor": "#3A8E8C",
+      "blocks": [
+        {
+          "key": "warped_stem",
+          "displayName": "歪んだ幹",
+          "displayNameEn": "Warped Stem",
+          "name": "minecraft:warped_stem",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "stripped_warped_stem",
+          "displayName": "表皮を剥いだ歪んだ幹",
+          "displayNameEn": "Stripped Warped Stem",
+          "name": "minecraft:stripped_warped_stem",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "warped_planks",
+          "displayName": "歪んだ板材",
+          "displayNameEn": "Warped Planks",
+          "name": "minecraft:warped_planks",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "warped_slab",
+          "displayName": "歪んだハーフブロック",
+          "displayNameEn": "Warped Slab",
+          "name": "minecraft:warped_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "rarity": 1
+        },
+        {
+          "key": "waxed_weathered_copper",
+          "displayName": "錆止めされた錆びた銅",
+          "displayNameEn": "Waxed Weathered Copper",
+          "name": "minecraft:waxed_weathered_copper",
+          "states": {},
+          "version": 18168865,
+          "rarity": 2
+        },
+        {
+          "key": "waxed_weathered_cut_copper_slab",
+          "displayName": "錆止めされた錆びた切り込み入りの銅のハーフブロック",
+          "displayNameEn": "Waxed Weathered Cut Copper Slab",
+          "name": "minecraft:waxed_weathered_cut_copper_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "rarity": 2
+        },
+        {
+          "key": "warped_pressure_plate",
+          "displayName": "歪んだ感圧板",
+          "displayNameEn": "Warped Pressure Plate",
+          "name": "minecraft:warped_pressure_plate",
+          "states": {
+            "redstone_signal": 0
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "rarity": 1
+        }
+      ]
+    },
+    {
+      "id": 56,
+      "nameEn": "Warped Hyphae",
+      "name": "歪んだ菌糸",
+      "mapColor": "#562C3E",
+      "blocks": [
+        {
+          "key": "warped_hyphae",
+          "displayName": "歪んだ菌糸",
+          "displayNameEn": "Warped Hyphae",
+          "name": "minecraft:warped_hyphae",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "stripped_warped_hyphae",
+          "displayName": "表皮を剥いだ歪んだ菌糸",
+          "displayNameEn": "Stripped Warped Hyphae",
+          "name": "minecraft:stripped_warped_hyphae",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "rarity": 1
+        }
+      ]
+    },
+    {
+      "id": 57,
+      "nameEn": "Warped Wart Block",
+      "name": "歪んだウォートブロック",
+      "mapColor": "#14B485",
+      "blocks": [
+        {
+          "key": "warped_wart_block",
+          "displayName": "歪んだウォートブロック",
+          "displayNameEn": "Warped Wart Block",
+          "name": "minecraft:warped_wart_block",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        }
+      ]
+    },
+    {
+      "id": 58,
+      "nameEn": "Deepslate",
+      "name": "深層岩",
+      "mapColor": "#646464",
+      "blocks": [
+        {
+          "key": "deepslate",
+          "displayName": "深層岩",
+          "displayNameEn": "Deepslate",
+          "name": "minecraft:deepslate",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865
+        },
+        {
+          "key": "cobbled_deepslate",
+          "displayName": "深層岩の丸石",
+          "displayNameEn": "Cobbled Deepslate",
+          "name": "minecraft:cobbled_deepslate",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "cobbled_deepslate_slab",
+          "displayName": "深層岩の丸石のハーフブロック",
+          "displayNameEn": "Cobbled Deepslate Slab",
+          "name": "minecraft:cobbled_deepslate_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true
+        }
+      ]
+    },
+    {
+      "id": 59,
+      "nameEn": "Raw Iron",
+      "name": "鉄の原石",
+      "mapColor": "#D8AF93",
+      "blocks": [
+        {
+          "key": "raw_iron_block",
+          "displayName": "鉄の原石ブロック",
+          "displayNameEn": "Block of Raw Iron",
+          "name": "minecraft:raw_iron_block",
+          "states": {},
+          "version": 18168865,
+          "rarity": 2
+        }
+      ]
+    },
+    {
+      "id": 60,
+      "nameEn": "Glow Lichen",
+      "name": "ヒカリゴケ",
+      "mapColor": "#7FA796",
+      "blocks": [
+        {
+          "key": "glow_lichen",
+          "displayName": "ヒカリゴケ",
+          "displayNameEn": "Glow Lichen",
+          "name": "minecraft:glow_lichen",
+          "states": {
+            "multi_face_direction_bits": 1
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true,
+          "rarity": 1
+        },
+        {
+          "key": "verdant_froglight",
+          "displayName": "新緑色のフロッグライト",
+          "displayNameEn": "Verdant Froglight",
+          "name": "minecraft:verdant_froglight",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "rarity": 2
+        }
+      ]
+    }
+  ]
+}

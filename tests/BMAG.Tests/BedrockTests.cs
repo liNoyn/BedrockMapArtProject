@@ -12,6 +12,8 @@ namespace BMAG.Tests;
 
 public class BedrockTests
 {
+    public BedrockTests() => SafeWorldExporter.MinecraftRunningCheck = () => false;
+
     [Fact] // T19
     public void Nbt_IsLittleEndian_AndRoundTrips()
     {
@@ -128,6 +130,7 @@ public class BedrockTests
         var img = ImagePipeline.Process(TestHelpers.Gradient(300, 200), new ImageSettings { MapsX = 2, MapsY = 1 });
         var tiles = TileSplitter.Split(img, 2, 1);
         var plan = SafeWorldExporter.Plan(WorldInfo.Load(world), tiles, 2, 1, new WorldExportOptions { ProjectName = "test", StartId = 500 });
+        Assert.Contains("chest", BMAG.Export.McStructure.FromBytes(MapItemGenerator.CreateChestStructure([1], plan.Profile).ToBytes()).Palette[0].Name);
         Assert.Equal(new long[] { 500, 501 }, plan.MapIds);
         var result = SafeWorldExporter.Execute(plan);
 
@@ -181,6 +184,30 @@ public class BedrockTests
         Assert.True(calibrated.Find(blocks[0].Key)!.Verified);
         var reloaded = ColorProfile.LoadJson(calibrated.ToJson());
         Assert.Equal(new Rgba(1, 2, 3), reloaded.ColorOf(reloaded.Find(blocks[0].Key)!, Shade.Normal));
+    }
+
+    [Fact]
+    public void Inventory_MapsGoIntoEmptySlotsOnly()
+    {
+        var inv = new NbtList(NbtType.Compound);
+        for (int i = 0; i < 4; i++)
+            inv.Add(new NbtCompound
+            {
+                { "Count", new NbtByte((byte)(i == 1 ? 5 : 0)) }, { "Damage", new NbtShort(0) },
+                { "Name", new NbtString(i == 1 ? "minecraft:dirt" : "") }, { "Slot", new NbtByte((byte)i) }, { "WasPickedUp", new NbtByte(0) },
+            });
+        var player = NbtIO.Write(new NbtCompound { { "Inventory", inv }, { "Other", new NbtInt(7) } });
+        var log = new List<string>();
+        var updated = SafeWorldExporter.AddMapsToInventory(player, [10, 11], VersionProfile.Bedrock_1_16_210, false, log.Add)!;
+        var items = NbtIO.Read(updated).Get<NbtList>("Inventory")!.Items.Cast<NbtCompound>().ToList();
+        Assert.Equal("minecraft:filled_map", items[0].GetString("Name"));
+        Assert.Equal(10, items[0].Get<NbtCompound>("tag")!.GetLong("map_uuid"));
+        Assert.Equal("minecraft:dirt", items[1].GetString("Name"));
+        Assert.Equal(11, items[2].Get<NbtCompound>("tag")!.GetLong("map_uuid"));
+        Assert.Equal(2, items[2].GetInt("Slot"));
+        Assert.Equal("", items[3].GetString("Name"));
+        Assert.Throws<InvalidOperationException>(() =>
+            SafeWorldExporter.AddMapsToInventory(player, [1, 2, 3, 4], VersionProfile.Bedrock_1_16_210, false, log.Add));
     }
 
     /// <summary>Optional: set BMAG_TEST_WORLD to a COPY of a real Bedrock world to test reading and writing it.</summary>
