@@ -136,8 +136,8 @@
                 <Button Grid.Column="4" Content="{Binding L[DeletePreset]}" Command="{Binding DeletePresetCommand}" Margin="4,0,0,0" />
               </Grid>
               <Grid ColumnDefinitions="Auto,Auto,*">
-                <Button Content="{Binding L[DownloadTextures]}" Command="{Binding DownloadTexturesCommand}" />
-                <Button Grid.Column="1" Content="{Binding L[UseResourcePack]}" Command="{Binding UseResourcePackCommand}" Margin="4,0" />
+                <Button Content="{Binding L[DownloadTextures]}" Command="{Binding DownloadTexturesCommand}" IsVisible="{Binding TexturesMissing}" Margin="0,0,4,0" />
+                <Button Grid.Column="1" Content="{Binding L[UseResourcePack]}" Command="{Binding UseResourcePackCommand}" Margin="0,0,4,0" />
                 <TextBlock Grid.Column="2" Classes="note" Text="{Binding TextureStatus}" VerticalAlignment="Center" />
               </Grid>
               <TextBlock Classes="note" Text="{Binding L[PaletteHint]}" />

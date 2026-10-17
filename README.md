@@ -27,10 +27,12 @@ Little-Endian NBT、`.mcstructure` は外部ライブラリを使わずに自前
 - プリセット: すべて / サバイバル向け / 支え不要 / カーペット / コンクリート / 羊毛 / グレースケール / なし、
   ユーザー定義プリセットの保存。
 - カスタムブロック: 手入力、またはビヘイビアパック（フォルダ / `.mcpack` / `.mcaddon`）の `minecraft:map_color` から読み込み。
-- **ブロックのアイコン**: 「Minecraft のテクスチャを取得」で Mojang 公式の
-  [bedrock-samples](https://github.com/Mojang/bedrock-samples) からテクスチャを PC にダウンロードして表示します
-  （Minecraft EULA が適用されます。テクスチャは本リポジトリには含まれず、再配布もしません）。
-  手持ちのリソースパックのフォルダを指定することもできます。未取得のときは地図色で表示します。
+- **ブロックのアイコン**: Minecraft のテクスチャで表示します。初回のビルド時に Mojang 公式の
+  [bedrock-samples](https://github.com/Mojang/bedrock-samples) から必要なテクスチャを `.textures/` に取得し、
+  `BMAG.exe` と同じフォルダの `textures/` に入れるので、起動した時点からアイコンが出ます
+  （Minecraft EULA が適用されます。テクスチャは本リポジトリには含めていません）。
+  オフラインでビルドした場合は、アプリ内の「Minecraft のテクスチャを取得」ボタンから取得できます。
+  手持ちのリソースパックのフォルダを指定することもできます。
 
 **変換・建築**
 - 画像: PNG / JPEG / WebP / BMP / GIF / TIFF。アニメーション GIF・WebP と複数ページ TIFF はフレームを選択可能。
@@ -63,6 +65,8 @@ Little-Endian NBT、`.mcstructure` は外部ライブラリを使わずに自前
 ```bash
 dotnet build BMAG.sln
 ```
+
+初回のビルドはテクスチャの取得のため 1 分ほどかかります（インターネット接続が必要。取得しない場合は `-p:BundleTextures=false`）。
 
 ```bash
 dotnet run --project src/BMAG.App
