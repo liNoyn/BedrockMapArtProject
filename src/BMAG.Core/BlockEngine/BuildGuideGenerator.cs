@@ -21,13 +21,13 @@ public readonly record struct WorldOrigin(int X, int Y, int Z)
 public static class BuildGuideGenerator
 {
     public static void WriteAll(string dir, BlockLayout layout, QuantizeResult q, ColorProfile profile,
-        List<MaterialLine> materials, int mapsX, int mapsY, WorldOrigin? origin, string projectName)
+        List<MaterialLine> materials, int mapsX, int mapsY, WorldOrigin? origin, string projectName, bool english = false)
     {
         Directory.CreateDirectory(dir);
         ImageCodec.SavePng(q.Preview, Path.Combine(dir, "preview_block_map.png"));
-        File.WriteAllText(Path.Combine(dir, "materials.csv"), MaterialsCsv(materials), new UTF8Encoding(true));
+        File.WriteAllText(Path.Combine(dir, "materials.csv"), MaterialsCsv(materials, english), new UTF8Encoding(true));
         File.WriteAllText(Path.Combine(dir, "placements.csv"), PlacementsCsv(layout, origin), new UTF8Encoding(true));
-        File.WriteAllText(Path.Combine(dir, "summary.txt"), Summary(layout, profile, materials, mapsX, mapsY, origin, projectName), new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(dir, "summary.txt"), Summary(layout, profile, materials, mapsX, mapsY, origin, projectName, english), new UTF8Encoding(false));
 
         var mapsDir = Path.Combine(dir, "maps");
         Directory.CreateDirectory(mapsDir);
@@ -35,21 +35,24 @@ public static class BuildGuideGenerator
             for (int mx = 0; mx < mapsX; mx++)
             {
                 int n = my * mapsX + mx + 1;
-                using (var png = RenderMapGuide(layout, q, mx, my, origin))
+                using (var png = RenderMapGuide(layout, q, mx, my, origin, english: english))
                 using (var fs = File.Create(Path.Combine(mapsDir, $"map_{n:00}_guide.png")))
                     png.SaveTo(fs);
-                File.WriteAllText(Path.Combine(mapsDir, $"map_{n:00}_rows.txt"), RowInstructions(layout, mx, my, origin, n), new UTF8Encoding(false));
+                File.WriteAllText(Path.Combine(mapsDir, $"map_{n:00}_rows.txt"), RowInstructions(layout, mx, my, origin, n, english), new UTF8Encoding(false));
             }
     }
 
-    public static string MaterialsCsv(List<MaterialLine> materials)
+    private static string T(bool en, string ja, string english) => en ? english : ja;
+
+    public static string MaterialsCsv(List<MaterialLine> materials, bool en = false)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("種類,ブロック,識別子,状態,必要数,スタック,シュルカーボックス,使用マップ,代替ブロック");
+        sb.AppendLine(T(en, "種類,ブロック,識別子,状態,必要数,スタック,シュルカーボックス,使用マップ,代替ブロック",
+            "kind,block,id,states,count,stacks,shulker_boxes,maps,alternatives"));
         foreach (var m in materials)
             sb.AppendLine(string.Join(",",
-                m.IsSupport ? "支え" : "本体", Csv(m.Block.DisplayName), m.Block.Name, Csv(m.Block.StatesText),
-                m.Count, Csv(m.Stacks), m.ShulkerBoxes, Csv(m.MapsText), Csv(m.AlternativesText)));
+                m.IsSupport ? T(en, "支え", "support") : T(en, "本体", "art"), Csv(m.Block.LocalName(en)), m.Block.Name, Csv(m.Block.StatesText),
+                m.Count, Csv(m.Stacks), m.ShulkerBoxes, Csv(m.MapsText), Csv(string.Join(", ", m.Alternatives.Select(a => a.LocalName(en))))));
         return sb.ToString();
     }
 
@@ -71,53 +74,58 @@ public static class BuildGuideGenerator
     }
 
     public static string Summary(BlockLayout layout, ColorProfile profile, List<MaterialLine> materials,
-        int mapsX, int mapsY, WorldOrigin? origin, string projectName)
+        int mapsX, int mapsY, WorldOrigin? origin, string projectName, bool en = false)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"Bedrock Map Art Generator - 建築ガイド: {projectName}");
-        sb.AppendLine($"生成日時: {DateTime.Now:yyyy-MM-dd HH:mm}");
-        sb.AppendLine($"地図: {mapsX} x {mapsY} 枚 ({mapsX * 128} x {mapsY * 128} ブロック)");
-        sb.AppendLine($"方式: {ModeName(layout.Mode)}, 支えブロック: {SupportName(layout.Supports)}, 最大高さ: {layout.MaxHeight}");
-        sb.AppendLine($"色プロファイル: {profile.Name} ({profile.Id})");
+        sb.AppendLine($"Bedrock Map Art Generator - {T(en, "建築ガイド", "build guide")}: {projectName}");
+        sb.AppendLine($"{T(en, "生成日時", "Created")}: {DateTime.Now:yyyy-MM-dd HH:mm}");
+        sb.AppendLine(T(en, $"地図: {mapsX} x {mapsY} 枚 ({mapsX * 128} x {mapsY * 128} ブロック)", $"Maps: {mapsX} x {mapsY} ({mapsX * 128} x {mapsY * 128} blocks)"));
+        sb.AppendLine(T(en, $"方式: {ModeName(layout.Mode)}, 支えブロック: {SupportName(layout.Supports)}, 最大高さ: {layout.MaxHeight}",
+            $"3D: {ModeName(layout.Mode, true)}, support blocks: {SupportName(layout.Supports, true)}, max height: {layout.MaxHeight}"));
+        sb.AppendLine($"{T(en, "色プロファイル", "Colour profile")}: {profile.Name} ({profile.Id})");
         var used = materials.Where(m => !m.IsSupport).Select(m => m.Block).ToList();
         int unverified = used.Count(b => !b.Verified);
         if (unverified > 0)
-            sb.AppendLine($"注意: 使用ブロック {used.Count} 種のうち {unverified} 種の地図色は実機未検証の推定値です。");
+            sb.AppendLine(T(en, $"注意: 使用ブロック {used.Count} 種のうち {unverified} 種の地図色は実機未検証の推定値です。",
+                $"Note: {unverified} of the {used.Count} map colours used are unverified estimates."));
         sb.AppendLine();
-        sb.AppendLine("座標系: X+ = 東（画像の右）, Z+ = 南（画像の下）, 北が画像の上。");
-        sb.AppendLine("Z=0 の行は地図の外側（北側）に置く支えブロック行です。1 行目の陰影を正しくするために必要です。");
+        sb.AppendLine(T(en, "座標系: X+ = 東（画像の右）, Z+ = 南（画像の下）, 北が画像の上。", "Axes: X+ = east (image right), Z+ = south (image down), north is up."));
+        sb.AppendLine(T(en, "Z=0 の行は地図の外側（北側）に置く支えブロック行です。1 行目の陰影を正しくするために必要です。",
+            "Row Z=0 is the support row just north of the map area; it gives the first image row its shade."));
         if (origin is { } o)
         {
-            sb.AppendLine($"ワールド座標の原点 (支え行の北西角): X={o.X}, Y={o.Y}, Z={o.Z}");
-            sb.AppendLine($"画像左上ピクセルのワールド座標: X={o.X}, Z={o.Z + 1}");
+            sb.AppendLine(T(en, $"ワールド座標の原点 (支え行の北西角): X={o.X}, Y={o.Y}, Z={o.Z}", $"World origin (north-west corner of the support row): X={o.X}, Y={o.Y}, Z={o.Z}"));
+            sb.AppendLine(T(en, $"画像左上ピクセルのワールド座標: X={o.X}, Z={o.Z + 1}", $"Top-left image pixel: X={o.X}, Z={o.Z + 1}"));
         }
         else
         {
-            sb.AppendLine("スケール 0 の地図の範囲は X/Z = 128k-64 ～ 128k+63 です。画像左上を (128i-64, 128j-64) に置くと地図 1 枚にぴったり収まります。");
+            sb.AppendLine(T(en, "スケール 0 の地図の範囲は X/Z = 128k-64 ～ 128k+63 です。画像左上を (128i-64, 128j-64) に置くと地図 1 枚にぴったり収まります。",
+                "A scale-0 map covers X/Z = 128k-64 .. 128k+63. Put the top-left pixel at (128i-64, 128j-64) to fill one map exactly."));
         }
         sb.AppendLine();
-        sb.AppendLine("必要素材:");
+        sb.AppendLine(T(en, "必要素材:", "Materials:"));
         foreach (var m in materials)
-            sb.AppendLine($"  {(m.IsSupport ? "[支え] " : "")}{m.Block.DisplayName}: {m.Count} 個 ({m.Stacks})");
-        sb.AppendLine($"  合計: {materials.Sum(m => m.Count)} 個");
+            sb.AppendLine($"  {(m.IsSupport ? T(en, "[支え] ", "[support] ") : "")}{m.Block.LocalName(en)}: {m.Count} ({m.Stacks})");
+        sb.AppendLine($"  {T(en, "合計", "Total")}: {materials.Sum(m => m.Count)}");
         return sb.ToString();
     }
 
     /// <summary>Run-length row instructions for survival building, west to east per row.</summary>
-    public static string RowInstructions(BlockLayout layout, int mapX, int mapY, WorldOrigin? origin, int mapNumber)
+    public static string RowInstructions(BlockLayout layout, int mapX, int mapY, WorldOrigin? origin, int mapNumber, bool en = false)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"マップ #{mapNumber} の行ごとの配置（西→東）。座標はレイアウト座標{(origin is null ? "" : "（括弧内はワールド座標）")}。");
+        sb.AppendLine(T(en, $"マップ #{mapNumber} の行ごとの配置（西→東）。座標はレイアウト座標{(origin is null ? "" : "（括弧内はワールド座標）")}。",
+            $"Map #{mapNumber}, row by row (west to east). Layout coordinates{(origin is null ? "" : " (world coordinates in brackets)")}."));
         int x0 = mapX * 128;
         int zStart = mapY * 128 + 1;
         if (mapY == 0)
-            AppendRow(sb, layout, x0, 0, origin, "支え行");
+            AppendRow(sb, layout, x0, 0, origin, T(en, "支え行", "Support row"), en);
         for (int z = zStart; z < zStart + 128; z++)
-            AppendRow(sb, layout, x0, z, origin, $"行 {z - zStart + 1}");
+            AppendRow(sb, layout, x0, z, origin, $"{T(en, "行", "Row")} {z - zStart + 1}", en);
         return sb.ToString();
     }
 
-    private static void AppendRow(StringBuilder sb, BlockLayout layout, int x0, int z, WorldOrigin? origin, string label)
+    private static void AppendRow(StringBuilder sb, BlockLayout layout, int x0, int z, WorldOrigin? origin, string label, bool en)
     {
         string zText = origin is { } o ? $"Z={z} ({o.Z + z})" : $"Z={z}";
         sb.Append($"{label} [{zText}]: ");
@@ -132,13 +140,13 @@ public static class BuildGuideGenerator
             if (b is null) continue;
             string range = x - start == 1 ? $"{start}" : $"{start}-{x - 1}";
             string hText = layout.IsFlat ? "" : $" y{h}";
-            runs.Add($"{range}{hText} {b.DisplayName}×{x - start}");
+            runs.Add($"{range}{hText} {b.LocalName(en)}×{x - start}");
         }
         sb.AppendLine(string.Join(" | ", runs));
     }
 
     /// <summary>Top-down guide image for one map with block, chunk (16), structure (64) grid lines and coordinates (design 7.1).</summary>
-    public static SKData RenderMapGuide(BlockLayout layout, QuantizeResult q, int mapX, int mapY, WorldOrigin? origin, int cell = 8)
+    public static SKData RenderMapGuide(BlockLayout layout, QuantizeResult q, int mapX, int mapY, WorldOrigin? origin, int cell = 8, bool english = false)
     {
         const int margin = 40;
         int size = 128 * cell;
@@ -185,27 +193,29 @@ public static class BuildGuideGenerator
             canvas.DrawText(lx, margin + i * cell + 2, top + size + 14, text);
             canvas.DrawText(lz, 2, top + i * cell + 12, text);
         }
-        canvas.DrawText($"マップ #{mapY * (layout.Width / 128) + mapX + 1}  {(origin is null ? "レイアウト座標" : "ワールド座標")}  北↑  赤線=構造物(64) 黒線=チャンク(16)", margin, 14, text);
+        canvas.DrawText(english
+            ? $"Map #{mapY * (layout.Width / 128) + mapX + 1}  {(origin is null ? "layout coordinates" : "world coordinates")}  north up  red = structure (64)  black = chunk (16)"
+            : $"マップ #{mapY * (layout.Width / 128) + mapX + 1}  {(origin is null ? "レイアウト座標" : "ワールド座標")}  北↑  赤線=構造物(64) 黒線=チャンク(16)", margin, 14, text);
 
         using var image = surface.Snapshot();
         return image.Encode(SKEncodedImageFormat.Png, 100);
     }
 
-    public static string ModeName(StaircaseMode m) => m switch
+    public static string ModeName(StaircaseMode m, bool en = false) => m switch
     {
-        StaircaseMode.Flat => "Flat（平面）",
-        StaircaseMode.Classic => "Classic 階段（実験的）",
-        StaircaseMode.Valley => "Valley 階段（実験的）",
-        StaircaseMode.FullDark => "全面暗（実験的）",
-        _ => "全面明（実験的）",
+        StaircaseMode.Flat => T(en, "Flat（平面）", "flat"),
+        StaircaseMode.Classic => T(en, "Classic 階段（実験的）", "classic staircase (experimental)"),
+        StaircaseMode.Valley => T(en, "Valley 階段（実験的）", "valley staircase (experimental)"),
+        StaircaseMode.FullDark => T(en, "全面暗（実験的）", "full dark (experimental)"),
+        _ => T(en, "全面明（実験的）", "full light (experimental)"),
     };
 
-    public static string SupportName(SupportMode m) => m switch
+    public static string SupportName(SupportMode m, bool en = false) => m switch
     {
-        SupportMode.None => "なし",
-        SupportMode.Important => "必要なブロックのみ",
-        SupportMode.AllOptimized => "すべて（最適化）",
-        _ => "すべて（二重・最適化）",
+        SupportMode.None => T(en, "なし", "none"),
+        SupportMode.Important => T(en, "必要なブロックのみ", "under blocks that need it"),
+        SupportMode.AllOptimized => T(en, "すべて（最適化）", "all (optimized)"),
+        _ => T(en, "すべて（二重・最適化）", "all (double, optimized)"),
     };
 
     private static string Csv(string s) => s.Contains(',') || s.Contains('"') ? "\"" + s.Replace("\"", "\"\"") + "\"" : s;

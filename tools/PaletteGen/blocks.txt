@@ -5,11 +5,12 @@
 #
 # CS|id|English name|日本語名|base R,G,B
 # B|key|bedrock identifier|state overrides (k=v;k=v)|flags|English name|日本語名
-# flags: S = needs a block underneath, G = falls (gravity), F = flammable, T = biome tinted,
+# flags: S = needs a block underneath, G = falls (gravity), F = flammable,
+#        T = biome tinted on Bedrock maps (grass block; oak, jungle, acacia, dark oak, mangrove leaves),
 #        X = not selected by default, 1-3 = rarity (0 common .. 3 very rare)
 
 CS|0|Grass|草|127,178,56
-B|grass_block|minecraft:grass_block||T|Grass Block|草ブロック
+B|grass_block|minecraft:grass_block||TX|Grass Block|草ブロック
 B|slime_block|minecraft:slime||S|Slime Block|スライムブロック
 
 CS|1|Sand|砂|247,233,163
@@ -49,12 +50,12 @@ B|heavy_weighted_pressure_plate|minecraft:heavy_weighted_pressure_plate||S1|Heav
 B|brewing_stand|minecraft:brewing_stand||S1|Brewing Stand|醸造台
 
 CS|6|Leaves|葉|0,124,0
-B|oak_leaves|minecraft:oak_leaves|persistent_bit=true|FT|Oak Leaves|オークの葉
-B|spruce_leaves|minecraft:spruce_leaves|persistent_bit=true|FT|Spruce Leaves|トウヒの葉
-B|birch_leaves|minecraft:birch_leaves|persistent_bit=true|FT|Birch Leaves|シラカバの葉
-B|jungle_leaves|minecraft:jungle_leaves|persistent_bit=true|FT|Jungle Leaves|ジャングルの葉
-B|acacia_leaves|minecraft:acacia_leaves|persistent_bit=true|FT|Acacia Leaves|アカシアの葉
-B|dark_oak_leaves|minecraft:dark_oak_leaves|persistent_bit=true|FT|Dark Oak Leaves|ダークオークの葉
+B|oak_leaves|minecraft:oak_leaves|persistent_bit=true|FTX|Oak Leaves|オークの葉
+B|spruce_leaves|minecraft:spruce_leaves|persistent_bit=true|F|Spruce Leaves|トウヒの葉
+B|birch_leaves|minecraft:birch_leaves|persistent_bit=true|F|Birch Leaves|シラカバの葉
+B|jungle_leaves|minecraft:jungle_leaves|persistent_bit=true|FTX|Jungle Leaves|ジャングルの葉
+B|acacia_leaves|minecraft:acacia_leaves|persistent_bit=true|FTX|Acacia Leaves|アカシアの葉
+B|dark_oak_leaves|minecraft:dark_oak_leaves|persistent_bit=true|FTX|Dark Oak Leaves|ダークオークの葉
 B|azalea_leaves|minecraft:azalea_leaves|persistent_bit=true|F|Azalea Leaves|ツツジの葉
 B|bamboo_block_x|minecraft:bamboo_block|pillar_axis=x|F|Block of Bamboo (horizontal)|竹ブロック（横）
 

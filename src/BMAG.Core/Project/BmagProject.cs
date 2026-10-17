@@ -36,8 +36,14 @@ public sealed class BmagProject
 
     // Block construction
     public string ColorProfileId { get; set; } = ColorProfile.DefaultId;
-    public ColorMetric Metric { get; set; } = ColorMetric.Lab;
+    public ColorMetric Metric { get; set; } = ColorMetric.Oklab;
     public DitherMode Dither { get; set; } = DitherMode.None;
+    public double DitherStrength { get; set; } = 1.0;
+    public bool Serpentine { get; set; } = true;
+    public Export.StructureSplit Split { get; set; } = Export.StructureSplit.Tiles64;
+    public bool WriteBehaviorPack { get; set; }
+    /// <summary>Manual pixel edits ("x,y,blockKey,shade").</summary>
+    public List<string>? Edits { get; set; }
     public StaircaseMode Staircase { get; set; } = StaircaseMode.Flat;
     public SupportMode Supports { get; set; } = SupportMode.Important;
     /// <summary>Colour set id → chosen block key.</summary>

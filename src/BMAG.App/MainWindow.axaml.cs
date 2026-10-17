@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
@@ -21,6 +22,7 @@ public partial class MainWindow : Window, IDialogService
         {
             if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.S) _vm.SaveProjectCommand.Execute(null);
             if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.O) _vm.OpenImageCommand.Execute(null);
+            if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.Z) _vm.UndoEditCommand.Execute(null);
         };
         // "BMAG.exe picture.png" (Open with…) loads the image on start.
         var startFile = Environment.GetCommandLineArgs().Skip(1).FirstOrDefault(File.Exists);
@@ -33,16 +35,64 @@ public partial class MainWindow : Window, IDialogService
         };
         if (this.FindControl<Image>("BuildImage") is { } img)
         {
-            img.PointerMoved += (_, e) => ForwardPointer(img, e, false);
-            img.PointerPressed += (_, e) => ForwardPointer(img, e, true);
+            img.PointerMoved += (_, e) => ForwardPointer(img, e, false, e.GetCurrentPoint(img).Properties.IsLeftButtonPressed, false);
+            img.PointerPressed += (_, e) => { e.Pointer.Capture(img); ForwardPointer(img, e, true, true, false); };
+            img.PointerReleased += (_, e) => { ForwardPointer(img, e, false, false, true); e.Pointer.Capture(null); _vm.EndPaintStroke(); };
         }
+        SetupCropDrag();
     }
 
-    private void ForwardPointer(Image img, PointerEventArgs e, bool click)
+    private void ForwardPointer(Image img, PointerEventArgs e, bool click, bool pressed, bool released)
     {
         var p = e.GetPosition(img);
         if (img.Bounds.Width <= 0 || img.Bounds.Height <= 0) return;
-        _vm.OnPreviewPointer(p.X / img.Bounds.Width, p.Y / img.Bounds.Height, click);
+        _vm.OnPreviewPointer(p.X / img.Bounds.Width, p.Y / img.Bounds.Height, click, pressed, released);
+    }
+
+    /// <summary>Drag a rectangle on the Original view to set a manual crop.</summary>
+    private void SetupCropDrag()
+    {
+        if (this.FindControl<Image>("PreviewImage") is not { } img || this.FindControl<Canvas>("CropOverlay") is not { } canvas
+            || this.FindControl<Avalonia.Controls.Shapes.Rectangle>("CropRect") is not { } rect) return;
+        Avalonia.Point? start = null;
+
+        // The bitmap is drawn uniformly scaled and centred inside the control.
+        Avalonia.Rect ShownRect()
+        {
+            if (img.Source is not { } src || img.Bounds.Width <= 0) return default;
+            double scale = Math.Min(img.Bounds.Width / src.Size.Width, img.Bounds.Height / src.Size.Height);
+            double w = src.Size.Width * scale, h = src.Size.Height * scale;
+            return new Avalonia.Rect((img.Bounds.Width - w) / 2, (img.Bounds.Height - h) / 2, w, h);
+        }
+
+        img.PointerPressed += (_, e) =>
+        {
+            if (_vm.SelectedPreviewMode.Value != PreviewMode.Original || !e.GetCurrentPoint(img).Properties.IsLeftButtonPressed) return;
+            start = e.GetPosition(img);
+            e.Pointer.Capture(img);
+        };
+        img.PointerMoved += (_, e) =>
+        {
+            if (start is not { } s) return;
+            var p = e.GetPosition(img);
+            var a = img.TranslatePoint(new Avalonia.Point(Math.Min(s.X, p.X), Math.Min(s.Y, p.Y)), canvas) ?? default;
+            Canvas.SetLeft(rect, a.X);
+            Canvas.SetTop(rect, a.Y);
+            rect.Width = Math.Abs(p.X - s.X);
+            rect.Height = Math.Abs(p.Y - s.Y);
+            rect.IsVisible = true;
+        };
+        img.PointerReleased += (_, e) =>
+        {
+            if (start is not { } s) return;
+            start = null;
+            e.Pointer.Capture(null);
+            rect.IsVisible = false;
+            var r = ShownRect();
+            if (r.Width <= 0) return;
+            var p = e.GetPosition(img);
+            _vm.SetCropFromFractions((s.X - r.X) / r.Width, (s.Y - r.Y) / r.Height, (p.X - r.X) / r.Width, (p.Y - r.Y) / r.Height);
+        };
     }
 
     private async void OnDrop(object? sender, DragEventArgs e)
@@ -123,6 +173,23 @@ public partial class MainWindow : Window, IDialogService
         dialog.Opened += (_, _) => box.Focus();
         await dialog.ShowDialog(this);
         return result;
+    }
+
+    public async Task InfoAsync(string title, string message)
+    {
+        var dialog = MakeDialog(title);
+        var ok = new Button { Content = "OK", Classes = { "accent" } };
+        ok.Click += (_, _) => dialog.Close();
+        dialog.Content = new StackPanel
+        {
+            Margin = new Avalonia.Thickness(16), Spacing = 12,
+            Children =
+            {
+                new SelectableTextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap },
+                new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Children = { ok } },
+            },
+        };
+        await dialog.ShowDialog(this);
     }
 
     private static Window MakeDialog(string title) => new()

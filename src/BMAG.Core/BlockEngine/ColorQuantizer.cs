@@ -48,7 +48,11 @@ public static class StaircaseModes
 
 public sealed record QuantizeOptions
 {
-    public ColorMetric Metric { get; init; } = ColorMetric.Lab;
+    public ColorMetric Metric { get; init; } = ColorMetric.Oklab;
+    /// <summary>Error diffusion: alternate the scan direction per row (removes directional artefacts).</summary>
+    public bool Serpentine { get; init; } = true;
+    /// <summary>Error diffusion / ordered dithering strength, 0..1.</summary>
+    public double DitherStrength { get; init; } = 1.0;
     public DitherMode Dither { get; init; } = DitherMode.None;
     public StaircaseMode Mode { get; init; } = StaircaseMode.Flat;
     /// <summary>Pixels with alpha below this become empty (no block). Only relevant when transparency is kept.</summary>
@@ -72,6 +76,13 @@ public sealed class QuantizeResult
 
     public int Get(int x, int y) => EntryIndex[y * Width + x];
     public Shade GetShade(int x, int y) => Shades[y * Width + x];
+
+    /// <summary>Deep copy (manual edits are applied to copies so the automatic result can be reused).</summary>
+    public QuantizeResult Clone() => new()
+    {
+        Width = Width, Height = Height, EntryIndex = (int[])EntryIndex.Clone(), Shades = (Shade[])Shades.Clone(),
+        Entries = [.. Entries], Preview = Preview.Clone(), Mode = Mode,
+    };
 }
 
 /// <summary>Converts an image into block map colours (ColorQuantizer, design 12.1). Deterministic for the same input.</summary>
@@ -148,7 +159,8 @@ public static class ColorQuantizer
                     if (ordered != null)
                     {
                         double t = (ordered[(y % size) * size + x % size] + 0.5) / ordered.Length - 0.5;
-                        r += t * spread; g += t * spread; b += t * spread;
+                        double k = t * spread * options.DitherStrength;
+                        r += k; g += k; b += k;
                     }
                     Assign(i, local.Find(r, g, b));
                 }
@@ -203,21 +215,24 @@ public static class ColorQuantizer
             buf[i * 3 + 1] = image.Pixels[i * 4 + 1];
             buf[i * 3 + 2] = image.Pixels[i * 4 + 2];
         }
+        double strength = Math.Clamp(options.DitherStrength, 0, 1);
         for (int y = 0; y < h; y++)
         {
             if ((y & 15) == 0) ct.ThrowIfCancellationRequested();
-            for (int x = 0; x < w; x++)
+            bool reverse = options.Serpentine && (y & 1) == 1;
+            for (int step = 0; step < w; step++)
             {
+                int x = reverse ? w - 1 - step : step;
                 int i = y * w + x;
                 if (isEmpty(i)) { idx[i] = -1; shades[i] = Shade.Normal; continue; }
                 double r = Math.Clamp(buf[i * 3], 0, 255), g = Math.Clamp(buf[i * 3 + 1], 0, 255), b = Math.Clamp(buf[i * 3 + 2], 0, 255);
                 int c = matcher.Find(r, g, b);
                 assign(i, c);
                 var col = candidates[c].Color;
-                double er = r - col.R, eg = g - col.G, eb = b - col.B;
+                double er = (r - col.R) * strength, eg = (g - col.G) * strength, eb = (b - col.B) * strength;
                 foreach (var (dx, dy, wt) in kernel)
                 {
-                    int nx = x + dx, ny = y + dy;
+                    int nx = reverse ? x - dx : x + dx, ny = y + dy;
                     if (nx < 0 || nx >= w || ny >= h) continue;
                     int ni = (ny * w + nx) * 3;
                     buf[ni] += (float)(er * wt);
@@ -262,7 +277,9 @@ public static class ColorQuantizer
         {
             _candidates = candidates;
             _metric = metric;
-            _labs = candidates.Select(c => ColorMath.ToLab(c.Color.R, c.Color.G, c.Color.B)).ToArray();
+            _labs = candidates.Select(c => metric == ColorMetric.Oklab
+                ? ColorMath.ToOklab(c.Color.R, c.Color.G, c.Color.B)
+                : ColorMath.ToLab(c.Color.R, c.Color.G, c.Color.B)).ToArray();
         }
 
         public int Find(double r, double g, double b)
@@ -273,7 +290,12 @@ public static class ColorQuantizer
 
             int best = 0;
             double bestD = double.MaxValue;
-            Lab lab = _metric is ColorMetric.Lab or ColorMetric.Ciede2000 ? ColorMath.ToLab(ri, gi, bi) : default;
+            Lab lab = _metric switch
+            {
+                ColorMetric.Lab or ColorMetric.Ciede2000 => ColorMath.ToLab(ri, gi, bi),
+                ColorMetric.Oklab => ColorMath.ToOklab(ri, gi, bi),
+                _ => default,
+            };
             for (int i = 0; i < _candidates.Count; i++)
             {
                 var c = _candidates[i].Color;
@@ -281,7 +303,7 @@ public static class ColorQuantizer
                 {
                     ColorMetric.Rgb => Sq(ri - c.R) + Sq(gi - c.G) + Sq(bi - c.B),
                     ColorMetric.WeightedRgb => ColorMath.WeightedRgbSq(ri, gi, bi, c.R, c.G, c.B),
-                    ColorMetric.Lab => ColorMath.DeltaE76(lab, _labs[i]),
+                    ColorMetric.Lab or ColorMetric.Oklab => ColorMath.DeltaE76(lab, _labs[i]),
                     _ => ColorMath.DeltaE2000(lab, _labs[i]),
                 };
                 if (d < bestD) { bestD = d; best = i; } // strict '<' keeps the first (preferred) candidate on ties

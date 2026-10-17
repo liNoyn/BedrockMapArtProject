@@ -8,6 +8,7 @@ public sealed class AppSettings
     public bool English { get; set; }
     public string? ResourcePack { get; set; }
     public bool TexturesAccepted { get; set; }
+    public bool TexturesAsked { get; set; }
 
     private static string FilePath =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BMAG", "settings.json");
