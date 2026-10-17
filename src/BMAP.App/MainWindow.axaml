@@ -349,6 +349,11 @@
           <Border Classes="group" IsVisible="{Binding IsStaircase}">
             <StackPanel Spacing="4">
               <TextBlock Classes="note" Text="{Binding L[ShadeRuleNote]}" />
+              <Grid ColumnDefinitions="Auto,*">
+                <TextBlock Classes="lbl" Text="{Binding L[ShadingModel]}" />
+                <ComboBox Grid.Column="1" ItemsSource="{Binding ShadingModels}" SelectedItem="{Binding ShadingModelOption}" HorizontalAlignment="Stretch" />
+              </Grid>
+              <TextBlock Classes="note" Text="{Binding L[ShadingModelHint]}" />
               <Grid ColumnDefinitions="Auto,*" IsEnabled="{Binding CanLimitHeight}">
                 <TextBlock Classes="lbl" Text="{Binding L[MaxHeight]}" />
                 <NumericUpDown Grid.Column="1" Value="{Binding MaxHeight}" Minimum="0" Maximum="383" FormatString="0" />

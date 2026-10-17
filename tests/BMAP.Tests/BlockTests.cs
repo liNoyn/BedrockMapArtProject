@@ -23,8 +23,16 @@ public class BlockTests
     [Fact]
     public void BuiltInProfile_HasAllMapartCraftColourSets_AndIsUnverified()
     {
-        Assert.Equal(60, Profile.ColourSets.Count); // 61 map colours minus water
-        Assert.True(Profile.Blocks.Count() > 300);
+        // 61 map colours minus water, plus Bedrock-only sets from gd-codes (birch / spruce leaves, sculk, 16 wool slabs).
+        Assert.Equal(79, Profile.ColourSets.Count);
+        Assert.True(Profile.Blocks.Count() > 350);
+        Assert.Equal(ColorStatus.ThirdParty, Profile.ColourSets.Single(s => s.NameEn == "Purple").Status);
+        Assert.Equal("#995ACC", Profile.ColourSets.Single(s => s.NameEn == "Purple").MapColor); // normal = gd-codes #844DB0
+        Assert.Equal("#844DB0", Profile.Shaded(Rgba.FromHex(Profile.ColourSets.Single(s => s.NameEn == "Purple").MapColor), Shade.Normal).ToHex());
+        Assert.Equal(ColorStatus.Verified, Profile.ColourSets.Single(s => s.NameEn == "Quartz").Status);
+        Assert.Equal(ColorStatus.Estimated, Profile.ColourSets.Single(s => s.NameEn == "Gray").Status);
+        Assert.All(Profile.ColourSets.Where(s => s.NameEn.EndsWith("Wool Slab")), s => Assert.Equal(ColorStatus.ThirdParty, s.Status));
+        Assert.All(Profile.ColourSets.Where(s => s.NameEn.EndsWith("Wool Slab")).SelectMany(s => s.Blocks), b => Assert.False(b.DefaultEnabled));
         Assert.All(Profile.Blocks, b => Assert.False(b.Verified));
         Assert.Equal(Profile.Blocks.Count(), Profile.Blocks.Select(b => b.Key).Distinct().Count());
         Assert.All(Profile.Blocks, b => Assert.StartsWith("minecraft:", b.Name));
@@ -36,7 +44,7 @@ public class BlockTests
     [Fact]
     public void Presets_PickOneBlockPerColourSet()
     {
-        Assert.Equal(60, Presets[0].Keys.Count);
+        Assert.Equal(63, Presets[0].Keys.Count); // wool slab colours are not selected by default (third-party, unverified)
         var survival = Presets[1].ToSelection().Resolve(Profile);
         Assert.DoesNotContain(survival, e => e.Block.Gravity || e.Block.NeedsSupport || e.Block.Rarity > 1);
         Assert.All(Presets.Single(p => p.NameEn == "Carpets").Keys, k => Assert.EndsWith("_carpet", k));

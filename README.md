@@ -24,7 +24,9 @@ renderer are implemented in the project without further libraries.
 ## Features
 
 **Block selection (as in MapartCraft)**
-- 60 colour sets (one per map colour) with 323 blocks: the Bedrock equivalents of every MapartCraft block. Pick
+- 79 colour sets with 355 blocks: one per map colour (the Bedrock equivalents of every MapartCraft block) plus
+  Bedrock-only colours from gd-codes' data (birch and spruce leaves, sculk, 16 wool slab colours — the wool slabs are not
+  selected by default because they are unverified). Pick
   **any number** of blocks per colour; each row shows the dark / normal / light map colour and how many are selected.
 - Several blocks of one colour share its pixels equally (same map, materials spread out), either in stretches (easy to
   build) or scattered.
@@ -53,6 +55,8 @@ renderer are implemented in the project without further libraries.
 
 **3D map art (staircasing) and the shading rule**
 - 3D: off (flat), Classic, Valley, full dark, full light.
+- **Shading model**: step 1 (Java), step 2 (gd-codes, Nukkit), step 2 with gd-codes rounding, or alternating by parity
+  (hypothesis). Light and dark steps are handled separately; a rule measured in game is stored in the colour profile.
 - **Shading rule analysis** (details in [docs/shading-rules.md](docs/shading-rules.md), Japanese)
   - Map simulator: redraws the map from the block positions alone and compares it pixel by pixel with the planned
     colours (tested to match in every staircase, support and dithering mode).
@@ -84,7 +88,10 @@ renderer are implemented in the project without further libraries.
   "verified" and used by quantizing, height limits, layout and the 3D view.
 - Every colour has a status: verified / API-derived / third-party / estimated / unknown. Estimates are never shown as verified.
 - `mapcheck` checks that every pixel of any drawn map is "base colour × multiplier". This confirmed the multipliers
-  180 / 220 / 255 and 13 base colours on maps drawn by Bedrock.
+  180 / 220 / 255, the rounding (floor from the base colour) and 13 base colours on maps drawn by Bedrock.
+- Measurements are scored against candidate models from other implementations (Java, step 2, gd-codes rounding, parity,
+  PowerNukkitX). `refcompare` downloads gd-codes' 82 colour categories and compares them with BMAP. Findings:
+  [docs/bedrock-research.md](docs/bedrock-research.md) (Japanese).
 
 **Previews and guides**
 - Predicted map colours, original, difference, shading analysis, 2D build view (textures, heights, chunk borders,
@@ -138,7 +145,7 @@ read only), `textures`. Run without arguments for usage.
 | `tests/BMAP.Tests` | xUnit tests |
 | `tools/PaletteGen` | Builds `palettes/bedrock-full-v2.json` from `blocks.txt` (validated against Mojang's metadata) |
 | `tools/publish.ps1`, `tools/make-icon.ps1` | Release zip, app icon |
-| `docs/` | [Shading rules](docs/shading-rules.md), [in-game calibration](docs/calibration.md), [benchmarks](docs/benchmarks.md) |
+| `docs/` | [Shading rules](docs/shading-rules.md), [in-game calibration](docs/calibration.md), [other implementations checked](docs/bedrock-research.md), [benchmarks](docs/benchmarks.md) |
 
 | Feature | Code (`src/BMAP.Core`) |
 |---|---|
@@ -163,7 +170,8 @@ The game cannot be driven from the development environment, so these points are 
 |---|---|
 | Shade multipliers 180 / 220 / 255 | **Verified** on 12 maps (~190 k pixels) drawn by Bedrock 1.21.132 – 1.26.51 |
 | Base colours of the colour sets | **13 of 60 verified**; the rest are Java values (estimates) |
-| Smallest height step that changes the shade (1 or 2) | **Not verified**; measure it with the shading test pad (2 can be set if needed) |
+| Rounding | **Verified**: base × multiplier / 255, rounded down (gd-codes' rounding does not match) |
+| Smallest height step that changes the shade (1 or 2) | **Not verified**; gd-codes and Nukkit use 2. Measure it with the shading test pad; switch with the shading model |
 | Which block gives which colour | Not verified; measure with the colour test pad |
 | Block identifiers and states | All 323 validated against Mojang's metadata (1.26.50); loading as structures not checked |
 
@@ -184,6 +192,8 @@ Logs are in `%LOCALAPPDATA%\BMAP\logs`.
   many features. No MapartCraft code or images are included.
 - [Cartographer](https://github.com/julienvincent/cartographer): a map art converter with several staircasing algorithms.
 - [Image Map](https://github.com/tryashtar/image-map): the Bedrock map data format (`map_<ID>`, `colors`). No code used.
+- [gd-codes/mc-pixelart-maker](https://github.com/gd-codes/mc-pixelart-maker) (MIT): Bedrock colour categories (downloaded at run time for comparison) and step-2 builds.
+- [CloudburstMC/Nukkit](https://github.com/CloudburstMC/Nukkit), [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX): map shading formulas (re-implemented as candidate models; no code used).
 - Minecraft docs: [BlockMapColorComponent](https://learn.microsoft.com/en-us/minecraft/creator/scriptapi/minecraft/server/blockmapcolorcomponent?view=minecraft-bedrock-stable),
   [Block.getMapColor (pre-release)](https://learn.microsoft.com/en-us/minecraft/creator/scriptapi/minecraft/server/block?view=minecraft-bedrock-experimental),
   considered for reading base colours (see docs/calibration.md).

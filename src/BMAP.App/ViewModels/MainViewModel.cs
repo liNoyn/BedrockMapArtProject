@@ -763,6 +763,7 @@ public sealed partial class MainViewModel : ViewModelBase
         p.Dither = Dither.Value;
         p.DitherStrength = DitherStrength;
         p.MaxHeight = MaxHeight;
+        p.ShadingModelId = ShadingModelOption?.Value?.Id ?? "";
         p.ShadePenalty = ShadePenalty;
         p.Serpentine = Serpentine;
         p.LinearDiffusion = LinearDiffusion;
@@ -803,6 +804,8 @@ public sealed partial class MainViewModel : ViewModelBase
             Dither = Dithers.First(d => d.Value == p.Dither);
             DitherStrength = p.DitherStrength;
             MaxHeight = p.MaxHeight;
+            _shadingModel = ShadingModels.FirstOrDefault(m => (m.Value?.Id ?? "") == p.ShadingModelId) ?? ShadingModels[0];
+            Raise(nameof(ShadingModelOption));
             ShadePenalty = p.ShadePenalty;
             Serpentine = p.Serpentine;
             LinearDiffusion = p.LinearDiffusion;

@@ -23,7 +23,8 @@
 ## 主な機能
 
 **ブロック選択（MapartCraft と同じ方式）**
-- Minecraft の地図色ごとに 60 の色セット、合計 323 ブロック（MapartCraft の全ブロックに対応する統合版ブロック）。
+- 79 の色セット、合計 355 ブロック: Minecraft の地図色ごとの 60 色（MapartCraft の全ブロックに対応する統合版ブロック）に、
+  gd-codes のデータによる Bedrock 独自の色（シラカバ・トウヒの葉、スカルク、羊毛ハーフブロック 16 色。未検証のため羊毛ハーフブロックは既定では選びません）を加えています。
   使いたいブロックをクリックで **いくつでも** 選べます。行の左には暗・通常・明の 3 段階の地図色と選択数が出ます。
 - 同じ色のブロックを複数選ぶと、その色のピクセルを均等に分担します（地図上の見た目は同じで素材を分散できます）。
   分け方は「まとまりで」（マップごと・行ごとに連続した範囲。建築しやすい）か「ばらばら」を選べます。
@@ -53,6 +54,8 @@
 
 **3D マップアート（階段）と陰影規則**
 - 3D: なし（平面）/ Classic / Valley / 全面暗 / 全面明。
+- **陰影モデル**: 段差 1（Java 版）/ 段差 2（gd-codes・Nukkit）/ 通常色から丸める段差 2 / 偶奇で交互（仮説）から選べます。
+  明と暗の段差は別々に扱い、実機キャリブレーションで測った規則は色プロファイルに保存されます。
 - **陰影規則の解析**（詳しくは [docs/shading-rules.md](docs/shading-rules.md)）
   - 地図シミュレーター: ブロックの配置だけから地図を描き直し、計画した色と 1 ピクセルずつ照合します（全方式で一致をテスト）。
   - 陰影・建築チェック: 予定と違うピクセル、北隣が空で地形しだいのピクセル、落下・破損するブロック、
@@ -80,7 +83,9 @@
   実際の色を読み取ります。結果は「実機確認済み」の色プロファイルとして保存でき、減色・高さの計算・建築配置・3D ビューに使われます。
 - 色の状態を区別します: 実機確認済み / API 由来 / 他プロジェクト / 推定 / 不明。推定値を確認済みとは表示しません。
 - `mapcheck`: どのワールドの地図でも、全ピクセルが「基本色 × 倍率」になっているかを調べます。これで陰影の倍率
-  180 / 220 / 255 と 13 の色セットの基本色を、Bedrock が描いた地図で確認しました。
+  180 / 220 / 255、丸め方（基本色からの切り捨て）、13 の色セットの基本色を、Bedrock が描いた地図で確認しました。
+- 測定結果を外部実装の候補モデル（Java・段差 2・gd-codes の丸め・偶奇・PowerNukkitX）と照合し、一致率で比べます。
+  `refcompare` は gd-codes の 82 色カテゴリをダウンロードして BMAP の色と照合します。結果は [docs/bedrock-research.md](docs/bedrock-research.md)。
 
 **プレビュー・ガイド**
 - ブロック地図色（予測）/ 元画像 / 差分 / 陰影解析 / 建築ビュー 2D（テクスチャ・高さ・チャンク境界・座標表示）/ 高さマップ。
@@ -133,7 +138,7 @@ powershell -ExecutionPolicy Bypass -File tools/publish.ps1
 | `tests/BMAP.Tests` | xUnit テスト |
 | `tools/PaletteGen` | `blocks.txt` から `palettes/bedrock-full-v2.json` を生成（Mojang のメタデータで検証） |
 | `tools/publish.ps1` / `tools/make-icon.ps1` | 配布用 zip / アプリアイコンの作成 |
-| `docs/` | [陰影規則](docs/shading-rules.md)、[実機キャリブレーション](docs/calibration.md)、[ベンチマーク](docs/benchmarks.md) |
+| `docs/` | [陰影規則](docs/shading-rules.md)、[実機キャリブレーション](docs/calibration.md)、[外部実装の検証](docs/bedrock-research.md)、[ベンチマーク](docs/benchmarks.md) |
 
 | 機能 | 実装（`src/BMAP.Core`） |
 |---|---|
@@ -158,7 +163,8 @@ powershell -ExecutionPolicy Bypass -File tools/publish.ps1
 |---|---|
 | 陰影の倍率 180 / 220 / 255 | **確認済み**（Bedrock 1.21.132〜1.26.51 が描いた地図 12 枚、約 19 万ピクセル） |
 | 色セットの基本色 | 60 色中 **13 色を確認済み**。残りは Java 版の値による推定 |
-| 陰影が変わる最小の段差（1 か 2 か） | **未確認**。陰影テストパッドで測定できます（2 なら設定で切り替えられます） |
+| 丸め方 | **確認済み**（基本色 × 倍率 ÷ 255 の切り捨て。gd-codes の方式とは不一致） |
+| 陰影が変わる最小の段差（1 か 2 か） | **未確認**。gd-codes・Nukkit は 2。陰影テストパッドで測定でき、陰影モデルで切り替えられます |
 | ブロックと色セットの対応 | 未確認。色テストパッドで測定できます |
 | ブロック識別子・状態 | Mojang 公式メタデータ（1.26.50）で全 323 ブロックを検証済み。構造物としての読み込みは未確認 |
 
@@ -178,6 +184,8 @@ powershell -ExecutionPolicy Bypass -File tools/publish.ps1
 - [MapartCraft](https://github.com/rebane2001/mapartcraft)（rebane2001、GPL-3.0）: 色セットの分け方、画面構成、多くの機能。コード・画像は含みません。
 - [Cartographer](https://github.com/julienvincent/cartographer): 複数の階段アルゴリズムを持つマップアート変換ツール。
 - [Image Map](https://github.com/tryashtar/image-map): Bedrock の地図データ（`map_<ID>`・`colors`）の形式。コードは使っていません。
+- [gd-codes/mc-pixelart-maker](https://github.com/gd-codes/mc-pixelart-maker)（MIT）: Bedrock の色カテゴリ（実行時にダウンロードして照合）と段差 2 の建築。
+- [CloudburstMC/Nukkit](https://github.com/CloudburstMC/Nukkit)・[PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX): 地図の陰影の計算式（候補モデルとして独自に実装。コードは使っていません）。
 - Minecraft 公式ドキュメント: [BlockMapColorComponent](https://learn.microsoft.com/en-us/minecraft/creator/scriptapi/minecraft/server/blockmapcolorcomponent?view=minecraft-bedrock-stable)、
   [Block.getMapColor（プレリリース）](https://learn.microsoft.com/en-us/minecraft/creator/scriptapi/minecraft/server/block?view=minecraft-bedrock-experimental)。
   基本色の取得方法として検討しました（[docs/calibration.md](docs/calibration.md)）。

@@ -14,9 +14,12 @@ namespace BMAP.Shading;
 /// </summary>
 public static class ShadeRule
 {
-    public static Shade Compare(int height, int northHeight, int step = 1) =>
-        height - northHeight >= Math.Max(1, step) ? Shade.Bright
-        : northHeight - height >= Math.Max(1, step) ? Shade.Dark
+    public static Shade Compare(int height, int northHeight, int step = 1) => Compare(height, northHeight, step, step);
+
+    /// <summary>Separate steps for light and dark (they are measured separately; they need not be equal).</summary>
+    public static Shade Compare(int height, int northHeight, int brightStep, int darkStep) =>
+        height - northHeight >= Math.Max(1, brightStep) ? Shade.Bright
+        : northHeight - height >= Math.Max(1, darkStep) ? Shade.Dark
         : Shade.Normal;
 }
 
@@ -68,6 +71,7 @@ public static class MapSimulator
         }
 
         var img = new RgbaImage(w, rows);
+        var model = profile.Shades.ShadingModel;
         var shades = new Shade[w * rows];
         var states = new PixelState[w * rows];
         var blocks = new BlockDefinition?[w * rows];
@@ -80,12 +84,16 @@ public static class MapSimulator
                 ys[o] = top[i] is null ? -1 : topY[i];
                 if (top[i] is not { } block) { states[o] = PixelState.Empty; shades[o] = Shade.Normal; continue; }
                 Shade shade;
+                int dy = 0;
                 if (top[n] is null) { states[o] = PixelState.DependsOnTerrain; shade = Shade.Normal; }
-                else shade = ShadeRule.Compare(topY[i], topY[n], profile.Shades.Step);
+                else { dy = topY[i] - topY[n]; shade = model.Classify(dy, x, z - 1); }
                 shades[o] = shade;
                 // Colours come from the given profile (by key), so a layout can be checked against another profile,
-                // e.g. one with colours measured in game.
-                img[x, z - 1] = profile.ColorOf(profile.Find(block.Key) ?? block, shade);
+                // e.g. one with colours measured in game. Measured colours win; graded models compute from the base.
+                var def = profile.Find(block.Key) ?? block;
+                img[x, z - 1] = model.Kind == ShadingModelKind.Graded && !def.Measured.ContainsKey(shade)
+                    ? model.Colour(def.BaseColor, dy, x, z - 1, profile.Shades)
+                    : profile.ColorOf(def, shade);
             }
         return new SimulatedMap { Width = w, Height = rows, Image = img, Shades = shades, States = states, TopBlocks = blocks, TopY = ys };
     }

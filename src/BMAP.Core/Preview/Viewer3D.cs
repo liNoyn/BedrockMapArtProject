@@ -132,7 +132,7 @@ public sealed class SceneMesh
             var b = blocks[i];
             int ti = b.Z * w + b.X;
             isTop[i] = topY[ti] == b.Y;
-            if (isTop[i] && b.Z > 0 && topY[ti - w] != int.MinValue) shades[i] = ShadeRule.Compare(b.Y, topY[ti - w], layout.Step);
+            if (isTop[i] && b.Z > 0 && topY[ti - w] != int.MinValue) shades[i] = ShadeRule.Compare(b.Y, topY[ti - w], layout.UpStep, layout.DownStep);
             else shades[i] = Shade.Normal;
             if (isTop[i] || problemAt.GetValueOrDefault((b.X, b.Z)) == 3) problem[i] = problemAt.GetValueOrDefault((b.X, b.Z));
         }

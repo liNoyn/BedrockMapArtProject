@@ -31,10 +31,15 @@ public sealed partial class MainViewModel
             if (Profile is not { } p) return "";
             int blocks = p.Blocks.Count(b => b.EffectiveStatus == ColorStatus.Verified), sets = p.ColourSets.Count(s => s.Status == ColorStatus.Verified);
             var sh = p.Shades;
-            string mult = sh.Status == ColorStatus.Verified ? L["StatusVerified"] : L["StatusEstimated"];
-            string step = sh.StepStatus == ColorStatus.Verified ? L["StatusVerified"] : L["StatusEstimated"];
+            string S(ColorStatus s) => L[s switch
+            {
+                ColorStatus.Verified => "StatusVerified", ColorStatus.ThirdParty => "StatusThirdParty",
+                ColorStatus.ApiDerived => "StatusApi", ColorStatus.Unknown => "StatusUnknown", _ => "StatusEstimated",
+            }];
+            string steps = sh.UpThreshold == sh.DownThreshold ? $"{sh.UpThreshold}" : $"+{sh.UpThreshold}/−{sh.DownThreshold}";
             return L.Format("ProfileNoteFmt", blocks, p.Blocks.Count(), sets, p.ColourSets.Count,
-                $"{sh.Dark}/{sh.Normal}/{sh.Bright}", mult, sh.Step, step);
+                $"{sh.Dark}/{sh.Normal}/{sh.Bright}", S(sh.Status), steps, S(sh.StepStatus))
+                + (p.ColourSets.Count(s => s.Status == ColorStatus.ThirdParty) is int tp and > 0 ? L.Format("ProfileNoteThirdParty", tp) : "");
         }
     }
 
@@ -101,6 +106,7 @@ public sealed partial class MainViewModel
     {
         BaseProfile = baseProfile;
         Profile = baseProfile.WithCustomBlocks(CustomBlocks.Select(c => c.Block));
+        if (ShadingModelOption?.Value is { } model) Profile = Profile.WithShadingModel(model);
         Raise(nameof(SelectedBaseProfile));
         Raise(nameof(ProfileNote));
         Raise(nameof(ColourSetsForCustom));

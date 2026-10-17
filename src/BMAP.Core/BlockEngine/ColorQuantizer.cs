@@ -107,8 +107,11 @@ public sealed class QuantizeResult
     /// <summary>Predicted map colours ("Block Map" preview, design 11.3).</summary>
     public required RgbaImage Preview { get; init; }
     public StaircaseMode Mode { get; init; }
-    /// <summary>Height difference used for one light / dark step (the profile's shading rule).</summary>
+    /// <summary>Height difference used for one light / dark step (the profile's shading rule): the larger of the two.</summary>
     public int Step { get; init; } = 1;
+    /// <summary>Height difference for a light step and for a dark step (may differ).</summary>
+    public int UpStep { get; init; } = 1;
+    public int DownStep { get; init; } = 1;
 
     public int Get(int x, int y) => EntryIndex[y * Width + x];
     public Shade GetShade(int x, int y) => Shades[y * Width + x];
@@ -117,7 +120,7 @@ public sealed class QuantizeResult
     public QuantizeResult Clone() => new()
     {
         Width = Width, Height = Height, EntryIndex = (int[])EntryIndex.Clone(), Shades = (Shade[])Shades.Clone(),
-        Entries = [.. Entries], Preview = Preview.Clone(), Mode = Mode, Step = Step,
+        Entries = [.. Entries], Preview = Preview.Clone(), Mode = Mode, Step = Step, UpStep = UpStep, DownStep = DownStep,
     };
 }
 
@@ -215,7 +218,7 @@ public static partial class ColorQuantizer
         }
         return new QuantizeResult
         {
-            Width = w, Height = h, EntryIndex = idx, Shades = q.Shades, Entries = flat, Preview = q.Preview, Mode = q.Mode, Step = q.Step,
+            Width = w, Height = h, EntryIndex = idx, Shades = q.Shades, Entries = flat, Preview = q.Preview, Mode = q.Mode, Step = q.Step, UpStep = q.UpStep, DownStep = q.DownStep,
         };
     }
 
@@ -302,6 +305,7 @@ public static partial class ColorQuantizer
         {
             Width = w, Height = h, EntryIndex = idx, Shades = shades, Entries = entries, Preview = preview,
             Mode = options.Mode == StaircaseMode.Flat ? StaircaseMode.Flat : resultMode, Step = step,
+            UpStep = profile.Shades.BuildUp, DownStep = profile.Shades.BuildDown,
         };
     }
 
