@@ -273,6 +273,39 @@
               <Slider Minimum="0" Maximum="1" Value="{Binding DitherStrength}" />
               <CheckBox Content="{Binding L[Serpentine]}" IsChecked="{Binding Serpentine}" />
               <TextBlock Classes="warn" IsVisible="{Binding IsStaircase}" Text="{Binding L[StairWarn]}" />
+              <Border IsVisible="{Binding IsStaircase}" BorderBrush="#405BE35B" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,8,0,0">
+                <StackPanel Spacing="4">
+                  <TextBlock Classes="h" Text="{Binding L[Map3D]}" Margin="0" />
+                  <Grid ColumnDefinitions="150,*" IsEnabled="{Binding CanLimitHeight}">
+                    <TextBlock Text="{Binding L[MaxHeight]}" VerticalAlignment="Center" />
+                    <NumericUpDown Grid.Column="1" Value="{Binding MaxHeight}" Minimum="0" Maximum="383" FormatString="0" />
+                  </Grid>
+                  <TextBlock Classes="note" Text="{Binding L[MaxHeightHint]}" />
+                  <TextBlock><Run Text="{Binding L[ShadePenalty]}" /><Run Text="{Binding ShadePenalty, StringFormat='{} {0:P0}'}" /></TextBlock>
+                  <Slider Minimum="0" Maximum="1" Value="{Binding ShadePenalty}" />
+                  <TextBlock Classes="note" Text="{Binding L[ShadePenaltyHint]}" />
+                  <Button Content="{Binding L[FlatBackground]}" Command="{Binding FlatBackgroundCommand}" HorizontalAlignment="Left" />
+                  <TextBlock Classes="note" Text="{Binding L[FlatBackgroundHint]}" />
+                  <Button Content="{Binding L[AnalyzeHeight]}" Command="{Binding AnalyzeHeightCommand}" Classes="accent" HorizontalAlignment="Stretch" Margin="0,6,0,0" />
+                  <ProgressBar Value="{Binding AnalysisProgress}" Maximum="100" IsVisible="{Binding IsAnalyzing}" />
+                  <TextBlock Classes="note" Text="{Binding L[HeightAnalysisHint]}" />
+                  <TextBlock Text="{Binding HeightAnalysisNote}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                  <ItemsControl ItemsSource="{Binding HeightRows}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:HeightRowViewModel">
+                        <Grid ColumnDefinitions="70,80,*,52,80,56" Margin="0,1">
+                          <TextBlock Text="{Binding LimitText}" VerticalAlignment="Center" FontWeight="SemiBold" />
+                          <TextBlock Grid.Column="1" Text="{Binding HeightText}" VerticalAlignment="Center" />
+                          <ProgressBar Grid.Column="2" Value="{Binding Quality}" Maximum="100" MinWidth="40" Height="10" VerticalAlignment="Center" Margin="4,0" />
+                          <TextBlock Grid.Column="3" Text="{Binding QualityText}" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                          <TextBlock Grid.Column="4" Text="{Binding Badge}" Foreground="#2E9E2E" VerticalAlignment="Center" Margin="6,0,0,0" FontSize="12" />
+                          <Button Grid.Column="5" Content="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).L[UseThis]}" Command="{Binding ApplyCommand}" Padding="6,1" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Border>
 
               <TextBlock Classes="h" Text="{Binding L[WorldPos]}" />
               <CheckBox Content="{Binding L[UseOrigin]}" IsChecked="{Binding UseOrigin}" />
@@ -285,6 +318,9 @@
                 <NumericUpDown Grid.Column="5" Value="{Binding OriginY}" FormatString="0" Minimum="-64" Maximum="319" />
               </Grid>
               <TextBlock Classes="note" Text="{Binding OriginText}" />
+              <TextBlock Classes="h" Text="{Binding L[PlacementHeight]}" />
+              <SelectableTextBlock Text="{Binding PlacementText}" TextWrapping="Wrap" FontSize="12" />
+              <Button Content="{Binding L[ApplyRecommendedY]}" Command="{Binding ApplyRecommendedYCommand}" HorizontalAlignment="Left" Margin="0,4,0,0" />
 
               <TextBlock Classes="h" Text="{Binding L[Result]}" />
               <TextBlock Text="{Binding BlockSummary}" TextWrapping="Wrap" />

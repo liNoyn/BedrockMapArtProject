@@ -120,6 +120,77 @@ public class BlockTests
             Assert.Throws<InvalidOperationException>(() => BlockLayout.Generate(q, Cobble, maxHeight: layout.MaxHeight - 1));
     }
 
+    [Theory] // height-limited staircasing: optimal (DP) and greedy (error diffusion)
+    [InlineData(DitherMode.None, 3)]
+    [InlineData(DitherMode.None, 8)]
+    [InlineData(DitherMode.Bayer4, 4)]
+    [InlineData(DitherMode.FloydSteinberg, 3)]
+    [InlineData(DitherMode.Atkinson, 6)]
+    public void HeightLimit_IsRespected_AndShadesStayBuildable(DitherMode dither, int limit)
+    {
+        var img = TestHelpers.Gradient(128, 128);
+        var q = Quantize(img, opt: new QuantizeOptions { Mode = StaircaseMode.Valley, Dither = dither, MaxHeight = limit });
+        var layout = BlockLayout.Generate(q, Cobble);
+        Assert.True(layout.MaxHeight <= limit, $"height {layout.MaxHeight} > {limit}");
+        for (int x = 0; x < 128; x++)
+            for (int z = 1; z < layout.Depth; z++)
+            {
+                int d = layout.HeightAt(x, z) - layout.HeightAt(x, z - 1);
+                Assert.Equal(d > 0 ? Shade.Bright : d < 0 ? Shade.Dark : Shade.Normal, q.GetShade(x, z - 1));
+            }
+    }
+
+    [Fact]
+    public void HeightLimit_DpIsOptimalVsGreedyColumnwise()
+    {
+        // Without dithering the DP result can never have a larger total error than any other feasible choice,
+        // e.g. the flat result (which is always feasible).
+        var img = TestHelpers.Gradient(128, 128);
+        var limited = Quantize(img, opt: new QuantizeOptions { Mode = StaircaseMode.Valley, MaxHeight = 2 });
+        var flat = Quantize(img, opt: new QuantizeOptions { Mode = StaircaseMode.Flat });
+        var free = Quantize(img, opt: new QuantizeOptions { Mode = StaircaseMode.Valley });
+        double eL = HeightAdvisor.MeanDeltaE(img, limited.Preview), eF = HeightAdvisor.MeanDeltaE(img, flat.Preview), eU = HeightAdvisor.MeanDeltaE(img, free.Preview);
+        // (ΔE76 and the Oklab metric used for matching rank colours almost identically; allow a tiny tolerance.)
+        eL -= 0.05; eU -= 0.05;
+        Assert.True(eL <= eF + 1e-9, $"limited {eL} worse than flat {eF}");
+        Assert.True(eU <= eL + 1e-9, $"unlimited {eU} worse than limited {eL}");
+    }
+
+    [Fact]
+    public void ShadePenalty_LowersTheBuild()
+    {
+        var img = TestHelpers.Gradient(128, 128);
+        var plain = BlockLayout.Generate(Quantize(img, opt: new QuantizeOptions { Mode = StaircaseMode.Valley }), Cobble);
+        var calm = BlockLayout.Generate(Quantize(img, opt: new QuantizeOptions { Mode = StaircaseMode.Valley, ShadePenalty = 0.5 }), Cobble);
+        Assert.True(calm.MaxHeight <= plain.MaxHeight);
+        Assert.True(calm.Heights.Distinct().Count() <= plain.Heights.Distinct().Count());
+    }
+
+    [Fact]
+    public void HeightAnalysis_RecommendsAKnee()
+    {
+        var img = TestHelpers.Gradient(128, 128);
+        var options = HeightAdvisor.Analyze(img, Profile, Everything, new QuantizeOptions { Mode = StaircaseMode.Valley }, Cobble, SupportMode.None);
+        Assert.Equal(StaircaseMode.Flat, options[0].Mode);
+        Assert.Single(options, o => o.Recommended);
+        var unlimited = options.Single(o => o.Unlimited);
+        var rec = options.Single(o => o.Recommended);
+        Assert.True(rec.BuildHeight <= unlimited.BuildHeight);
+        Assert.True(rec.MeanDeltaE <= options.Min(o => o.MeanDeltaE) + Math.Max(0.3, options.Min(o => o.MeanDeltaE) * 0.05) + 1e-9);
+        Assert.All(options.Where(o => o.Limit > 0), o => Assert.True(o.MaxHeight <= o.Limit));
+    }
+
+    [Fact]
+    public void Placement_FitsIntoTheWorld()
+    {
+        var q = Quantize(TestHelpers.Gradient(128, 128), opt: new QuantizeOptions { Mode = StaircaseMode.Valley, MaxHeight = 20 });
+        var layout = BlockLayout.Generate(q, Cobble);
+        var advice = PlacementAdvisor.Advise(layout, 310);
+        Assert.True(advice.Fits);
+        Assert.Equal(64, advice.RecommendedBaseY);
+        Assert.Equal(319 - layout.MaxHeight, advice.MaxBaseY);
+        Assert.Contains(advice.Notes, n => n.Contains("310"));
+    }
     [Fact]
     public void Valley_IsNeverTallerThanClassic()
     {

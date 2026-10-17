@@ -28,11 +28,102 @@ public sealed partial class MainViewModel
     public LocOption<StaircaseMode> StaircaseOption
     {
         get => _staircase;
-        set { if (value != null && Set(ref _staircase, value)) { Raise(nameof(IsStaircase)); ScheduleUpdate(); } }
+        set { if (value != null && Set(ref _staircase, value)) { Raise(nameof(IsStaircase)); Raise(nameof(CanLimitHeight)); ScheduleUpdate(); } }
     }
     public bool IsStaircase => StaircaseOption?.Value is not (null or StaircaseMode.Flat);
     private LocOption<SupportMode> _supportMode = null!;
     public LocOption<SupportMode> SupportModeOption { get => _supportMode; set { if (value != null && Set(ref _supportMode, value)) ScheduleUpdate(); } }
+
+    // ---- 3D map art: height ----
+    private int _maxHeight;
+    public int MaxHeight { get => _maxHeight; set { if (Set(ref _maxHeight, Math.Max(0, value))) ScheduleUpdate(); } }
+    private double _shadePenalty;
+    public double ShadePenalty { get => _shadePenalty; set { if (Set(ref _shadePenalty, Math.Clamp(value, 0, 1))) ScheduleUpdate(); } }
+    public bool CanLimitHeight => StaircaseOption?.Value is StaircaseMode.Classic or StaircaseMode.Valley;
+    public ObservableCollection<HeightRowViewModel> HeightRows { get; } = [];
+    private bool _isAnalyzing;
+    public bool IsAnalyzing { get => _isAnalyzing; set { if (Set(ref _isAnalyzing, value)) AnalyzeHeightCommand?.RaiseCanExecuteChanged(); } }
+    private int _analysisProgress;
+    public int AnalysisProgress { get => _analysisProgress; set => Set(ref _analysisProgress, value); }
+    private string _heightAnalysisNote = "";
+    public string HeightAnalysisNote { get => _heightAnalysisNote; set => Set(ref _heightAnalysisNote, value); }
+    private string _placementText = "";
+    public string PlacementText { get => _placementText; set => Set(ref _placementText, value); }
+    private PlacementAdvice? _advice;
+    public RelayCommand AnalyzeHeightCommand { get; private set; } = null!;
+    public RelayCommand ApplyRecommendedYCommand { get; private set; } = null!;
+    public RelayCommand FlatBackgroundCommand { get; private set; } = null!;
+
+    /// <summary>
+    /// Sets the background to the closest colour the selected blocks can show in the normal (flat) shade, so large
+    /// background areas need no staircase. Pure white, for example, only exists in the light shade.
+    /// </summary>
+    private void UseFlatBackground()
+    {
+        if (Profile is null) return;
+        Rgba bg;
+        try { bg = Rgba.FromHex(BackgroundColor); } catch { bg = new Rgba(255, 255, 255); }
+        var target = ColorEngine.ColorMath.ToOklab(bg.R, bg.G, bg.B);
+        var best = CurrentSelection().Resolve(Profile)
+            .Select(e => Profile.ColorOf(e.Block, Shade.Normal))
+            .OrderBy(c => ColorEngine.ColorMath.DeltaE76(target, ColorEngine.ColorMath.ToOklab(c.R, c.G, c.B)))
+            .FirstOrDefault();
+        if (best == default) return;
+        BackgroundColor = best.ToHex();
+        Log(L.Format("FlatBackgroundSet", BackgroundColor));
+    }
+
+    private async Task AnalyzeHeightAsync()
+    {
+        if (_processed is null || Profile is null) return;
+        IsAnalyzing = true;
+        AnalysisProgress = 0;
+        HeightRows.Clear();
+        try
+        {
+            var img = _processed;
+            var profile = Profile;
+            var selection = CurrentSelection();
+            var options = CurrentQuantizeOptions();
+            var support = SelectedSupportBlock ?? profile.Blocks.First();
+            var supports = SupportModeOption.Value;
+            var progress = new Progress<int>(p => AnalysisProgress = p);
+            var rows = await Task.Run(() => HeightAdvisor.Analyze(img, profile, selection, options, support, supports, progress: progress));
+            foreach (var r in rows) HeightRows.Add(new HeightRowViewModel(r, L, ApplyHeightOption));
+            var rec = rows.Single(r => r.Recommended);
+            var flat = rows[0];
+            HeightAnalysisNote = L.Format("HeightAnalysisResult",
+                rec.Mode == StaircaseMode.Flat ? L["Flat"] : rec.Limit == 0 ? L["Unlimited"] : rec.Limit.ToString(),
+                rec.BuildHeight, rec.Quality.ToString("0"), flat.MeanDeltaE.ToString("0.0"), rec.MeanDeltaE.ToString("0.0"));
+        }
+        catch (Exception ex) { Log(ex.Message); }
+        finally { IsAnalyzing = false; }
+    }
+
+    private void ApplyHeightOption(HeightOption o)
+    {
+        _loadingProject = true;
+        try
+        {
+            StaircaseOption = Staircases.First(s => s.Value == o.Mode);
+            MaxHeight = o.Limit;
+        }
+        finally { _loadingProject = false; }
+        ScheduleUpdate();
+        Log(L.Format("HeightApplied", o.Mode == StaircaseMode.Flat ? L["Flat"] : o.Limit == 0 ? L["Unlimited"] : o.Limit.ToString(), o.BuildHeight));
+    }
+
+    private void UpdatePlacement()
+    {
+        if (_layout is null || ApplyRecommendedYCommand is null) { PlacementText = ""; _advice = null; return; }
+        _advice = PlacementAdvisor.Advise(_layout, UseOrigin ? OriginY : null, L.English);
+        var a = _advice;
+        var sb = new StringBuilder(L.Format("PlacementSummary", a.BuildHeight, a.MinBaseY, a.MaxBaseY, a.RecommendedBaseY));
+        if (UseOrigin) sb.Append("\n").Append(L.Format("PlacementCurrent", OriginY, OriginY + a.BuildHeight - 1));
+        foreach (var n in a.Notes) sb.Append("\n• ").Append(n);
+        PlacementText = sb.ToString();
+        ApplyRecommendedYCommand.RaiseCanExecuteChanged();
+    }
 
     private double _ditherStrength = 1.0;
     public double DitherStrength { get => _ditherStrength; set { if (Set(ref _ditherStrength, Math.Clamp(value, 0, 1))) ScheduleUpdate(); } }
@@ -73,11 +164,11 @@ public sealed partial class MainViewModel
     }
 
     private bool _useOrigin = true;
-    public bool UseOrigin { get => _useOrigin; set { if (Set(ref _useOrigin, value)) Raise(nameof(OriginText)); } }
+    public bool UseOrigin { get => _useOrigin; set { if (Set(ref _useOrigin, value)) { Raise(nameof(OriginText)); UpdatePlacement(); } } }
     private int _originMapX, _originMapZ, _originY = 64;
     public int OriginMapX { get => _originMapX; set { if (Set(ref _originMapX, value)) Raise(nameof(OriginText)); } }
     public int OriginMapZ { get => _originMapZ; set { if (Set(ref _originMapZ, value)) Raise(nameof(OriginText)); } }
-    public int OriginY { get => _originY; set { if (Set(ref _originY, value)) Raise(nameof(OriginText)); } }
+    public int OriginY { get => _originY; set { if (Set(ref _originY, value)) { Raise(nameof(OriginText)); UpdatePlacement(); } } }
     private WorldOrigin? Origin => UseOrigin ? WorldOrigin.AlignedToMap(OriginMapX, OriginMapZ, OriginY) : null;
     public string OriginText => Origin is { } o ? L.Format("OriginText", o.X, o.Z + 1, o.Z, o.Y) : L["OriginNone"];
 
@@ -103,6 +194,9 @@ public sealed partial class MainViewModel
         UndoEditCommand = new RelayCommand(UndoEdit, () => _edits.CanUndo);
         ClearEditsCommand = new RelayCommand(ClearEditsAsync, () => _edits.Count > 0);
         RegisterInWorldCommand = new RelayCommand(RegisterInWorldAsync, () => _layout != null && SelectedWorld != null && !IsBusy);
+        AnalyzeHeightCommand = new RelayCommand(AnalyzeHeightAsync, () => _processed != null && !IsAnalyzing);
+        FlatBackgroundCommand = new RelayCommand(UseFlatBackground);
+        ApplyRecommendedYCommand = new RelayCommand(() => { if (_advice is { Fits: true } a) { UseOrigin = true; OriginY = a.RecommendedBaseY; } }, () => _advice is { Fits: true });
         Dithers =
         [
             new(DitherMode.None, "SuNone", L), new(DitherMode.FloydSteinberg, "Floyd–Steinberg", L),
@@ -138,6 +232,7 @@ public sealed partial class MainViewModel
     private QuantizeOptions CurrentQuantizeOptions() => new()
     {
         Metric = Metric.Value, Dither = Dither.Value, Mode = StaircaseOption.Value, DitherStrength = DitherStrength, Serpentine = Serpentine,
+        MaxHeight = MaxHeight, ShadePenalty = ShadePenalty,
     };
 
     private StructureExportOptions CurrentStructureOptions() => new()
@@ -246,6 +341,7 @@ public sealed partial class MainViewModel
         UpdateProgressTexts();
         if (Brushes.Count == 0 || _quantized.Entries.Count != _brushEntryCount) { RebuildBrushes(); _brushEntryCount = _quantized.Entries.Count; }
         Raise(nameof(EditsText));
+        UpdatePlacement();
     }
 
     private void UpdateMaterials()
