@@ -22,16 +22,31 @@ public sealed class StructureTile
     public int BlockCount => Structure.CountBlocks();
 }
 
-public sealed record StructureExportOptions
+public enum StructureSplit
 {
-    /// <summary>Horizontal tile size (default 64, the structure block limit).</summary>
-    public int TileSize { get; init; } = 64;
-    /// <summary>Vertical limit per piece; taller columns are split vertically.</summary>
-    public int MaxTileHeight { get; init; } = 256;
-    public string Namespace { get; init; } = "bmag";
+    /// <summary>64x64 pieces (+ separate support row pieces): loadable with a structure block.</summary>
+    Tiles64,
+    /// <summary>One piece per map (128 x 129 with the support row for the top maps).</summary>
+    PerMap,
+    /// <summary>Everything in one piece (for /structure load from packs or editors such as Amulet).</summary>
+    Whole,
 }
 
-/// <summary>Splits a layout into .mcstructure pieces and writes files / behavior packs (StructureExporter, design 8).</summary>
+public sealed record StructureExportOptions
+{
+    public StructureSplit Split { get; init; } = StructureSplit.Tiles64;
+    /// <summary>Horizontal tile size for <see cref="StructureSplit.Tiles64"/> (max 64, the structure block limit).</summary>
+    public int TileSize { get; init; } = 64;
+    /// <summary>Vertical limit per piece; taller builds are split vertically.</summary>
+    public int MaxTileHeight { get; init; } = 256;
+    public string Namespace { get; init; } = "bmag";
+    /// <summary>Also write a behavior pack with load functions (off by default).</summary>
+    public bool WriteBehaviorPack { get; init; }
+    /// <summary>Language of the placement guide.</summary>
+    public bool English { get; init; }
+}
+
+/// <summary>Splits a layout into .mcstructure pieces and writes them with a placement guide (StructureExporter, design 8).</summary>
 public static class StructureExporter
 {
     public static PaletteBlock ToPaletteBlock(BlockDefinition b) => new(b.Name, b.StatesToNbt(), b.Version);
@@ -42,6 +57,30 @@ public static class StructureExporter
         int ts = options.TileSize;
         int order = 0;
 
+        if (options.Split != StructureSplit.Tiles64)
+        {
+            // Per map: the support row joins the top maps. Whole: one bucket.
+            int size = options.Split == StructureSplit.PerMap ? 128 : int.MaxValue / 2;
+            var groups = new Dictionary<(int Tx, int Tz), List<BlockPlacement>>();
+            foreach (var p in layout.Placements())
+            {
+                var key = (p.X / size, Math.Max(0, p.Z - 1) / size);
+                if (!groups.TryGetValue(key, out var list)) groups[key] = list = [];
+                list.Add(p);
+            }
+            foreach (var key in groups.Keys.OrderBy(k => k.Tz).ThenBy(k => k.Tx))
+            {
+                int x0 = options.Split == StructureSplit.Whole ? 0 : key.Tx * 128;
+                int z0 = key.Tz == 0 ? 0 : key.Tz * 128 + 1;
+                int w = options.Split == StructureSplit.Whole ? layout.Width : Math.Min(128, layout.Width - x0);
+                int d = options.Split == StructureSplit.Whole ? layout.Depth : (key.Tz == 0 ? 129 : Math.Min(128, layout.Depth - z0));
+                string id = options.Split == StructureSplit.Whole ? "all" : $"map_{key.Tz * mapsX + key.Tx + 1:00}";
+                tiles.AddRange(BuildPieces(groups[key], layout, x0, z0, w, d, id, mapsX, options, ref order));
+            }
+            return tiles;
+        }
+
+        ts = Math.Clamp(ts, 1, 64);
         // Bucket every block (visible and support) by horizontal tile.
         var buckets = new Dictionary<(int Tx, int Tz), List<BlockPlacement>>();
         foreach (var p in layout.Placements())
@@ -130,9 +169,10 @@ public static class StructureExporter
         return s.Length > 32 ? s[..32] : s;
     }
 
+
     /// <summary>
-    /// Writes .mcstructure files, a behavior pack folder with load functions, and a zipped .mcpack (design 8.4).
-    /// Every written file is read back and validated.
+    /// Writes the .mcstructure files (the main output), a placement guide (text + CSV) and, optionally, a behavior
+    /// pack with load functions. Every written structure is read back and validated (design 8.5).
     /// </summary>
     public static StructureExportResult Export(string outDir, string projectName, BlockLayout layout, int mapsX,
         StructureExportOptions options, WorldOrigin? origin)
@@ -141,34 +181,52 @@ public static class StructureExporter
         string ns = $"{options.Namespace}_{slug}";
         var tiles = Split(layout, mapsX, options);
         var problems = ValidateCoverage(layout, tiles);
-        if (problems.Count > 0) throw new InvalidOperationException("構造物の分割検証に失敗しました:\n" + string.Join("\n", problems.Take(10)));
+        if (problems.Count > 0) throw new InvalidOperationException("構造物の分割検証に失敗しました / structure split failed:\n" + string.Join("\n", problems.Take(10)));
 
-        string packDir = Path.Combine(outDir, $"BMAG_{slug}_BP");
-        if (Directory.Exists(packDir)) Directory.Delete(packDir, true);
-        string structDir = Path.Combine(packDir, "structures", ns);
+        string structDir = Path.Combine(outDir, "mcstructure");
+        if (Directory.Exists(structDir)) Directory.Delete(structDir, true);
         Directory.CreateDirectory(structDir);
+        var files = new List<string>();
         foreach (var t in tiles)
         {
             var bytes = t.Structure.ToBytes();
-            var path = Path.Combine(structDir, t.Id + ".mcstructure");
+            var path = Path.Combine(structDir, FileName(slug, t) + ".mcstructure");
             File.WriteAllBytes(path, bytes);
-            // Re-read check (design 8.5).
             var back = McStructure.FromBytes(File.ReadAllBytes(path));
             var errs = back.Validate();
             if (errs.Count > 0 || back.CountBlocks() != t.BlockCount)
-                throw new InvalidDataException($"{t.Id}.mcstructure の再読み込み検証に失敗しました: {string.Join(", ", errs)}");
+                throw new InvalidDataException($"{Path.GetFileName(path)}: re-read check failed {string.Join(", ", errs)}");
+            files.Add(path);
         }
 
-        WriteManifest(packDir, projectName);
-        WriteFunctions(packDir, slug, ns, tiles, mapsX, layout, origin);
-        File.WriteAllText(Path.Combine(packDir, "BMAG_README.txt"), Instructions(projectName, slug, ns, tiles, origin), new UTF8Encoding(false));
-        File.WriteAllText(Path.Combine(outDir, "structures.csv"), TilesCsv(tiles, ns, origin), new UTF8Encoding(true));
+        File.WriteAllText(Path.Combine(outDir, "placement.csv"), PlacementCsv(slug, tiles, origin), new UTF8Encoding(true));
+        File.WriteAllText(Path.Combine(outDir, options.English ? "PLACEMENT.txt" : "配置方法.txt"),
+            PlacementGuide(projectName, slug, tiles, origin, options), new UTF8Encoding(false));
 
-        string mcpack = Path.Combine(outDir, $"BMAG_{slug}.mcpack");
-        if (File.Exists(mcpack)) File.Delete(mcpack);
-        ZipDirectory(packDir, mcpack);
-        return new StructureExportResult(packDir, mcpack, tiles, ns, slug);
+        string zip = Path.Combine(outDir, $"{slug}_mcstructure.zip");
+        if (File.Exists(zip)) File.Delete(zip);
+        ZipDirectory(structDir, zip);
+
+        string? mcpack = null;
+        if (options.WriteBehaviorPack)
+        {
+            string packDir = Path.Combine(outDir, $"BMAG_{slug}_BP");
+            if (Directory.Exists(packDir)) Directory.Delete(packDir, true);
+            var packStructDir = Path.Combine(packDir, "structures", ns);
+            Directory.CreateDirectory(packStructDir);
+            foreach (var t in tiles)
+                File.Copy(Path.Combine(structDir, FileName(slug, t) + ".mcstructure"), Path.Combine(packStructDir, t.Id + ".mcstructure"));
+            WriteManifest(packDir, projectName);
+            WriteFunctions(packDir, slug, ns, tiles, mapsX, layout, origin);
+            mcpack = Path.Combine(outDir, $"BMAG_{slug}.mcpack");
+            if (File.Exists(mcpack)) File.Delete(mcpack);
+            ZipDirectory(packDir, mcpack);
+        }
+        return new StructureExportResult(structDir, files, zip, mcpack, tiles, ns, slug);
     }
+
+    /// <summary>File name of a piece; it becomes the structure's name after importing it in game.</summary>
+    public static string FileName(string slug, StructureTile t) => $"{slug}_{t.Id}";
 
     private static void WriteManifest(string packDir, string projectName)
     {
@@ -178,7 +236,7 @@ public static class StructureExporter
             header = new
             {
                 name = $"BMAG: {projectName}",
-                description = "Bedrock Map Art Generator で生成したマップアート構造物",
+                description = "Bedrock Map Art Generator",
                 uuid = Guid.NewGuid().ToString(),
                 version = new[] { 1, 0, 0 },
                 min_engine_version = new[] { 1, 20, 0 },
@@ -201,55 +259,78 @@ public static class StructureExporter
             ? $"structure load {ns}:{t.Id} {o.X + t.OffsetX} {o.Y + t.OffsetY} {o.Z + t.OffsetZ}"
             : $"structure load {ns}:{t.Id} ~{t.OffsetX} ~{t.OffsetY} ~{t.OffsetZ}";
 
-        var all = new StringBuilder("# 実行位置を支え行の北西角 (レイアウト座標 0,0,0) として全体を読み込みます。\n");
+        var all = new StringBuilder("# origin = north-west corner of the support row (layout 0,0,0)\n");
         foreach (var t in tiles.OrderBy(t => t.Order)) all.AppendLine(Line(t, false));
         File.WriteAllText(Path.Combine(fnDir, "all.mcfunction"), all.ToString(), new UTF8Encoding(false));
-
         int mapCount = mapsX * (layout.ImageHeight / 128);
         for (int n = 1; n <= mapCount; n++)
         {
-            var sb = new StringBuilder($"# マップ #{n} の部分だけを読み込みます（実行位置は全体の原点）。\n");
+            var sb = new StringBuilder($"# map #{n}\n");
             foreach (var t in tiles.Where(t => t.MapNumbers.Contains(n)).OrderBy(t => t.Order)) sb.AppendLine(Line(t, false));
             File.WriteAllText(Path.Combine(fnDir, $"map_{n:00}.mcfunction"), sb.ToString(), new UTF8Encoding(false));
         }
         if (origin is not null)
         {
-            var abs = new StringBuilder("# 設定したワールド座標へ全体を読み込みます。\n");
+            var abs = new StringBuilder("# absolute world coordinates\n");
             foreach (var t in tiles.OrderBy(t => t.Order)) abs.AppendLine(Line(t, true));
             File.WriteAllText(Path.Combine(fnDir, "all_absolute.mcfunction"), abs.ToString(), new UTF8Encoding(false));
         }
     }
 
-    private static string TilesCsv(List<StructureTile> tiles, string ns, WorldOrigin? origin)
+    private static string PlacementCsv(string slug, List<StructureTile> tiles, WorldOrigin? origin)
     {
-        var sb = new StringBuilder("order,structure,offset_x,offset_y,offset_z,world_x,world_y,world_z,size_x,size_y,size_z,blocks,maps\n");
+        var sb = new StringBuilder("order,file,offset_x,offset_y,offset_z,world_x,world_y,world_z,size_x,size_y,size_z,blocks,maps\n");
         foreach (var t in tiles.OrderBy(t => t.Order))
         {
             var s = t.Structure;
             string w = origin is { } o ? $"{o.X + t.OffsetX},{o.Y + t.OffsetY},{o.Z + t.OffsetZ}" : ",,";
-            sb.AppendLine($"{t.Order + 1},{ns}:{t.Id},{t.OffsetX},{t.OffsetY},{t.OffsetZ},{w},{s.SizeX},{s.SizeY},{s.SizeZ},{t.BlockCount},\"{string.Join(" ", t.MapNumbers)}\"");
+            sb.AppendLine($"{t.Order + 1},{FileName(slug, t)}.mcstructure,{t.OffsetX},{t.OffsetY},{t.OffsetZ},{w},{s.SizeX},{s.SizeY},{s.SizeZ},{t.BlockCount},\"{string.Join(" ", t.MapNumbers)}\"");
         }
         return sb.ToString();
     }
 
-    private static string Instructions(string projectName, string slug, string ns, List<StructureTile> tiles, WorldOrigin? origin)
+    /// <summary>Step-by-step guide for importing the files with a structure block (Bedrock, Windows).</summary>
+    public static string PlacementGuide(string projectName, string slug, List<StructureTile> tiles, WorldOrigin? origin, StructureExportOptions options)
     {
+        bool en = options.English;
+        bool tooBig = tiles.Any(t => t.Structure.SizeX > 64 || t.Structure.SizeZ > 64);
         var sb = new StringBuilder();
-        sb.AppendLine($"BMAG Behavior Pack: {projectName}");
+        sb.AppendLine($"Bedrock Map Art Generator — {projectName}");
+        sb.AppendLine(en ? $"{tiles.Count} .mcstructure files in the \"mcstructure\" folder (also zipped)." : $".mcstructure ファイル {tiles.Count} 個（mcstructure フォルダ、zip にもまとめています）。");
         sb.AppendLine();
-        sb.AppendLine("■ 使い方（クリエイティブ／チート有効ワールド向け）");
-        sb.AppendLine("1. .mcpack を開いてインポートし、ワールド設定のビヘイビアパックで有効にします。");
-        sb.AppendLine("2. 支え行の北西角にしたい位置に立ち、次を実行します:");
-        sb.AppendLine($"     /function bmag/{slug}/all");
-        sb.AppendLine("   マップ 1 枚ずつ読み込む場合: /function bmag/" + slug + "/map_01 など（実行位置は常に全体の原点）。");
-        if (origin is not null) sb.AppendLine($"   設定したワールド座標に置く場合: /function bmag/{slug}/all_absolute");
-        sb.AppendLine("3. 個別に読み込む場合は structures.csv の座標で /structure load を使うか、構造ブロックの読み込みモードで名前を指定します。");
+        if (en)
+        {
+            sb.AppendLine("How to place (creative / cheats on):");
+            sb.AppendLine("1. Flatten the area first. Air in the files is 'structure void', so existing blocks are kept.");
+            sb.AppendLine("2. /give @s structure_block, place it, set the mode to Load and press \"Import\", then pick a file.");
+            sb.AppendLine("   The imported structure is saved in the world under the file name (usually \"mystructure:<file name>\").");
+            sb.AppendLine("3. Either set the structure block's offset so the corner lands on the coordinates below and press Load,");
+            sb.AppendLine("   or run the command shown for each file after importing it.");
+            sb.AppendLine("4. The target chunks must be loaded: stay near the piece you are loading.");
+            if (tooBig) sb.AppendLine("Note: pieces larger than 64 blocks cannot be loaded with a structure block; use them with /structure load or editors such as Amulet.");
+        }
+        else
+        {
+            sb.AppendLine("配置のしかた（クリエイティブ・チート有効）:");
+            sb.AppendLine("1. 先に地面を平らにしてください。ファイル内の空気は「ストラクチャーヴォイド」なので既存のブロックは残ります。");
+            sb.AppendLine("2. /give @s structure_block で構造ブロックを出して置き、モードを「読み込み」にして「インポート」からファイルを選びます。");
+            sb.AppendLine("   インポートした構造物はファイル名でワールドに保存されます（通常は「mystructure:ファイル名」）。");
+            sb.AppendLine("3. 構造ブロックのオフセットを下の座標に角が来るよう設定して「読み込み」を押すか、");
+            sb.AppendLine("   インポート後に各ファイルのコマンドを実行します。");
+            sb.AppendLine("4. 置き先のチャンクが読み込まれている必要があります。読み込むピースの近くにいてください。");
+            if (tooBig) sb.AppendLine("注意: 64 ブロックを超えるピースは構造ブロックでは読み込めません。/structure load や Amulet などのエディタで使ってください。");
+        }
         sb.AppendLine();
-        sb.AppendLine("■ 注意");
-        sb.AppendLine("- 読み込み先のチャンクが読み込まれていないと失敗します。遠い部分はその近くに移動してから map_XX を実行してください。");
-        sb.AppendLine("- 構造物の読み込みにはチートが必要です。チートなしのサバイバルでは建築ガイド（maps フォルダ）を見て手作業で建築してください。");
-        sb.AppendLine("- 空白（-1）の部分は既存ブロックを変更しません。地面を平らにしてから読み込んでください。");
-        sb.AppendLine($"- 構造物数: {tiles.Count}、名前空間: {ns}");
+        sb.AppendLine(origin is null
+            ? (en ? "Positions relative to the north-west corner of the support row (layout 0,0,0):" : "支え行の北西角（レイアウト 0,0,0）からの位置:")
+            : (en ? "World coordinates of each piece's north-west bottom corner:" : "各ピースの北西・下の角のワールド座標:"));
+        foreach (var t in tiles.OrderBy(t => t.Order))
+        {
+            var s = t.Structure;
+            string pos = origin is { } o ? $"{o.X + t.OffsetX} {o.Y + t.OffsetY} {o.Z + t.OffsetZ}" : $"~{t.OffsetX} ~{t.OffsetY} ~{t.OffsetZ}";
+            sb.AppendLine($"  {t.Order + 1,3}. {FileName(slug, t)}.mcstructure  [{s.SizeX}x{s.SizeY}x{s.SizeZ}]  @ {pos}");
+            sb.AppendLine($"       /structure load \"mystructure:{FileName(slug, t)}\" {pos}");
+        }
         return sb.ToString();
     }
 
@@ -264,4 +345,5 @@ public static class StructureExporter
     }
 }
 
-public sealed record StructureExportResult(string PackDirectory, string McpackPath, List<StructureTile> Tiles, string Namespace, string Slug);
+public sealed record StructureExportResult(string StructureDirectory, List<string> Files, string ZipPath, string? McpackPath,
+    List<StructureTile> Tiles, string Namespace, string Slug);

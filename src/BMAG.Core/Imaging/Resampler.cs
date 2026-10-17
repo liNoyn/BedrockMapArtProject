@@ -11,10 +11,14 @@ public static class Resampler
     /// into a destination of dstW x dstH. Pixels outside the source are transparent.
     /// </summary>
     public static RgbaImage Resample(RgbaImage src, double srcX, double srcY, double srcW, double srcH,
-        int dstW, int dstH, Interpolation mode, CancellationToken ct = default)
+        int dstW, int dstH, Interpolation mode, CancellationToken ct = default, bool linearLight = false)
     {
         if (mode == Interpolation.Nearest)
             return Nearest(src, srcX, srcY, srcW, srcH, dstW, dstH);
+
+        // Gamma-correct resampling works on linear light (0..255 scale) and converts back afterwards.
+        float Channel(byte v) => linearLight ? (float)(ColorEngine.ColorMath.SrgbToLinear(v) * 255) : v;
+        byte Back(float v) => linearLight ? ClampByte(ColorEngine.ColorMath.LinearToSrgb(v / 255.0)) : ClampByte(v);
 
         // Premultiplied float planes.
         int w = src.Width, h = src.Height;
@@ -22,9 +26,9 @@ public static class Resampler
         for (int i = 0; i < w * h; i++)
         {
             float a = src.Pixels[i * 4 + 3] / 255f;
-            plane[i * 4] = src.Pixels[i * 4] * a;
-            plane[i * 4 + 1] = src.Pixels[i * 4 + 1] * a;
-            plane[i * 4 + 2] = src.Pixels[i * 4 + 2] * a;
+            plane[i * 4] = Channel(src.Pixels[i * 4]) * a;
+            plane[i * 4 + 1] = Channel(src.Pixels[i * 4 + 1]) * a;
+            plane[i * 4 + 2] = Channel(src.Pixels[i * 4 + 2]) * a;
             plane[i * 4 + 3] = a * 255f;
         }
 
@@ -75,9 +79,9 @@ public static class Resampler
                     continue;
                 }
                 float inv = 255f / a;
-                dst.Pixels[di] = ClampByte(r * inv);
-                dst.Pixels[di + 1] = ClampByte(g * inv);
-                dst.Pixels[di + 2] = ClampByte(b * inv);
+                dst.Pixels[di] = Back(r * inv);
+                dst.Pixels[di + 1] = Back(g * inv);
+                dst.Pixels[di + 2] = Back(b * inv);
                 dst.Pixels[di + 3] = ClampByte(a);
             }
         });

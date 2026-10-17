@@ -213,3 +213,11 @@ public sealed class CustomBlockViewModel(CustomBlock block, Action<CustomBlockVi
     public string Text => $"{Block.Name}  {(Block.ColourSetId is int id ? $"set {id}" : Block.MapColor)}  ({Block.Source})";
     public RelayCommand RemoveCommand => new(() => remove(this));
 }
+
+/// <summary>A paint brush: a block, "no block" or "back to the automatic result".</summary>
+public sealed record BrushOption(string Key, string Label, BlockDefinition? Block)
+{
+    public const string Auto = "<auto>";
+    public const string None = "<none>";
+    public override string ToString() => Label;
+}

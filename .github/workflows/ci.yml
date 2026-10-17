@@ -1,0 +1,18 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      # Textures are not fetched in CI (they are Mojang's assets and not needed for the tests).
+      - run: dotnet build BMAG.sln -c Release -p:BundleTextures=false
+      - run: dotnet test tests/BMAG.Tests -c Release --no-build

@@ -42,7 +42,7 @@ public static class ImagePipeline
         double dstX0 = (outW - src.Width * scaleX) / 2 + s.OffsetX * outW;
         double dstY0 = (outH - src.Height * scaleY) / 2 + s.OffsetY * outH;
         var img = Resampler.Resample(src, -dstX0 / scaleX, -dstY0 / scaleY, outW / scaleX, outH / scaleY,
-            outW, outH, s.Interpolation, ct);
+            outW, outH, s.Interpolation, ct, s.LinearLight);
 
         ct.ThrowIfCancellationRequested();
         ApplyAdjustments(img, s);

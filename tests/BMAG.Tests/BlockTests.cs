@@ -202,10 +202,51 @@ public class BlockTests
         var q = Quantize(TestHelpers.Gradient(128, 128));
         var layout = BlockLayout.Generate(q, Cobble, supports: SupportMode.Important);
         var result = StructureExporter.Export(dir, "Test Art!", layout, 1, new StructureExportOptions(), new WorldOrigin(-64, 64, -65));
-        Assert.True(File.Exists(result.McpackPath));
-        Assert.True(File.Exists(Path.Combine(result.PackDirectory, "manifest.json")));
-        Assert.True(File.Exists(Path.Combine(result.PackDirectory, "functions", "bmag", "test_art", "all.mcfunction")));
-        Assert.Equal("bmag_test_art", result.Namespace);
+        Assert.Null(result.McpackPath); // .mcstructure only by default
+        Assert.Equal(result.Tiles.Count, result.Files.Count);
+        Assert.All(result.Files, f => Assert.EndsWith(".mcstructure", f));
+        Assert.Contains("test_art_t_0_0.mcstructure", result.Files.Select(Path.GetFileName));
+        Assert.True(File.Exists(result.ZipPath));
+        Assert.True(File.Exists(Path.Combine(dir, "placement.csv")));
+        var guide = File.ReadAllText(Path.Combine(dir, "配置方法.txt"));
+        Assert.Contains("/structure load \"mystructure:test_art_t_0_0\" -64 64 -64", guide);
+
+        var withPack = StructureExporter.Export(TestHelpers.TempDir(), "Test Art!", layout, 1, new StructureExportOptions { WriteBehaviorPack = true }, null);
+        Assert.True(File.Exists(withPack.McpackPath));
+        Assert.Equal("bmag_test_art", withPack.Namespace);
+    }
+
+    [Theory]
+    [InlineData(StructureSplit.PerMap, 2)]
+    [InlineData(StructureSplit.Whole, 1)]
+    public void LargerSplits_CoverEverything(StructureSplit split, int expectedPieces)
+    {
+        var q = Quantize(TestHelpers.Gradient(256, 128));
+        var layout = BlockLayout.Generate(q, Cobble, supports: SupportMode.Important);
+        var tiles = StructureExporter.Split(layout, 2, new StructureExportOptions { Split = split });
+        Assert.Equal(expectedPieces, tiles.Count);
+        Assert.Empty(StructureExporter.ValidateCoverage(layout, tiles));
+        Assert.Equal(129, tiles[0].Structure.SizeZ); // includes the support row
+    }
+
+    [Fact]
+    public void PixelEdits_ApplyAndUndo()
+    {
+        var q = Quantize(RgbaImage.Filled(128, 128, Profile.ColorOf(Profile.Find("white_wool")!, Shade.Normal)), Only("white_wool"));
+        var edits = new PixelOverrides();
+        edits.BeginStroke();
+        edits.Set(new PixelEdit(5, 6, "black_concrete"));
+        edits.Set(new PixelEdit(7, 6, null));
+        edits.EndStroke();
+        var edited = q.Clone();
+        edits.ApplyTo(edited, Profile);
+        Assert.Equal("black_concrete", edited.Entries[edited.Get(5, 6)].Block.Key);
+        Assert.Equal(-1, edited.Get(7, 6));
+        Assert.Equal("white_wool", q.Entries[q.Get(5, 6)].Block.Key); // original untouched
+        var restored = PixelOverrides.Deserialize(edits.Serialize());
+        Assert.Equal(2, restored.Count);
+        edits.Undo();
+        Assert.Equal(0, edits.Count);
     }
 
     [Fact]

@@ -109,6 +109,59 @@ public static class SafeWorldExporter
 
     public static WorldExportResult Execute(WorldExportPlan plan, IProgress<string>? progress = null, CancellationToken ct = default)
     {
+        var (written, logPath, log) = RunOnCopy(plan.Source, plan.Destination, plan.Options.RenameCopy ? plan.DestinationName : null,
+            plan.SourceBytes + plan.Tiles.Count * 70_000L,
+            (dir, logFn) => WriteToCopy(plan, dir, logFn, ct), progress, ct);
+        WriteMetadata(plan, written);
+        string instructions = Instructions(plan);
+        File.AppendAllText(logPath, Environment.NewLine + instructions, new UTF8Encoding(false));
+        return new WorldExportResult(plan.Destination, plan.MapIds, written, logPath, instructions);
+    }
+
+    /// <summary>
+    /// Registers .mcstructure pieces in a COPY of the world as "mystructure:&lt;name&gt;" (what a structure block import
+    /// would create), so they can be placed with /structure load or a structure block without importing each file.
+    /// </summary>
+    public static (string Destination, List<string> Keys, string LogPath) RegisterStructures(WorldInfo world, string projectName,
+        IReadOnlyList<(string Name, byte[] Data)> structures, IProgress<string>? progress = null, CancellationToken ct = default)
+    {
+        if (!WorldInfo.LooksLikeWorld(world.Folder)) throw new InvalidOperationException("Bedrock ワールドのフォルダではありません（level.dat と db が必要です）。");
+        if (VersionProfile.ForWorld(world.VersionParts) is null)
+            throw new NotSupportedException($"このワールドのバージョン ({world.Version ?? "不明"}) は書き込み対象外です。");
+        string slug = StructureExporter.Slug(projectName);
+        string dest = Path.Combine(Path.GetDirectoryName(world.Folder)!, $"{world.FolderName}_bmag_{DateTime.Now:yyyyMMdd_HHmmss}");
+        var (written, logPath, _) = RunOnCopy(world, dest, $"{world.Name} (BMAG {slug})",
+            DirectorySize(world.Folder) + structures.Sum(s => (long)s.Data.Length),
+            (dir, log) =>
+            {
+                var batch = new WriteBatch();
+                var expected = new Dictionary<string, byte[]>();
+                foreach (var (name, data) in structures)
+                {
+                    string key = "structuretemplate_mystructure:" + name;
+                    batch.Put(key, data);
+                    expected[key] = data;
+                }
+                log($"コピー側の LevelDB に構造物 {batch.Count} 件を書き込みます…");
+                using (var db = LevelDbDatabase.Open(Path.Combine(dir, "db"), readOnly: false)) db.Write(batch);
+                using (var verify = LevelDbDatabase.Open(Path.Combine(dir, "db"), readOnly: true))
+                    foreach (var (key, value) in expected)
+                        if (verify.Get(key) is not { } back || !back.AsSpan().SequenceEqual(value))
+                            throw new InvalidDataException($"{key} を読み戻せません。");
+                log($"検証 OK: {expected.Count} 件");
+                return expected.Keys.ToList();
+            }, progress, ct);
+        return (dest, written, logPath);
+    }
+
+    /// <summary>
+    /// The safe write procedure shared by all world exports (design 10.1): hash the original, copy it, verify the
+    /// copy, let <paramref name="write"/> change the copy only, optionally rename it, and re-check the original.
+    /// On failure the unfinished copy is removed.
+    /// </summary>
+    private static (List<string> Written, string LogPath, StringBuilder Log) RunOnCopy(WorldInfo source, string destination,
+        string? newName, long neededBytes, Func<string, Action<string>, List<string>> write, IProgress<string>? progress, CancellationToken ct)
+    {
         var log = new StringBuilder();
         void Log(string msg)
         {
@@ -116,7 +169,7 @@ public static class SafeWorldExporter
             progress?.Report(msg);
         }
 
-        string tempDest = plan.Destination + "_incomplete";
+        string tempDest = destination + "_incomplete";
         string logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BMAG", "logs");
         Directory.CreateDirectory(logDir);
         string logPath = Path.Combine(logDir, $"export_{DateTime.Now:yyyyMMdd_HHmmss}.log");
@@ -125,42 +178,34 @@ public static class SafeWorldExporter
         {
             if (MinecraftRunningCheck())
                 throw new InvalidOperationException("Minecraft が起動中です。ワールドを閉じるだけでなく、ゲームを終了してから実行してください。");
-            if (Directory.Exists(plan.Destination) || Directory.Exists(tempDest))
-                throw new IOException($"出力先がすでに存在します: {plan.Destination}");
-            var drive = new DriveInfo(Path.GetPathRoot(plan.Destination)!);
-            long needed = plan.SourceBytes + plan.Tiles.Count * 70_000L + 50_000_000L;
+            if (Directory.Exists(destination) || Directory.Exists(tempDest))
+                throw new IOException($"出力先がすでに存在します: {destination}");
+            var drive = new DriveInfo(Path.GetPathRoot(destination)!);
+            long needed = neededBytes + 50_000_000L;
             if (drive.AvailableFreeSpace < needed)
                 throw new IOException($"空き容量が不足しています（必要: {needed / 1048576} MB, 空き: {drive.AvailableFreeSpace / 1048576} MB）。");
 
             Log("元ワールドのハッシュを計算しています…");
-            var before = HashTree(plan.Source.Folder, ct);
-
+            var before = HashTree(source.Folder, ct);
             Log("ワールドをコピーしています…");
-            CopyTree(plan.Source.Folder, tempDest, ct);
-
+            CopyTree(source.Folder, tempDest, ct);
             Log("コピーを検証しています…");
             var copied = HashTree(tempDest, ct);
-            var after = HashTree(plan.Source.Folder, ct);
+            var after = HashTree(source.Folder, ct);
             if (!SameHashes(before, after))
                 throw new IOException("コピー中に元ワールドが変更されました。Minecraft やバックアップソフトが使用していないか確認してください。");
             if (!SameHashes(before, copied))
                 throw new IOException("コピーしたファイルが元ワールドと一致しません。");
             Log($"コピー OK（{copied.Count} ファイル）。元ワールドは変更されていません。");
 
-            var written = WriteToCopy(plan, tempDest, Log, ct);
+            var written = write(tempDest, Log);
+            if (newName != null) RenameWorld(tempDest, newName, Log);
 
-            if (plan.Options.RenameCopy) RenameWorld(tempDest, plan.DestinationName, Log);
-
-            Directory.Move(tempDest, plan.Destination);
-            var finalHashes = HashTree(plan.Source.Folder, ct);
-            if (!SameHashes(before, finalHashes)) throw new IOException("元ワールドのハッシュが変化しました（想定外）。");
-            Log($"完了: {plan.Destination}");
-
-            WriteMetadata(plan, written);
-            string instructions = Instructions(plan);
-            log.AppendLine().AppendLine(instructions);
+            Directory.Move(tempDest, destination);
+            if (!SameHashes(before, HashTree(source.Folder, ct))) throw new IOException("元ワールドのハッシュが変化しました（想定外）。");
+            Log($"完了: {destination}");
             File.WriteAllText(logPath, log.ToString(), new UTF8Encoding(false));
-            return new WorldExportResult(plan.Destination, plan.MapIds, written, logPath, instructions);
+            return (written, logPath, log);
         }
         catch (Exception ex)
         {
@@ -175,7 +220,6 @@ public static class SafeWorldExporter
             throw;
         }
     }
-
     private static List<string> WriteToCopy(WorldExportPlan plan, string worldDir, Action<string> log, CancellationToken ct)
     {
         var batch = new WriteBatch();

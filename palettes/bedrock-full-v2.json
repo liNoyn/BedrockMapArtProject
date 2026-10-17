@@ -25,7 +25,8 @@
           "name": "minecraft:grass_block",
           "states": {},
           "version": 18168865,
-          "biomeTinted": true
+          "biomeTinted": true,
+          "defaultEnabled": false
         },
         {
           "key": "slime_block",
@@ -369,7 +370,8 @@
           },
           "version": 18168865,
           "flammable": true,
-          "biomeTinted": true
+          "biomeTinted": true,
+          "defaultEnabled": false
         },
         {
           "key": "spruce_leaves",
@@ -381,8 +383,7 @@
             "update_bit": false
           },
           "version": 18168865,
-          "flammable": true,
-          "biomeTinted": true
+          "flammable": true
         },
         {
           "key": "birch_leaves",
@@ -394,8 +395,7 @@
             "update_bit": false
           },
           "version": 18168865,
-          "flammable": true,
-          "biomeTinted": true
+          "flammable": true
         },
         {
           "key": "jungle_leaves",
@@ -408,7 +408,8 @@
           },
           "version": 18168865,
           "flammable": true,
-          "biomeTinted": true
+          "biomeTinted": true,
+          "defaultEnabled": false
         },
         {
           "key": "acacia_leaves",
@@ -421,7 +422,8 @@
           },
           "version": 18168865,
           "flammable": true,
-          "biomeTinted": true
+          "biomeTinted": true,
+          "defaultEnabled": false
         },
         {
           "key": "dark_oak_leaves",
@@ -434,7 +436,8 @@
           },
           "version": 18168865,
           "flammable": true,
-          "biomeTinted": true
+          "biomeTinted": true,
+          "defaultEnabled": false
         },
         {
           "key": "azalea_leaves",

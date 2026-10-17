@@ -29,6 +29,8 @@ public sealed record ImageSettings
 
     public FitMode Fit { get; init; } = FitMode.Fit;
     public Interpolation Interpolation { get; init; } = Interpolation.Lanczos3;
+    /// <summary>Resample in linear light (gamma-correct): keeps fine bright/dark detail at its true brightness.</summary>
+    public bool LinearLight { get; init; } = true;
 
     /// <summary>Extra zoom applied after fitting (1 = none). Values above 1 zoom in.</summary>
     public double Zoom { get; init; } = 1.0;

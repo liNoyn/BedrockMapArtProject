@@ -268,9 +268,10 @@ public sealed partial class MainViewModel
             var layout = CalibrationPad.CreateLayout(profile, support);
             var origin = WorldOrigin.AlignedToMap(CalibrationMapX, CalibrationMapZ, CalibrationY);
             string dir = Path.Combine(folder, "BMAG_calibration");
-            var result = await Task.Run(() => StructureExporter.Export(dir, "calibration", layout, 1, new StructureExportOptions(), origin));
+            var result = await Task.Run(() => StructureExporter.Export(dir, "calibration", layout, 1,
+                new StructureExportOptions { WriteBehaviorPack = true, English = L.English }, origin));
             int count = CalibrationPad.CalibratableBlocks(profile).Count;
-            Log(result.McpackPath);
+            Log(result.McpackPath ?? result.StructureDirectory);
             CalibrationResult = L.English
                 ? $"Pad with {count} blocks.\n1. Import the .mcpack and enable it in a flat creative world (or a copy) with cheats.\n" +
                   $"2. Run /function bmag/calibration/all_absolute ({CalibrationText})\n" +

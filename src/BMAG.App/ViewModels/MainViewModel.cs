@@ -19,6 +19,7 @@ public interface IDialogService
     Task<string?> PickFolderAsync(string title);
     Task<bool> ConfirmAsync(string title, string message);
     Task<string?> PromptAsync(string title, string message, string initial);
+    Task InfoAsync(string title, string message);
 }
 
 public enum PreviewMode { Original, DirectMap, BlockMap, Difference, Build2D, Build3D }
@@ -33,8 +34,10 @@ public sealed partial class MainViewModel : ViewModelBase
     private RgbaImage? _source;
     private RgbaImage? _sourceThumb;
     private RgbaImage? _processed;
+    private QuantizeResult? _baseQuantized;
     private QuantizeResult? _quantized;
     private BlockLayout? _layout;
+    private PixelOverrides _edits = new();
     private string? _projectPath;
     private bool _loadingProject;
     private BmagProject _project = new();
@@ -76,12 +79,72 @@ public sealed partial class MainViewModel : ViewModelBase
         SetJapaneseCommand = new RelayCommand(() => SetLanguage(false));
         SetEnglishCommand = new RelayCommand(() => SetLanguage(true));
         RotateCommand = new RelayCommand(() => { Rotation = (Rotation + 1) % 4; });
+        AboutCommand = new RelayCommand(ShowAboutAsync);
+        OpenLogsCommand = new RelayCommand(() => OpenFolder(LogDirectory));
 
         InitPalette();
         InitBuild();
         InitWorld();
         L.PropertyChanged += (_, _) => { RaiseLocalizedTexts(); RefreshPreview(); };
         Log(L.English ? "Bedrock Map Art Generator started. Open an image." : "Bedrock Map Art Generator を起動しました。画像を開いてください。");
+        if (!Textures.IsAvailable && !_settings.TexturesAsked)
+            Dispatcher.UIThread.Post(async () => await OfferTexturesAsync(), DispatcherPriority.Background);
+    }
+
+    public static string Version =>
+        typeof(MainViewModel).Assembly.GetName().Version is { } v ? $"{v.Major}.{v.Minor}.{v.Build}" : "0.0.0";
+
+    public static string LogDirectory =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BMAG", "logs");
+
+    public RelayCommand AboutCommand { get; }
+    public RelayCommand OpenLogsCommand { get; }
+
+    private async Task OfferTexturesAsync()
+    {
+        _settings.TexturesAsked = true;
+        _settings.Save();
+        if (!await _dialogs.ConfirmAsync(L["DownloadTextures"], L["FirstRunTextures"])) return;
+        _settings.TexturesAccepted = true;
+        _settings.Save();
+        await DownloadTexturesAsync();
+    }
+
+    private Task ShowAboutAsync() => _dialogs.InfoAsync(L["About"], L.English
+        ? $"Bedrock Map Art Generator {Version}\nhttps://github.com/liNoyn/BedrockMapArtGenerator\n\n" +
+          "Map art for Minecraft Bedrock Edition: .mcstructure builds and direct map data.\n\n" +
+          "License: MIT. Inspired by MapartCraft (rebane2001, GPL-3.0; no code copied) and Image Map (tryashtar).\n" +
+          "Block textures are © Mojang AB, downloaded to your PC from Mojang/bedrock-samples under the Minecraft EULA.\n" +
+          "Minecraft is a trademark of Mojang Studios / Microsoft. This project is not affiliated with them.\n\n" +
+          $"Logs: {LogDirectory}"
+        : $"Bedrock Map Art Generator {Version}\nhttps://github.com/liNoyn/BedrockMapArtGenerator\n\n" +
+          "Minecraft 統合版のマップアート作成ツール（.mcstructure 建築データと地図データの直接生成）。\n\n" +
+          "ライセンス: MIT。MapartCraft（rebane2001、GPL-3.0。コードは含みません）と Image Map（tryashtar）を参考にしています。\n" +
+          "ブロックのテクスチャは © Mojang AB で、Mojang/bedrock-samples から Minecraft EULA に基づいて PC にダウンロードしたものです。\n" +
+          "Minecraft は Mojang Studios / Microsoft の商標です。本プロジェクトはこれらと関係ありません。\n\n" +
+          $"ログ: {LogDirectory}");
+
+    /// <summary>Sets a manual crop from a rectangle dragged on the Original view (fractions of the shown image).</summary>
+    public void SetCropFromFractions(double x0, double y0, double x1, double y1)
+    {
+        if (_source is null) return;
+        double ax = Math.Clamp(Math.Min(x0, x1), 0, 1), bx = Math.Clamp(Math.Max(x0, x1), 0, 1);
+        double ay = Math.Clamp(Math.Min(y0, y1), 0, 1), by = Math.Clamp(Math.Max(y0, y1), 0, 1);
+        int w = (int)Math.Round((bx - ax) * _source.Width), h = (int)Math.Round((by - ay) * _source.Height);
+        if (w < 4 || h < 4) return;
+        _loadingProject = true;
+        try
+        {
+            CropModeOption = CropModes.First(c => c.Value == CropMode.Manual);
+            CropX = (int)Math.Round(ax * _source.Width);
+            CropY = (int)Math.Round(ay * _source.Height);
+            CropW = w;
+            CropH = h;
+        }
+        finally { _loadingProject = false; }
+        RefreshPreview();
+        ScheduleUpdate();
+        Log(L.English ? $"Crop: {CropX},{CropY} {CropW}x{CropH}" : $"切り抜き: {CropX},{CropY} {CropW}x{CropH}");
     }
 
     // ------------------------------------------------------------------ language
@@ -171,6 +234,9 @@ public sealed partial class MainViewModel : ViewModelBase
     public double Gamma { get => _gamma; set { if (Set(ref _gamma, value)) ScheduleUpdate(); } }
     public double Sharpen { get => _sharpen; set { if (Set(ref _sharpen, value)) ScheduleUpdate(); } }
 
+    private bool _linearLight = true;
+    public bool LinearLight { get => _linearLight; set { if (Set(ref _linearLight, value)) ScheduleUpdate(); } }
+
     private string _background = "#FFFFFF";
     public string BackgroundColor { get => _background; set { if (Set(ref _background, value)) ScheduleUpdate(); } }
     private LocOption<TransparencyMode> _transparency;
@@ -249,7 +315,7 @@ public sealed partial class MainViewModel : ViewModelBase
     [
         ReloadFrameCommand, ExportBlockCommand, ExportTilesCommand, PlanWorldExportCommand, ExecuteWorldExportCommand,
         LoadMapsCommand, ExportMapPngCommand, UseMapAsSourceCommand, MeasureCalibrationCommand, SaveCalibratedProfileCommand,
-        ExportMaterialsCommand, DownloadTexturesCommand,
+        ExportMaterialsCommand, DownloadTexturesCommand, RegisterInWorldCommand, UndoEditCommand, ClearEditsCommand,
     ];
 
     private void RaiseCommands()
@@ -264,6 +330,7 @@ public sealed partial class MainViewModel : ViewModelBase
         MapsX = MapsX, MapsY = MapsY, Fit = Fit.Value, Interpolation = Interp.Value, Zoom = Zoom,
         OffsetX = OffsetX, OffsetY = OffsetY, Brightness = Brightness, Contrast = Contrast, Saturation = Saturation,
         Gamma = Gamma, Sharpen = Sharpen, BackgroundColor = SafeColor(BackgroundColor), Transparency = Transparency.Value,
+        LinearLight = LinearLight,
         CropMode = CropModeOption.Value, Crop = CropModeOption.Value == CropMode.Manual ? new CropRect(CropX, CropY, CropW, CropH) : null,
     };
 
@@ -296,30 +363,23 @@ public sealed partial class MainViewModel : ViewModelBase
         var profile = Profile;
         var selection = CurrentSelection();
         var qopt = CurrentQuantizeOptions();
-        var support = SelectedSupportBlock ?? profile.Find("cobblestone") ?? profile.Blocks.First();
-        var supportMode = SupportModeOption.Value;
         Status = L["Converting"];
         try
         {
-            var (processed, q, layout, error) = await Task.Run(() =>
+            var (processed, q, error) = await Task.Run(() =>
             {
                 var p = ImagePipeline.Process(source, settings, cts.Token);
                 QuantizeResult? qr = null;
-                BlockLayout? lay = null;
                 string? err = null;
-                try
-                {
-                    qr = ColorQuantizer.Quantize(p, profile, selection, qopt, cts.Token);
-                    lay = BlockLayout.Generate(qr, support, 0, supportMode);
-                }
+                try { qr = ColorQuantizer.Quantize(p, profile, selection, qopt, cts.Token); }
                 catch (InvalidOperationException ex) { err = ex.Message; }
-                return (p, qr, lay, err);
+                return (p, qr, err);
             }, cts.Token);
             if (cts.IsCancellationRequested) return;
             _processed = processed;
-            _quantized = q;
-            _layout = layout;
+            _baseQuantized = q;
             if (error != null) Log(error);
+            ApplyEditsAndLayout();
             RebuildViewAreas();
             UpdateBlockInfo();
             RefreshPreview();
@@ -332,6 +392,18 @@ public sealed partial class MainViewModel : ViewModelBase
             Log((L.English ? "Conversion failed: " : "変換に失敗しました: ") + ex.Message);
         }
         finally { RaiseCommands(); }
+    }
+
+    /// <summary>Re-applies manual edits to a copy of the automatic result and rebuilds the 3D layout.</summary>
+    private void ApplyEditsAndLayout()
+    {
+        if (_baseQuantized is null || Profile is null) { _quantized = null; _layout = null; return; }
+        var q = _edits.Count == 0 ? _baseQuantized : _baseQuantized.Clone();
+        _edits.ApplyTo(q, Profile);
+        _quantized = q;
+        var support = SelectedSupportBlock ?? Profile.Find("cobblestone") ?? Profile.Blocks.First();
+        try { _layout = BlockLayout.Generate(q, support, 0, SupportModeOption.Value); }
+        catch (InvalidOperationException ex) { _layout = null; Log(ex.Message); }
     }
 
     private static double MeanDeltaE(RgbaImage a, RgbaImage b)
@@ -422,6 +494,29 @@ public sealed partial class MainViewModel : ViewModelBase
             PreviewInfo = _source is null ? L["DropHere"] : "";
             return;
         }
+        if (mode == PreviewMode.Original && IsManualCrop && _source != null && _sourceThumb != null)
+        {
+            // Show the crop rectangle on the original.
+            image = _sourceThumb.Clone();
+            double k = (double)_sourceThumb.Width / _source.Width;
+            int rx = (int)(CropX * k), ry = (int)(CropY * k), rw = Math.Max(1, (int)(CropW * k)), rh = Math.Max(1, (int)(CropH * k));
+            var c = new Rgba(255, 60, 60);
+            for (int t = 0; t < 2; t++)
+            {
+                for (int x = rx; x < rx + rw; x++)
+                {
+                    if (x < 0 || x >= image.Width) continue;
+                    if (ry + t >= 0 && ry + t < image.Height) image[x, ry + t] = c;
+                    if (ry + rh - 1 - t >= 0 && ry + rh - 1 - t < image.Height) image[x, ry + rh - 1 - t] = c;
+                }
+                for (int y = ry; y < ry + rh; y++)
+                {
+                    if (y < 0 || y >= image.Height) continue;
+                    if (rx + t >= 0 && rx + t < image.Width) image[rx + t, y] = c;
+                    if (rx + rw - 1 - t >= 0 && rx + rw - 1 - t < image.Width) image[rx + rw - 1 - t, y] = c;
+                }
+            }
+        }
         if (mode != PreviewMode.Original)
         {
             int factor = Math.Max(1, 1024 / Math.Max(image.Width, image.Height));
@@ -439,7 +534,7 @@ public sealed partial class MainViewModel : ViewModelBase
     }
 
     /// <summary>Pointer over the build view at fractions (0..1) of the rendered image.</summary>
-    public void OnPreviewPointer(double fx, double fy, bool click)
+    public void OnPreviewPointer(double fx, double fy, bool click, bool pressed = false, bool released = false)
     {
         if (SelectedPreviewMode.Value != PreviewMode.Build2D || _layout is not { } layout || Preview is null) return;
         var hit = LayoutRenderer.HitTestTopDown(_renderedRegion, _renderedCell, fx * Preview.PixelSize.Width, fy * Preview.PixelSize.Height);
@@ -451,6 +546,11 @@ public sealed partial class MainViewModel : ViewModelBase
             $"{b.LocalName(L.English)}  ({b.Name})  x {x}, y {layout.HeightAt(x, z)}, z {z}{world}" +
             $"  {L.Format("MapN", MaterialCalculator.MapNumberOf(x, z, MapsX))}" +
             (supportsBelow > 0 ? $"  +{supportsBelow} {L["Support"]}" : "");
+        if (PaintMode && (click || pressed || released))
+        {
+            Paint(x, z, start: click, end: released);
+            return;
+        }
         if (click && EditProgress)
         {
             var key = MaterialCalculator.ChunkKey(x, z, MapsX);
@@ -537,8 +637,9 @@ public sealed partial class MainViewModel : ViewModelBase
         _projectPath = null;
         ApplyProject(new BmagProject());
         _source = _sourceThumb = _processed = null;
-        _quantized = null;
+        _quantized = _baseQuantized = null;
         _layout = null;
+        _edits = new PixelOverrides();
         _sourcePath = null;
         FrameCount = 1;
         IsVideo = false;
@@ -599,6 +700,11 @@ public sealed partial class MainViewModel : ViewModelBase
         p.ColorProfileId = BaseProfile?.Id ?? ColorProfile.DefaultId;
         p.Metric = Metric.Value;
         p.Dither = Dither.Value;
+        p.DitherStrength = DitherStrength;
+        p.Serpentine = Serpentine;
+        p.Split = SplitOption.Value;
+        p.WriteBehaviorPack = WriteBehaviorPack;
+        p.Edits = _edits.Count > 0 ? _edits.Serialize() : null;
         p.Staircase = StaircaseOption.Value;
         p.Supports = SupportModeOption.Value;
         p.Selection = CurrentSelection().Blocks;
@@ -633,6 +739,12 @@ public sealed partial class MainViewModel : ViewModelBase
             Transparency = TransparencyModes.First(t => t.Value == s.Transparency);
             Metric = Metrics.First(m => m.Value == p.Metric);
             Dither = Dithers.First(d => d.Value == p.Dither);
+            DitherStrength = p.DitherStrength;
+            Serpentine = p.Serpentine;
+            SplitOption = Splits.First(s => s.Value == p.Split);
+            WriteBehaviorPack = p.WriteBehaviorPack;
+            _edits = PixelOverrides.Deserialize(p.Edits);
+            LinearLight = s.LinearLight;
             StaircaseOption = Staircases.First(b => b.Value == p.Staircase);
             SupportModeOption = SupportModes.First(b => b.Value == p.Supports);
             MaxBlockTypes = p.MaxBlockTypes;

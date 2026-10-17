@@ -7,6 +7,7 @@
         x:Class="BMAG.App.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="Bedrock Map Art Generator"
+        Icon="/Assets/bmag.ico"
         Width="1560" Height="940" MinWidth="1200" MinHeight="700"
         DragDrop.AllowDrop="True">
 
@@ -26,6 +27,10 @@
           <MenuItem Header="{Binding L[Japanese]}" Command="{Binding SetJapaneseCommand}" />
           <MenuItem Header="{Binding L[EnglishLang]}" Command="{Binding SetEnglishCommand}" />
         </MenuItem>
+      </MenuItem>
+      <MenuItem Header="{Binding L[Help]}">
+        <MenuItem Header="{Binding L[About]}" Command="{Binding AboutCommand}" />
+        <MenuItem Header="{Binding L[OpenLogs]}" Command="{Binding OpenLogsCommand}" />
       </MenuItem>
     </Menu>
 
@@ -78,6 +83,7 @@
 
           <TextBlock Classes="h" Text="{Binding L[Crop]}" />
           <ComboBox ItemsSource="{Binding CropModes}" SelectedItem="{Binding CropModeOption}" HorizontalAlignment="Stretch" />
+          <TextBlock Classes="note" Text="{Binding L[CropDragHint]}" />
           <Grid ColumnDefinitions="*,*,*,*" IsVisible="{Binding IsManualCrop}">
             <NumericUpDown Value="{Binding CropX}" FormatString="0" Minimum="0" Maximum="100000" ShowButtonSpinner="False" ToolTip.Tip="X" />
             <NumericUpDown Grid.Column="1" Value="{Binding CropY}" FormatString="0" Minimum="0" Maximum="100000" ShowButtonSpinner="False" ToolTip.Tip="Y" />
@@ -88,6 +94,7 @@
           <TextBlock Classes="h" Text="{Binding L[Placement]}" />
           <ComboBox ItemsSource="{Binding FitModes}" SelectedItem="{Binding Fit}" HorizontalAlignment="Stretch" />
           <ComboBox ItemsSource="{Binding Interpolations}" SelectedItem="{Binding Interp}" HorizontalAlignment="Stretch" />
+          <CheckBox Content="{Binding L[LinearLight]}" IsChecked="{Binding LinearLight}" />
           <TextBlock><Run Text="{Binding L[Zoom]}" /><Run Text="{Binding Zoom, StringFormat=' {0:0.00}x'}" /></TextBlock>
           <Slider Minimum="0.25" Maximum="4" Value="{Binding Zoom}" />
           <TextBlock><Run Text="{Binding L[OffsetX]}" /><Run Text="{Binding OffsetX, StringFormat=' {0:0.00}'}" /></TextBlock>
@@ -260,6 +267,11 @@
                 <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding MaxBlockTypes}" Minimum="0" Maximum="400" FormatString="0" Margin="0,2" />
               </Grid>
               <TextBlock Classes="note" Text="{Binding L[MaxTypesHint]}" />
+
+              <TextBlock Classes="h" Text="{Binding L[Accuracy]}" />
+              <TextBlock><Run Text="{Binding L[DitherStrength]}" /><Run Text="{Binding DitherStrength, StringFormat='{} {0:P0}'}" /></TextBlock>
+              <Slider Minimum="0" Maximum="1" Value="{Binding DitherStrength}" />
+              <CheckBox Content="{Binding L[Serpentine]}" IsChecked="{Binding Serpentine}" />
               <TextBlock Classes="warn" IsVisible="{Binding IsStaircase}" Text="{Binding L[StairWarn]}" />
 
               <TextBlock Classes="h" Text="{Binding L[WorldPos]}" />
@@ -276,7 +288,14 @@
 
               <TextBlock Classes="h" Text="{Binding L[Result]}" />
               <TextBlock Text="{Binding BlockSummary}" TextWrapping="Wrap" />
-              <Button Content="{Binding L[ExportBuild]}" Command="{Binding ExportBlockCommand}" Classes="accent" HorizontalAlignment="Stretch" Margin="0,6" />
+
+              <TextBlock Classes="h" Text="{Binding L[Output]}" />
+              <ComboBox ItemsSource="{Binding Splits}" SelectedItem="{Binding SplitOption}" HorizontalAlignment="Stretch" />
+              <TextBlock Classes="note" Text="{Binding L[SplitHint]}" />
+              <CheckBox Content="{Binding L[WriteBP]}" IsChecked="{Binding WriteBehaviorPack}" />
+              <Button Content="{Binding L[ExportBuild]}" Command="{Binding ExportBlockCommand}" Classes="accent" HorizontalAlignment="Stretch" Margin="0,6,0,2" />
+              <Button Content="{Binding L[RegisterInWorld]}" Command="{Binding RegisterInWorldCommand}" HorizontalAlignment="Stretch" />
+              <TextBlock Classes="note" Text="{Binding L[RegisterHint]}" />
             </StackPanel>
           </ScrollViewer>
         </TabItem>
@@ -460,7 +479,22 @@
             <Button Content="{Binding L[Rotate]}" Command="{Binding RotateCommand}" IsVisible="{Binding IsBuild3D}" Margin="0,0,8,4" />
             <CheckBox Content="{Binding L[ShowSupports]}" IsChecked="{Binding ShowSupports}" IsVisible="{Binding IsBuild3D}" Margin="0,0,8,0" />
             <CheckBox Content="{Binding L[ShowHeights]}" IsChecked="{Binding ShowHeights}" IsVisible="{Binding !IsBuild3D}" Margin="0,0,8,0" />
-            <CheckBox Content="{Binding L[EditProgress]}" IsChecked="{Binding EditProgress}" IsVisible="{Binding !IsBuild3D}" />
+            <CheckBox Content="{Binding L[EditProgress]}" IsChecked="{Binding EditProgress}" IsVisible="{Binding !IsBuild3D}" Margin="0,0,8,0" />
+            <CheckBox Content="{Binding L[Paint]}" IsChecked="{Binding PaintMode}" IsVisible="{Binding !IsBuild3D}" Margin="0,0,8,0" />
+          </WrapPanel>
+          <WrapPanel Orientation="Horizontal" IsVisible="{Binding PaintMode}">
+            <TextBlock Text="{Binding L[Brush]}" VerticalAlignment="Center" Margin="0,0,4,0" />
+            <ComboBox ItemsSource="{Binding Brushes}" SelectedItem="{Binding Brush}" Width="220" Margin="0,0,6,4">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:BrushOption">
+                  <TextBlock Text="{Binding Label}" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+            <ComboBox ItemsSource="{Binding BrushShades}" SelectedItem="{Binding BrushShade}" Width="90" Margin="0,0,6,4" IsVisible="{Binding IsStaircase}" />
+            <Button Content="{Binding L[Undo]}" Command="{Binding UndoEditCommand}" Margin="0,0,6,4" ToolTip.Tip="Ctrl+Z" />
+            <Button Content="{Binding L[ClearEdits]}" Command="{Binding ClearEditsCommand}" Margin="0,0,6,4" />
+            <TextBlock Text="{Binding EditsText}" VerticalAlignment="Center" Classes="note" />
           </WrapPanel>
       </WrapPanel>
       <TextBlock DockPanel.Dock="Top" Text="{Binding PreviewInfo}" FontSize="12" Opacity="0.7" Margin="12,4" TextTrimming="CharacterEllipsis" />
@@ -468,8 +502,11 @@
                  IsVisible="{Binding IsBuildView}" />
       <Border Background="#18808080" Margin="10,0,10,6">
         <Grid>
-          <Image Source="{Binding Preview}" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="None" Margin="8"
-                 IsVisible="{Binding IsImageView}" />
+          <Image x:Name="PreviewImage" Source="{Binding Preview}" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="None" Margin="8"
+                 IsVisible="{Binding IsImageView}" Cursor="Cross" />
+          <Canvas x:Name="CropOverlay" IsHitTestVisible="False">
+            <Rectangle x:Name="CropRect" Stroke="#FF4040" StrokeThickness="2" StrokeDashArray="4,3" IsVisible="False" />
+          </Canvas>
           <ScrollViewer IsVisible="{Binding IsBuildView}" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
             <Image x:Name="BuildImage" Source="{Binding Preview}" Stretch="None" RenderOptions.BitmapInterpolationMode="None"
                    HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" />

@@ -141,6 +141,28 @@ public class ImageTests
         Assert.Null(provider.GetIcon(profile.Find("stone")!));
     }
 
+    [Fact]
+    public void LinearLightResize_KeepsAverageBrightness()
+    {
+        // A fine black/white checkerboard averages to mid grey: ~188 in linear light vs ~128 in gamma space.
+        var src = new RgbaImage(256, 256);
+        for (int y = 0; y < 256; y++) for (int x = 0; x < 256; x++) src[x, y] = (x + y) % 2 == 0 ? new Rgba(0, 0, 0) : new Rgba(255, 255, 255);
+        var lin = ImagePipeline.Process(src, new ImageSettings { Interpolation = Interpolation.Bilinear, LinearLight = true });
+        var gam = ImagePipeline.Process(src, new ImageSettings { Interpolation = Interpolation.Bilinear, LinearLight = false });
+        Assert.InRange((int)lin[64, 64].R, 180, 195);
+        Assert.InRange((int)gam[64, 64].R, 120, 135);
+    }
+
+    [Fact]
+    public void Oklab_OrdersColoursPerceptually()
+    {
+        var white = BMAG.ColorEngine.ColorMath.ToOklab(255, 255, 255);
+        var black = BMAG.ColorEngine.ColorMath.ToOklab(0, 0, 0);
+        Assert.Equal(1.0, white.L, 3);
+        Assert.Equal(0.0, black.L, 3);
+        Assert.Equal(0.0, white.A, 3);
+    }
+
     [Fact] // T07
     public void LargeImage_CanBeCancelled()
     {

@@ -2,6 +2,8 @@ namespace BMAG.ColorEngine;
 
 public enum ColorMetric
 {
+    /// <summary>Euclidean distance in Oklab (Björn Ottosson, 2020): perceptually uniform and fast. Default.</summary>
+    Oklab,
     /// <summary>Plain Euclidean RGB distance. Fast.</summary>
     Rgb,
     /// <summary>Weighted RGB ("redmean"). Cheap and closer to perception than plain RGB.</summary>
@@ -49,6 +51,29 @@ public static class ColorMath
     }
 
     private static double F(double t) => t > 216.0 / 24389 ? Math.Cbrt(t) : (24389.0 / 27 * t + 16) / 116;
+
+    /// <summary>sRGB (0..255) to Oklab. Uses the same cached sRGB→linear table as <see cref="ToLab"/>.</summary>
+    public static Lab ToOklab(double r, double g, double b)
+    {
+        double rl = Linear(r), gl = Linear(g), bl = Linear(b);
+        double l = Math.Cbrt(0.4122214708 * rl + 0.5363325363 * gl + 0.0514459929 * bl);
+        double m = Math.Cbrt(0.2119034982 * rl + 0.6806995451 * gl + 0.1073969566 * bl);
+        double s = Math.Cbrt(0.0883024619 * rl + 0.2817188376 * gl + 0.6299787005 * bl);
+        return new Lab(
+            0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+            1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+            0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s);
+    }
+
+    /// <summary>sRGB byte value to linear light (0..1).</summary>
+    public static double SrgbToLinear(byte v) => SrgbToLinearLut[v];
+
+    /// <summary>Linear light (0..1) to an sRGB value (0..255, not rounded).</summary>
+    public static double LinearToSrgb(double v)
+    {
+        v = Math.Clamp(v, 0, 1);
+        return 255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * Math.Pow(v, 1 / 2.4) - 0.055);
+    }
 
     public static double DeltaE76(Lab a, Lab b)
     {
