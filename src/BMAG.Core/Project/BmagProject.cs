@@ -49,8 +49,15 @@ public sealed class BmagProject
     public List<string>? Edits { get; set; }
     public StaircaseMode Staircase { get; set; } = StaircaseMode.Flat;
     public SupportMode Supports { get; set; } = SupportMode.Important;
-    /// <summary>Colour set id → chosen block key.</summary>
+    /// <summary>Selected block keys (any number per colour).</summary>
+    public List<string>? SelectedBlocks { get; set; }
+    /// <summary>Old format (one block per colour set): colour set id → block key. Still read.</summary>
     public Dictionary<int, string>? Selection { get; set; }
+    public BlockMixing Mixing { get; set; } = BlockMixing.Balanced;
+
+    /// <summary>The selection in either format, or null when none is stored.</summary>
+    public HashSet<string>? SelectionKeys() =>
+        SelectedBlocks is { } list ? [.. list] : Selection is { } old ? [.. old.Values] : null;
     public int MaxBlockTypes { get; set; }
     public string SupportBlockKey { get; set; } = "cobblestone";
     public int? OriginX { get; set; }

@@ -723,7 +723,9 @@ public sealed partial class MainViewModel : ViewModelBase
         p.Edits = _edits.Count > 0 ? _edits.Serialize() : null;
         p.Staircase = StaircaseOption.Value;
         p.Supports = SupportModeOption.Value;
-        p.Selection = CurrentSelection().Blocks;
+        p.SelectedBlocks = [.. CurrentSelection().Keys];
+        p.Selection = null;
+        p.Mixing = MixingOption?.Value ?? BlockMixing.Balanced;
         p.MaxBlockTypes = MaxBlockTypes;
         p.SupportBlockKey = _supportKey;
         p.OriginX = UseOrigin ? OriginMapX : null;
@@ -768,7 +770,8 @@ public sealed partial class MainViewModel : ViewModelBase
             MaxBlockTypes = p.MaxBlockTypes;
             _supportKey = p.SupportBlockKey;
             var profile = Profiles.FirstOrDefault(x => x.Id == p.ColorProfileId) ?? Profiles.FirstOrDefault();
-            if (profile != null) SelectProfile(profile, p.Selection);
+            MixingOption = Mixings.FirstOrDefault(m => m.Value == p.Mixing) ?? Mixings[0];
+            if (profile != null) SelectProfile(profile, p.SelectionKeys());
             UseOrigin = p.OriginX != null;
             OriginMapX = p.OriginX ?? 0; OriginMapZ = p.OriginZ ?? 0; OriginY = p.OriginY ?? 64;
             StartId = p.StartMapId;

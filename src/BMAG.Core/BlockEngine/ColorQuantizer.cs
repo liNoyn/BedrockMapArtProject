@@ -133,7 +133,68 @@ public static class ColorQuantizer
                 result = QuantizeWith(image, profile, entries, options, ct);
             }
         }
-        return result;
+        return Distribute(result, selection.Mixing);
+    }
+
+    /// <summary>
+    /// Splits each colour between the selected blocks that share it. Afterwards every entry is a single block, so
+    /// layouts, material lists and structures see the actual block per pixel.
+    /// Balanced: equal shares in reading order (map by map, then row by row) so each block covers one stretch.
+    /// Mixed: equal shares scattered with a deterministic per-pixel hash.
+    /// </summary>
+    public static QuantizeResult Distribute(QuantizeResult q, BlockMixing mixing)
+    {
+        if (q.Entries.All(e => e.AllMembers.Count <= 1)) return q;
+        var flat = new List<PaletteEntry>();
+        var memberIndex = new int[q.Entries.Count][];
+        for (int e = 0; e < q.Entries.Count; e++)
+        {
+            var entry = q.Entries[e];
+            memberIndex[e] = entry.AllMembers.Select(m =>
+            {
+                var others = entry.AllMembers.Where(o => o != m).Concat(entry.Alternatives).ToList();
+                flat.Add(new PaletteEntry(m, others));
+                return flat.Count - 1;
+            }).ToArray();
+        }
+
+        int w = q.Width, h = q.Height;
+        var idx = new int[q.EntryIndex.Length];
+        if (mixing == BlockMixing.Mixed)
+        {
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    int i = y * w + x, e = q.EntryIndex[i];
+                    idx[i] = e < 0 ? -1 : memberIndex[e][(int)(Jitter(x, y) * memberIndex[e].Length)];
+                }
+        }
+        else
+        {
+            // Reading order: maps left to right, top to bottom; inside a map row by row.
+            IEnumerable<int> Order()
+            {
+                for (int my = 0; my * 128 < h; my++)
+                    for (int mx = 0; mx * 128 < w; mx++)
+                        for (int y = my * 128; y < Math.Min(h, my * 128 + 128); y++)
+                            for (int x = mx * 128; x < Math.Min(w, mx * 128 + 128); x++)
+                                yield return y * w + x;
+            }
+            var total = new int[q.Entries.Count];
+            foreach (int e in q.EntryIndex) if (e >= 0) total[e]++;
+            var seen = new int[q.Entries.Count];
+            foreach (int i in Order())
+            {
+                int e = q.EntryIndex[i];
+                if (e < 0) { idx[i] = -1; continue; }
+                int m = memberIndex[e].Length;
+                idx[i] = memberIndex[e][Math.Min(m - 1, (int)((long)seen[e]++ * m / total[e]))];
+            }
+        }
+        return new QuantizeResult
+        {
+            Width = w, Height = h, EntryIndex = idx, Shades = q.Shades, Entries = flat, Preview = q.Preview, Mode = q.Mode,
+        };
     }
 
     private static QuantizeResult QuantizeWith(RgbaImage image, ColorProfile profile, List<PaletteEntry> entries,

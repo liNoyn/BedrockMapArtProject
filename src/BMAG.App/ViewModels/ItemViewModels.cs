@@ -50,14 +50,11 @@ public sealed class BlockChoiceViewModel : ViewModelBase
     public Bitmap? Icon { get => _icon; set { if (Set(ref _icon, value)) Raise(nameof(HasIcon)); } }
     public bool HasIcon => _icon != null;
 
+    /// <summary>Selected for generation. Any number of blocks per row can be selected.</summary>
     public bool IsSelected
     {
-        get => _row.Selected == this;
-        set
-        {
-            if (value) _row.Select(this);
-            else if (_row.Selected == this) _row.Select(null);
-        }
+        get => _row.IsChosen(this);
+        set => _row.SetChosen(this, value);
     }
 
     internal void Refresh() => Raise(nameof(IsSelected));
@@ -79,10 +76,10 @@ public sealed class BlockChoiceViewModel : ViewModelBase
     }
 }
 
-/// <summary>A MapartCraft-style row: three shade swatches, "none", then one button per block.</summary>
+/// <summary>A MapartCraft-style row: three shade swatches, "none", then one toggle button per block.</summary>
 public sealed class ColourSetRowViewModel : ViewModelBase
 {
-    private BlockChoiceViewModel? _selected;
+    private readonly HashSet<BlockChoiceViewModel> _chosen = [];
     private readonly Action _changed;
 
     public ColourSetRowViewModel(ColourSet set, ColorProfile profile, Loc loc, Action changed)
@@ -105,23 +102,57 @@ public sealed class ColourSetRowViewModel : ViewModelBase
     public IBrush NormalBrush { get; }
     public IBrush BrightBrush { get; }
     public ObservableCollection<BlockChoiceViewModel> Blocks { get; } = [];
-    public BlockChoiceViewModel? Selected => _selected;
+    public IEnumerable<BlockChoiceViewModel> Chosen => Blocks.Where(_chosen.Contains);
+    public int ChosenCount => _chosen.Count;
+    /// <summary>Shown next to the swatch when more than one block shares this colour.</summary>
+    public string CountBadge => _chosen.Count > 1 ? $"×{_chosen.Count}" : "";
 
+    /// <summary>"None" button: checked when nothing is selected, clicking it clears the row.</summary>
     public bool IsNone
     {
-        get => _selected is null;
-        set { if (value) Select(null); }
+        get => _chosen.Count == 0;
+        set { if (value) Clear(); else Raise(nameof(IsNone)); }
     }
 
-    public void Select(BlockChoiceViewModel? choice, bool notify = true)
+    public bool IsChosen(BlockChoiceViewModel choice) => _chosen.Contains(choice);
+
+    public void SetChosen(BlockChoiceViewModel choice, bool on, bool notify = true)
     {
-        if (_selected == choice) { Raise(nameof(IsNone)); return; }
-        var old = _selected;
-        _selected = choice;
-        old?.Refresh();
-        choice?.Refresh();
-        Raise(nameof(IsNone));
+        bool changed = on ? _chosen.Add(choice) : _chosen.Remove(choice);
+        choice.Refresh();
+        if (!changed) return;
+        RaiseCounts();
         if (notify) _changed();
+    }
+
+    public void Clear(bool notify = true)
+    {
+        if (_chosen.Count == 0) { Raise(nameof(IsNone)); return; }
+        var old = _chosen.ToList();
+        _chosen.Clear();
+        foreach (var c in old) c.Refresh();
+        RaiseCounts();
+        if (notify) _changed();
+    }
+
+    /// <summary>Replaces the selection without notifying (used when applying presets / projects).</summary>
+    public void Load(IEnumerable<string> keys)
+    {
+        var set = keys.ToHashSet();
+        _chosen.Clear();
+        foreach (var b in Blocks)
+        {
+            if (set.Contains(b.Block.Key)) _chosen.Add(b);
+            b.Refresh();
+        }
+        RaiseCounts();
+    }
+
+    private void RaiseCounts()
+    {
+        Raise(nameof(IsNone));
+        Raise(nameof(ChosenCount));
+        Raise(nameof(CountBadge));
     }
 
     public static IBrush Brush(Imaging.Rgba c) => new SolidColorBrush(Color.FromRgb(c.R, c.G, c.B));

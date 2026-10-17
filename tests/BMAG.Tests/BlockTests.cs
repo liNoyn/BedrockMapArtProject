@@ -18,7 +18,7 @@ public class BlockTests
         ColorQuantizer.Quantize(img, Profile, sel ?? Everything, opt ?? new QuantizeOptions());
 
     private static PaletteSelection Only(params string[] keys) =>
-        new() { Blocks = keys.Select(k => Profile.Find(k)!).ToDictionary(b => b.ColourSetId, b => b.Key) };
+        new() { Keys = [.. keys] };
 
     [Fact]
     public void BuiltInProfile_HasAllMapartCraftColourSets_AndIsUnverified()
@@ -36,11 +36,12 @@ public class BlockTests
     [Fact]
     public void Presets_PickOneBlockPerColourSet()
     {
-        Assert.Equal(60, Presets[0].Blocks.Count);
+        Assert.Equal(60, Presets[0].Keys.Count);
         var survival = Presets[1].ToSelection().Resolve(Profile);
         Assert.DoesNotContain(survival, e => e.Block.Gravity || e.Block.NeedsSupport || e.Block.Rarity > 1);
-        Assert.All(Presets.Single(p => p.NameEn == "Carpets").Blocks.Values, k => Assert.EndsWith("_carpet", k));
-        Assert.Empty(Presets.Single(p => p.NameEn == "None").Blocks);
+        Assert.All(Presets.Single(p => p.NameEn == "Carpets").Keys, k => Assert.EndsWith("_carpet", k));
+        Assert.Empty(Presets.Single(p => p.NameEn == "None").Keys);
+        Assert.True(Presets.Single(p => p.NameEn == "All blocks").Keys.Count > 250);
     }
 
     [Fact] // T08
@@ -58,7 +59,41 @@ public class BlockTests
     {
         var sel = Only("white_wool", "black_concrete", "red_terracotta");
         var q = Quantize(TestHelpers.Gradient(128, 128), sel);
-        Assert.All(q.EntryIndex, e => Assert.Contains(q.Entries[e].Block.Key, sel.Blocks.Values));
+        Assert.All(q.EntryIndex, e => Assert.Contains(q.Entries[e].Block.Key, sel.Keys));
+    }
+
+    [Theory]
+    [InlineData(BlockMixing.Balanced)]
+    [InlineData(BlockMixing.Mixed)]
+    public void SameColourBlocks_ShareThePixelsEqually(BlockMixing mixing)
+    {
+        // White wool, white concrete and snow block show the same map colour.
+        var white = Profile.ColorOf(Profile.Find("white_wool")!, Shade.Normal);
+        var sel = Only("white_wool", "white_concrete", "snow_block") with { Mixing = mixing };
+        Assert.Single(sel.Resolve(Profile)); // one colour, three members
+        var q = Quantize(RgbaImage.Filled(128, 128, white), sel);
+        var counts = q.EntryIndex.GroupBy(e => q.Entries[e].Block.Key).ToDictionary(g => g.Key, g => g.Count());
+        Assert.Equal(3, counts.Count);
+        Assert.All(counts.Values, n => Assert.InRange(n, 128 * 128 / 3 - 400, 128 * 128 / 3 + 400));
+        if (mixing == BlockMixing.Balanced)
+        {
+            // Reading order: the first rows belong to the first block, the last rows to the last one.
+            Assert.Equal("white_wool", q.Entries[q.Get(0, 0)].Block.Key);
+            Assert.Equal("snow_block", q.Entries[q.Get(127, 127)].Block.Key);
+        }
+        // Materials list the blocks separately; the map preview is unchanged.
+        var layout = BlockLayout.Generate(q, Cobble);
+        var materials = MaterialCalculator.Calculate(layout, 1).Where(m => !m.IsSupport).ToList();
+        Assert.Equal(3, materials.Count);
+        Assert.All(Enumerable.Range(0, 128), x => Assert.Equal(white, q.Preview[x, 64]));
+    }
+
+    [Fact]
+    public void OldPresetFiles_AreConverted()
+    {
+        var json = """[ { "Name": "old", "Blocks": { "13": "white_wool", "28": "black_wool" } } ]""";
+        var presets = System.Text.Json.JsonSerializer.Deserialize<List<BlockPreset>>(json)!;
+        Assert.Equal(["white_wool", "black_wool"], presets[0].Keys);
     }
 
     [Fact]
