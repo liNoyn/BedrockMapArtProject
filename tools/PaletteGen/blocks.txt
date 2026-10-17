@@ -53,8 +53,6 @@ B|brewing_stand|minecraft:brewing_stand||S1|Brewing Stand|醸造台
 
 CS|6|Leaves|葉|0,124,0
 B|oak_leaves|minecraft:oak_leaves|persistent_bit=true|FTX|Oak Leaves|オークの葉
-B|spruce_leaves|minecraft:spruce_leaves|persistent_bit=true|F|Spruce Leaves|トウヒの葉
-B|birch_leaves|minecraft:birch_leaves|persistent_bit=true|F|Birch Leaves|シラカバの葉
 B|jungle_leaves|minecraft:jungle_leaves|persistent_bit=true|FTX|Jungle Leaves|ジャングルの葉
 B|acacia_leaves|minecraft:acacia_leaves|persistent_bit=true|FTX|Acacia Leaves|アカシアの葉
 B|dark_oak_leaves|minecraft:dark_oak_leaves|persistent_bit=true|FTX|Dark Oak Leaves|ダークオークの葉
@@ -176,7 +174,7 @@ CS|22|Cyan|青緑色|76,127,153
 B|prismarine|minecraft:prismarine||2|Prismarine|プリズマリン
 B|prismarine_slab|minecraft:prismarine_slab||S2|Prismarine Slab|プリズマリンのハーフブロック
 
-CS|23|Purple|紫色|127,63,178
+CS|23|Purple|紫色|127,63,178|gd=132,77,176
 @DYE|purple
 B|mycelium|minecraft:mycelium||2|Mycelium|菌糸
 B|amethyst_block|minecraft:amethyst_block||1|Amethyst Block|アメジストブロック
@@ -219,9 +217,6 @@ B|blackstone_slab|minecraft:blackstone_slab||S|Blackstone Slab|ブラックス�
 B|basalt|minecraft:basalt|pillar_axis=y||Basalt|玄武岩
 B|netherite_block|minecraft:netherite_block||3|Block of Netherite|ネザライトブロック
 B|polished_blackstone_pressure_plate|minecraft:polished_blackstone_pressure_plate||S|Polished Blackstone Pressure Plate|磨かれたブラックストーンの感圧板
-B|sculk|minecraft:sculk||2|Sculk|スカルク
-B|sculk_catalyst|minecraft:sculk_catalyst||3|Sculk Catalyst|スカルクカタリスト
-B|sculk_shrieker|minecraft:sculk_shrieker||3|Sculk Shrieker|スカルクシュリーカー
 
 CS|29|Gold|金|250,238,77
 B|gold_block|minecraft:gold_block||3|Block of Gold|金ブロック
@@ -236,7 +231,7 @@ B|dark_prismarine|minecraft:dark_prismarine||2|Dark Prismarine|ダークプリ�
 B|dark_prismarine_slab|minecraft:dark_prismarine_slab||S2|Dark Prismarine Slab|ダークプリズマリンのハーフブロック
 B|beacon|minecraft:beacon||S3|Beacon|ビーコン
 
-CS|31|Lapis|ラピスラズリ|74,128,255
+CS|31|Lapis|ラピスラズリ|74,128,255|gd=64,110,220
 B|lapis_block|minecraft:lapis_block||2|Block of Lapis Lazuli|ラピスラズリブロック
 
 CS|32|Emerald|エメラルド|0,217,58
@@ -253,7 +248,7 @@ B|spruce_pressure_plate|minecraft:spruce_pressure_plate||S|Spruce Pressure Plate
 B|mangrove_log_x|minecraft:mangrove_log|pillar_axis=x|F|Mangrove Log (horizontal)|マングローブの原木（横）
 B|mangrove_roots|minecraft:mangrove_roots||F|Mangrove Roots|マングローブの根
 
-CS|34|Nether|ネザー|112,2,0
+CS|34|Nether|ネザー|112,2,0|gd=96,0,0
 B|netherrack|minecraft:netherrack|||Netherrack|ネザーラック
 B|nether_bricks|minecraft:nether_brick|||Nether Bricks|ネザーレンガ
 B|nether_brick_slab|minecraft:nether_brick_slab||S|Nether Brick Slab|ネザーレンガのハーフブロック
@@ -320,7 +315,7 @@ CS|49|Red Terracotta|赤色のテラコッタ|142,60,46
 CS|50|Black Terracotta|黒色のテラコッタ|37,22,16
 @TERRACOTTA|black
 
-CS|51|Crimson Nylium|真紅のナイリウム|189,48,49
+CS|51|Crimson Nylium|真紅のナイリウム|189,48,49|gd=163,42,42
 B|crimson_nylium|minecraft:crimson_nylium||1|Crimson Nylium|真紅のナイリウム
 
 CS|52|Crimson Stem|真紅の幹|148,63,97
@@ -366,3 +361,61 @@ B|raw_iron_block|minecraft:raw_iron_block||2|Block of Raw Iron|鉄の原石ブ�
 CS|60|Glow Lichen|ヒカリゴケ|127,167,150
 B|glow_lichen|minecraft:glow_lichen|multi_face_direction_bits=1|SF1|Glow Lichen|ヒカリゴケ
 B|verdant_froglight|minecraft:verdant_froglight|pillar_axis=y|2|Verdant Froglight|新緑色のフロッグライト
+
+# Colour sets from gd-codes/mc-pixelart-maker (Bedrock, determined experimentally; third-party, not verified by BMAP).
+CS|61|Birch Leaves|シラカバの葉|69,90,46|gd=59,77,39
+B|birch_leaves|minecraft:birch_leaves|persistent_bit=true|F|Birch Leaves|シラカバの葉
+CS|62|Spruce Leaves|トウヒの葉|53,83,53|gd=45,71,45
+B|spruce_leaves|minecraft:spruce_leaves|persistent_bit=true|F|Spruce Leaves|トウヒの葉
+CS|63|Sculk|スカルク|13,18,23|gd=11,15,19
+B|sculk|minecraft:sculk||2|Sculk|スカルク
+B|sculk_catalyst|minecraft:sculk_catalyst||3|Sculk Catalyst|スカルクカタリスト
+B|sculk_shrieker|minecraft:sculk_shrieker||3|Sculk Shrieker|スカルクシュリーカー
+CS|64|White Wool Slab|白の羊毛のハーフブロック|237,237,237|gd=204,204,204
+B|white_wool_slab|minecraft:white_wool_slab||SFX|White Wool Slab|白の羊毛のハーフブロック
+B|white_wool_double_slab|minecraft:white_wool_double_slab||FX|White Wool Double Slab|白の羊毛の二段ハーフブロック
+CS|65|Light Gray Wool Slab|薄灰色の羊毛のハーフブロック|163,163,156|gd=140,140,134
+B|light_gray_wool_slab|minecraft:light_gray_wool_slab||SFX|Light Gray Wool Slab|薄灰色の羊毛のハーフブロック
+B|light_gray_wool_double_slab|minecraft:light_gray_wool_double_slab||FX|Light Gray Wool Double Slab|薄灰色の羊毛の二段ハーフブロック
+CS|66|Gray Wool Slab|灰色の羊毛のハーフブロック|77,89,89|gd=66,76,76
+B|gray_wool_slab|minecraft:gray_wool_slab||SFX|Gray Wool Slab|灰色の羊毛のハーフブロック
+B|gray_wool_double_slab|minecraft:gray_wool_double_slab||FX|Gray Wool Double Slab|灰色の羊毛の二段ハーフブロック
+CS|67|Black Wool Slab|黒の羊毛のハーフブロック|33,33,38|gd=28,28,32
+B|black_wool_slab|minecraft:black_wool_slab||SFX|Black Wool Slab|黒の羊毛のハーフブロック
+B|black_wool_double_slab|minecraft:black_wool_double_slab||FX|Black Wool Double Slab|黒の羊毛の二段ハーフブロック
+CS|68|Brown Wool Slab|茶色の羊毛のハーフブロック|140,91,56|gd=120,78,48
+B|brown_wool_slab|minecraft:brown_wool_slab||SFX|Brown Wool Slab|茶色の羊毛のハーフブロック
+B|brown_wool_double_slab|minecraft:brown_wool_double_slab||FX|Brown Wool Double Slab|茶色の羊毛の二段ハーフブロック
+CS|69|Red Wool Slab|赤の羊毛のハーフブロック|165,45,40|gd=142,38,34
+B|red_wool_slab|minecraft:red_wool_slab||SFX|Red Wool Slab|赤の羊毛のハーフブロック
+B|red_wool_double_slab|minecraft:red_wool_double_slab||FX|Red Wool Double Slab|赤の羊毛の二段ハーフブロック
+CS|70|Orange Wool Slab|橙の羊毛のハーフブロック|249,135,33|gd=214,116,28
+B|orange_wool_slab|minecraft:orange_wool_slab||SFX|Orange Wool Slab|橙の羊毛のハーフブロック
+B|orange_wool_double_slab|minecraft:orange_wool_double_slab||FX|Orange Wool Double Slab|橙の羊毛の二段ハーフブロック
+CS|71|Yellow Wool Slab|黄の羊毛のハーフブロック|255,218,65|gd=220,188,56
+B|yellow_wool_slab|minecraft:yellow_wool_slab||SFX|Yellow Wool Slab|黄の羊毛のハーフブロック
+B|yellow_wool_double_slab|minecraft:yellow_wool_double_slab||FX|Yellow Wool Double Slab|黄の羊毛の二段ハーフブロック
+CS|72|Lime Wool Slab|黄緑の羊毛のハーフブロック|135,202,35|gd=116,174,30
+B|lime_wool_slab|minecraft:lime_wool_slab||SFX|Lime Wool Slab|黄緑の羊毛のハーフブロック
+B|lime_wool_double_slab|minecraft:lime_wool_double_slab||FX|Lime Wool Double Slab|黄緑の羊毛の二段ハーフブロック
+CS|73|Green Wool Slab|緑の羊毛のハーフブロック|102,130,26|gd=88,112,22
+B|green_wool_slab|minecraft:green_wool_slab||SFX|Green Wool Slab|緑の羊毛のハーフブロック
+B|green_wool_double_slab|minecraft:green_wool_double_slab||FX|Green Wool Double Slab|緑の羊毛の二段ハーフブロック
+CS|74|Cyan Wool Slab|青緑の羊毛のハーフブロック|26,160,160|gd=22,138,138
+B|cyan_wool_slab|minecraft:cyan_wool_slab||SFX|Cyan Wool Slab|青緑の羊毛のハーフブロック
+B|cyan_wool_double_slab|minecraft:cyan_wool_double_slab||FX|Cyan Wool Double Slab|青緑の羊毛の二段ハーフブロック
+CS|75|Light Blue Wool Slab|空色の羊毛のハーフブロック|65,184,221|gd=56,158,190
+B|light_blue_wool_slab|minecraft:light_blue_wool_slab||SFX|Light Blue Wool Slab|空色の羊毛のハーフブロック
+B|light_blue_wool_double_slab|minecraft:light_blue_wool_double_slab||FX|Light Blue Wool Double Slab|空色の羊毛の二段ハーフブロック
+CS|76|Blue Wool Slab|青の羊毛のハーフブロック|51,63,149|gd=44,54,128
+B|blue_wool_slab|minecraft:blue_wool_slab||SFX|Blue Wool Slab|青の羊毛のハーフブロック
+B|blue_wool_double_slab|minecraft:blue_wool_double_slab||FX|Blue Wool Double Slab|青の羊毛の二段ハーフブロック
+CS|77|Purple Wool Slab|紫の羊毛のハーフブロック|144,56,186|gd=124,48,160
+B|purple_wool_slab|minecraft:purple_wool_slab||SFX|Purple Wool Slab|紫の羊毛のハーフブロック
+B|purple_wool_double_slab|minecraft:purple_wool_double_slab||FX|Purple Wool Double Slab|紫の羊毛の二段ハーフブロック
+CS|78|Magenta Wool Slab|赤紫の羊毛のハーフブロック|202,84,193|gd=174,72,166
+B|magenta_wool_slab|minecraft:magenta_wool_slab||SFX|Magenta Wool Slab|赤紫の羊毛のハーフブロック
+B|magenta_wool_double_slab|minecraft:magenta_wool_double_slab||FX|Magenta Wool Double Slab|赤紫の羊毛の二段ハーフブロック
+CS|79|Pink Wool Slab|桃色の羊毛のハーフブロック|244,145,174|gd=210,125,150
+B|pink_wool_slab|minecraft:pink_wool_slab||SFX|Pink Wool Slab|桃色の羊毛のハーフブロック
+B|pink_wool_double_slab|minecraft:pink_wool_double_slab||FX|Pink Wool Double Slab|桃色の羊毛の二段ハーフブロック

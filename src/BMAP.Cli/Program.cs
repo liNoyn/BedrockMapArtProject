@@ -266,9 +266,49 @@ try
                             if (img.Pixels[i * 4] == s.C.R * mul / 255 && img.Pixels[i * 4 + 1] == s.C.G * mul / 255 && img.Pixels[i * 4 + 2] == s.C.B * mul / 255)
                                 seen[(s.Name, mul)] = seen.GetValueOrDefault((s.Name, mul)) + 1;
                 }
+            var rc = BMAP.Shading.Calibrator.RoundingCheck(images, bases, profile.Shades);
+            Console.WriteLine($"rounding (light/dark pixels): {rc.Shaded} explained, both models {rc.Both}, only Java base-floor {rc.OnlyFromBase}, only gd-codes from-normal {rc.OnlyFromNormal}");
             Console.WriteLine("colour sets seen (x180 / x220 / x255):");
             foreach (var g in seen.GroupBy(k => k.Key.Set).OrderByDescending(g => g.Sum(x => x.Value)))
                 Console.WriteLine($"    {g.Key,-22} {seen.GetValueOrDefault((g.Key, 180)),7} {seen.GetValueOrDefault((g.Key, 220)),7} {seen.GetValueOrDefault((g.Key, 255)),7}");
+            break;
+        }
+
+        case "refcompare":
+        {
+            // refcompare [world...]: downloads gd-codes' palette (not stored), compares it with BMAP's profile and,
+            // when worlds are given, counts how often each normal colour appears on maps drawn there (read only).
+            using var http = new HttpClient();
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("BMAP (+https://github.com/liNoyn/BedrockMapArtProject)");
+            var js = await http.GetStringAsync(BMAP.Palette.ReferencePalette.GdCodesUrl);
+            var reference = BMAP.Palette.ReferencePalette.ParseGdCodes(js);
+            var profile = BMAP.Palette.ColorProfile.LoadBuiltIn();
+            var cmp = BMAP.Palette.ReferencePalette.Compare(reference, profile);
+            var seen = new Dictionary<BMAP.Imaging.Rgba, int>();
+            foreach (var world in args.Skip(1))
+                try
+                {
+                    foreach (var m in BMAP.Bedrock.MapRecord.ReadAll(world))
+                        if (m.ToImage() is { } im && m.XCenter != int.MaxValue)
+                            for (int i = 0; i < im.Width * im.Height; i++)
+                                if (im.Pixels[i * 4 + 3] != 0)
+                                {
+                                    var c = new BMAP.Imaging.Rgba(im.Pixels[i * 4], im.Pixels[i * 4 + 1], im.Pixels[i * 4 + 2]);
+                                    seen[c] = seen.GetValueOrDefault(c) + 1;
+                                }
+                }
+                catch (Exception ex) { Console.WriteLine($"  skip {Path.GetFileName(world)}: {ex.Message}"); }
+            Console.WriteLine($"gd-codes: {reference.Count} categories, {reference.Select(r => r.Normal).Distinct().Count()} distinct normal colours");
+            Console.WriteLine($"{"key",-18} {"gd normal",-10} {"same colour in BMAP",-22} {"block's BMAP set (normal, max diff)",-40} {"on maps",7}");
+            foreach (var c in cmp)
+                Console.WriteLine($"{c.Reference.Key,-18} {c.Reference.Normal.ToHex(),-10} {c.ExactSet?.NameEn ?? "-",-22} " +
+                    $"{(c.BlockSet is null ? "(block not in BMAP)" : $"{c.BlockSet.NameEn} {c.BlockSetNormal?.ToHex()} d={c.Distance}"),-40} {seen.GetValueOrDefault(c.Reference.Normal),7}" +
+                    (c.Reference.BiomeDependent ? "  biome" : ""));
+            int exact = cmp.Count(c => c.ExactSet != null), sameBlock = cmp.Count(c => c.Distance == 0);
+            Console.WriteLine($"identical to a BMAP colour: {exact}/{cmp.Count}; block maps to the same colour in both: {sameBlock}; " +
+                $"different: {cmp.Count(c => c.Distance > 0)}; block unknown to BMAP: {cmp.Count(c => c.BlockSet is null)}");
+            if (seen.Count > 0)
+                Console.WriteLine($"gd-only colours (no identical BMAP colour) seen on maps: {cmp.Where(c => c.ExactSet is null && seen.ContainsKey(c.Reference.Normal)).Select(c => c.Reference.Key).DefaultIfEmpty("none").Aggregate((a, b) => a + ", " + b)}");
             break;
         }
 

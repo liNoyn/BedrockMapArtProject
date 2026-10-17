@@ -108,14 +108,40 @@ foreach (var rawLine in File.ReadAllLines(Path.Combine(root, "tools", "PaletteGe
                 ["mapColor"] = $"#{rgb[0]:X2}{rgb[1]:X2}{rgb[2]:X2}",
                 ["blocks"] = new JsonArray(),
             };
-            // Evidence from maps drawn by Bedrock: base colour x180 / x220 / x255 pixel counts.
-            if (f.Length > 5 && f[5].StartsWith("seen="))
+            // Optional fields:
+            //   seen=d,n,b  pixels of base x180 / x220 / x255 found on maps drawn by Bedrock (BMAP mapcheck)
+            //   gd=r,g,b    normal colour in gd-codes/mc-pixelart-maker (Bedrock, experimental, third-party)
+            // Priority of evidence: seen on Bedrock maps in 2+ shades > gd-codes (Bedrock) > Java value (estimate).
+            var notes = new List<string>();
+            string status = "estimated";
+            foreach (var extra in f.Skip(5))
             {
-                var n = f[5][5..].Split(',').Select(int.Parse).ToArray();
-                bool verified = n.Count(c => c >= 3) >= 2;
-                current["status"] = verified ? "verified" : "estimated";
-                current["statusNote"] = $"Seen on maps drawn by Bedrock 1.21.132-1.26.51: x180 {n[0]}, x220 {n[1]}, x255 {n[2]} pixels" +
-                    (verified ? "" : " (one shade only: not enough to verify)");
+                if (extra.StartsWith("gd="))
+                {
+                    var g = extra[3..].Split(',').Select(int.Parse).ToArray();
+                    int N(int c) => c * 220 / 255;
+                    if (N(rgb[0]) != g[0] || N(rgb[1]) != g[1] || N(rgb[2]) != g[2])
+                    {
+                        notes.Add($"Java base #{rgb[0]:X2}{rgb[1]:X2}{rgb[2]:X2} (normal #{N(rgb[0]):X2}{N(rgb[1]):X2}{N(rgb[2]):X2}) replaced by gd-codes");
+                        rgb = g.Select(n => (byte)Inverse(n)).ToArray();
+                        current["mapColor"] = $"#{rgb[0]:X2}{rgb[1]:X2}{rgb[2]:X2}";
+                    }
+                    notes.Add($"gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #{g[0]:X2}{g[1]:X2}{g[2]:X2}");
+                    status = "thirdParty";
+                }
+                else if (extra.StartsWith("seen="))
+                {
+                    var n = extra[5..].Split(',').Select(int.Parse).ToArray();
+                    bool verified = n.Count(c => c >= 3) >= 2;
+                    if (verified) status = "verified";
+                    notes.Add($"Seen on maps drawn by Bedrock 1.21.132-1.26.51: x180 {n[0]}, x220 {n[1]}, x255 {n[2]} pixels" +
+                        (verified ? "" : " (one shade only: not enough to verify)"));
+                }
+            }
+            if (notes.Count > 0)
+            {
+                current["status"] = status;
+                current["statusNote"] = string.Join("; ", notes);
             }
             sets.Add(current);
             break;
@@ -181,4 +207,11 @@ static string FindRepoRoot()
     var dir = new DirectoryInfo(AppContext.BaseDirectory);
     while (dir != null && !File.Exists(Path.Combine(dir.FullName, "BMAP.sln"))) dir = dir.Parent;
     return dir?.FullName ?? throw new DirectoryNotFoundException("BMAP.sln not found");
+}
+
+/// <summary>Smallest base value whose normal shade (x 220 / 255, rounded down) is n.</summary>
+static int Inverse(int n)
+{
+    for (int b = 0; b <= 255; b++) if (b * 220 / 255 == n) return b;
+    throw new ArgumentException($"no base colour gives normal {n}");
 }

@@ -3,7 +3,7 @@
   "id": "bedrock-full-v2",
   "name": "Bedrock 全ブロック / All blocks（推定色・未検証 / estimated colours）",
   "gameVersion": "1.26",
-  "updated": "2026-10-17",
+  "updated": "2026-10-18",
   "notes": "色セットと地図の基本色は Minecraft の地図色（Java 版の値）を初期値にしています。陰影の倍率 180/220/255 と一部の色セットの基本色は、Bedrock が描いた地図から確認済み（status）。ブロックとの対応と陰影の段差は未検証。ブロック識別子と状態は Bedrock 1.26 の公式メタデータで検証済み。",
   "shades": {
     "dark": 180,
@@ -380,30 +380,6 @@
           "flammable": true,
           "biomeTinted": true,
           "defaultEnabled": false
-        },
-        {
-          "key": "spruce_leaves",
-          "displayName": "トウヒの葉",
-          "displayNameEn": "Spruce Leaves",
-          "name": "minecraft:spruce_leaves",
-          "states": {
-            "persistent_bit": true,
-            "update_bit": false
-          },
-          "version": 18168865,
-          "flammable": true
-        },
-        {
-          "key": "birch_leaves",
-          "displayName": "シラカバの葉",
-          "displayNameEn": "Birch Leaves",
-          "name": "minecraft:birch_leaves",
-          "states": {
-            "persistent_bit": true,
-            "update_bit": false
-          },
-          "version": 18168865,
-          "flammable": true
         },
         {
           "key": "jungle_leaves",
@@ -1920,7 +1896,7 @@
       "id": 23,
       "nameEn": "Purple",
       "name": "紫色",
-      "mapColor": "#7F3FB2",
+      "mapColor": "#995ACC",
       "blocks": [
         {
           "key": "purple_wool",
@@ -1996,7 +1972,9 @@
           "version": 18168865,
           "rarity": 1
         }
-      ]
+      ],
+      "status": "thirdParty",
+      "statusNote": "Java base #7F3FB2 (normal #6D3699) replaced by gd-codes; gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #844DB0"
     },
     {
       "id": 24,
@@ -2556,38 +2534,6 @@
           },
           "version": 18168865,
           "needsSupport": true
-        },
-        {
-          "key": "sculk",
-          "displayName": "スカルク",
-          "displayNameEn": "Sculk",
-          "name": "minecraft:sculk",
-          "states": {},
-          "version": 18168865,
-          "rarity": 2
-        },
-        {
-          "key": "sculk_catalyst",
-          "displayName": "スカルクカタリスト",
-          "displayNameEn": "Sculk Catalyst",
-          "name": "minecraft:sculk_catalyst",
-          "states": {
-            "bloom": false
-          },
-          "version": 18168865,
-          "rarity": 3
-        },
-        {
-          "key": "sculk_shrieker",
-          "displayName": "スカルクシュリーカー",
-          "displayNameEn": "Sculk Shrieker",
-          "name": "minecraft:sculk_shrieker",
-          "states": {
-            "active": false,
-            "can_summon": false
-          },
-          "version": 18168865,
-          "rarity": 3
         }
       ]
     },
@@ -2702,7 +2648,7 @@
       "id": 31,
       "nameEn": "Lapis",
       "name": "ラピスラズリ",
-      "mapColor": "#4A80FF",
+      "mapColor": "#4B80FF",
       "blocks": [
         {
           "key": "lapis_block",
@@ -2713,7 +2659,9 @@
           "version": 18168865,
           "rarity": 2
         }
-      ]
+      ],
+      "status": "thirdParty",
+      "statusNote": "Java base #4A80FF (normal #3F6EDC) replaced by gd-codes; gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #406EDC"
     },
     {
       "id": 32,
@@ -2838,7 +2786,7 @@
       "id": 34,
       "nameEn": "Nether",
       "name": "ネザー",
-      "mapColor": "#700200",
+      "mapColor": "#700000",
       "blocks": [
         {
           "key": "netherrack",
@@ -2897,7 +2845,9 @@
           "needsSupport": true,
           "rarity": 1
         }
-      ]
+      ],
+      "status": "thirdParty",
+      "statusNote": "Java base #700200 (normal #600100) replaced by gd-codes; gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #600000"
     },
     {
       "id": 35,
@@ -3341,7 +3291,7 @@
       "id": 51,
       "nameEn": "Crimson Nylium",
       "name": "真紅のナイリウム",
-      "mapColor": "#BD3031",
+      "mapColor": "#BD3131",
       "blocks": [
         {
           "key": "crimson_nylium",
@@ -3352,7 +3302,9 @@
           "version": 18168865,
           "rarity": 1
         }
-      ]
+      ],
+      "status": "thirdParty",
+      "statusNote": "Java base #BD3031 (normal #A3292A) replaced by gd-codes; gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #A32A2A"
     },
     {
       "id": 52,
@@ -3703,6 +3655,652 @@
           "rarity": 2
         }
       ]
+    },
+    {
+      "id": 61,
+      "nameEn": "Birch Leaves",
+      "name": "シラカバの葉",
+      "mapColor": "#455A2E",
+      "blocks": [
+        {
+          "key": "birch_leaves",
+          "displayName": "シラカバの葉",
+          "displayNameEn": "Birch Leaves",
+          "name": "minecraft:birch_leaves",
+          "states": {
+            "persistent_bit": true,
+            "update_bit": false
+          },
+          "version": 18168865,
+          "flammable": true
+        }
+      ],
+      "status": "thirdParty",
+      "statusNote": "gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #3B4D27"
+    },
+    {
+      "id": 62,
+      "nameEn": "Spruce Leaves",
+      "name": "トウヒの葉",
+      "mapColor": "#355335",
+      "blocks": [
+        {
+          "key": "spruce_leaves",
+          "displayName": "トウヒの葉",
+          "displayNameEn": "Spruce Leaves",
+          "name": "minecraft:spruce_leaves",
+          "states": {
+            "persistent_bit": true,
+            "update_bit": false
+          },
+          "version": 18168865,
+          "flammable": true
+        }
+      ],
+      "status": "thirdParty",
+      "statusNote": "gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #2D472D"
+    },
+    {
+      "id": 63,
+      "nameEn": "Sculk",
+      "name": "スカルク",
+      "mapColor": "#0D1217",
+      "blocks": [
+        {
+          "key": "sculk",
+          "displayName": "スカルク",
+          "displayNameEn": "Sculk",
+          "name": "minecraft:sculk",
+          "states": {},
+          "version": 18168865,
+          "rarity": 2
+        },
+        {
+          "key": "sculk_catalyst",
+          "displayName": "スカルクカタリスト",
+          "displayNameEn": "Sculk Catalyst",
+          "name": "minecraft:sculk_catalyst",
+          "states": {
+            "bloom": false
+          },
+          "version": 18168865,
+          "rarity": 3
+        },
+        {
+          "key": "sculk_shrieker",
+          "displayName": "スカルクシュリーカー",
+          "displayNameEn": "Sculk Shrieker",
+          "name": "minecraft:sculk_shrieker",
+          "states": {
+            "active": false,
+            "can_summon": false
+          },
+          "version": 18168865,
+          "rarity": 3
+        }
+      ],
+      "status": "thirdParty",
+      "statusNote": "gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #0B0F13"
+    },
+    {
+      "id": 64,
+      "nameEn": "White Wool Slab",
+      "name": "白の羊毛のハーフブロック",
+      "mapColor": "#EDEDED",
+      "blocks": [
+        {
+          "key": "white_wool_slab",
+          "displayName": "白の羊毛のハーフブロック",
+          "displayNameEn": "White Wool Slab",
+          "name": "minecraft:white_wool_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true,
+          "defaultEnabled": false
+        },
+        {
+          "key": "white_wool_double_slab",
+          "displayName": "白の羊毛の二段ハーフブロック",
+          "displayNameEn": "White Wool Double Slab",
+          "name": "minecraft:white_wool_double_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "flammable": true,
+          "defaultEnabled": false
+        }
+      ],
+      "status": "thirdParty",
+      "statusNote": "gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #CCCCCC"
+    },
+    {
+      "id": 65,
+      "nameEn": "Light Gray Wool Slab",
+      "name": "薄灰色の羊毛のハーフブロック",
+      "mapColor": "#A3A39C",
+      "blocks": [
+        {
+          "key": "light_gray_wool_slab",
+          "displayName": "薄灰色の羊毛のハーフブロック",
+          "displayNameEn": "Light Gray Wool Slab",
+          "name": "minecraft:light_gray_wool_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true,
+          "defaultEnabled": false
+        },
+        {
+          "key": "light_gray_wool_double_slab",
+          "displayName": "薄灰色の羊毛の二段ハーフブロック",
+          "displayNameEn": "Light Gray Wool Double Slab",
+          "name": "minecraft:light_gray_wool_double_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "flammable": true,
+          "defaultEnabled": false
+        }
+      ],
+      "status": "thirdParty",
+      "statusNote": "gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #8C8C86"
+    },
+    {
+      "id": 66,
+      "nameEn": "Gray Wool Slab",
+      "name": "灰色の羊毛のハーフブロック",
+      "mapColor": "#4D5959",
+      "blocks": [
+        {
+          "key": "gray_wool_slab",
+          "displayName": "灰色の羊毛のハーフブロック",
+          "displayNameEn": "Gray Wool Slab",
+          "name": "minecraft:gray_wool_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true,
+          "defaultEnabled": false
+        },
+        {
+          "key": "gray_wool_double_slab",
+          "displayName": "灰色の羊毛の二段ハーフブロック",
+          "displayNameEn": "Gray Wool Double Slab",
+          "name": "minecraft:gray_wool_double_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "flammable": true,
+          "defaultEnabled": false
+        }
+      ],
+      "status": "thirdParty",
+      "statusNote": "gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #424C4C"
+    },
+    {
+      "id": 67,
+      "nameEn": "Black Wool Slab",
+      "name": "黒の羊毛のハーフブロック",
+      "mapColor": "#212126",
+      "blocks": [
+        {
+          "key": "black_wool_slab",
+          "displayName": "黒の羊毛のハーフブロック",
+          "displayNameEn": "Black Wool Slab",
+          "name": "minecraft:black_wool_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true,
+          "defaultEnabled": false
+        },
+        {
+          "key": "black_wool_double_slab",
+          "displayName": "黒の羊毛の二段ハーフブロック",
+          "displayNameEn": "Black Wool Double Slab",
+          "name": "minecraft:black_wool_double_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "flammable": true,
+          "defaultEnabled": false
+        }
+      ],
+      "status": "thirdParty",
+      "statusNote": "gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #1C1C20"
+    },
+    {
+      "id": 68,
+      "nameEn": "Brown Wool Slab",
+      "name": "茶色の羊毛のハーフブロック",
+      "mapColor": "#8C5B38",
+      "blocks": [
+        {
+          "key": "brown_wool_slab",
+          "displayName": "茶色の羊毛のハーフブロック",
+          "displayNameEn": "Brown Wool Slab",
+          "name": "minecraft:brown_wool_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true,
+          "defaultEnabled": false
+        },
+        {
+          "key": "brown_wool_double_slab",
+          "displayName": "茶色の羊毛の二段ハーフブロック",
+          "displayNameEn": "Brown Wool Double Slab",
+          "name": "minecraft:brown_wool_double_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "flammable": true,
+          "defaultEnabled": false
+        }
+      ],
+      "status": "thirdParty",
+      "statusNote": "gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #784E30"
+    },
+    {
+      "id": 69,
+      "nameEn": "Red Wool Slab",
+      "name": "赤の羊毛のハーフブロック",
+      "mapColor": "#A52D28",
+      "blocks": [
+        {
+          "key": "red_wool_slab",
+          "displayName": "赤の羊毛のハーフブロック",
+          "displayNameEn": "Red Wool Slab",
+          "name": "minecraft:red_wool_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true,
+          "defaultEnabled": false
+        },
+        {
+          "key": "red_wool_double_slab",
+          "displayName": "赤の羊毛の二段ハーフブロック",
+          "displayNameEn": "Red Wool Double Slab",
+          "name": "minecraft:red_wool_double_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "flammable": true,
+          "defaultEnabled": false
+        }
+      ],
+      "status": "thirdParty",
+      "statusNote": "gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #8E2622"
+    },
+    {
+      "id": 70,
+      "nameEn": "Orange Wool Slab",
+      "name": "橙の羊毛のハーフブロック",
+      "mapColor": "#F98721",
+      "blocks": [
+        {
+          "key": "orange_wool_slab",
+          "displayName": "橙の羊毛のハーフブロック",
+          "displayNameEn": "Orange Wool Slab",
+          "name": "minecraft:orange_wool_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true,
+          "defaultEnabled": false
+        },
+        {
+          "key": "orange_wool_double_slab",
+          "displayName": "橙の羊毛の二段ハーフブロック",
+          "displayNameEn": "Orange Wool Double Slab",
+          "name": "minecraft:orange_wool_double_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "flammable": true,
+          "defaultEnabled": false
+        }
+      ],
+      "status": "thirdParty",
+      "statusNote": "gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #D6741C"
+    },
+    {
+      "id": 71,
+      "nameEn": "Yellow Wool Slab",
+      "name": "黄の羊毛のハーフブロック",
+      "mapColor": "#FFDA41",
+      "blocks": [
+        {
+          "key": "yellow_wool_slab",
+          "displayName": "黄の羊毛のハーフブロック",
+          "displayNameEn": "Yellow Wool Slab",
+          "name": "minecraft:yellow_wool_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true,
+          "defaultEnabled": false
+        },
+        {
+          "key": "yellow_wool_double_slab",
+          "displayName": "黄の羊毛の二段ハーフブロック",
+          "displayNameEn": "Yellow Wool Double Slab",
+          "name": "minecraft:yellow_wool_double_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "flammable": true,
+          "defaultEnabled": false
+        }
+      ],
+      "status": "thirdParty",
+      "statusNote": "gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #DCBC38"
+    },
+    {
+      "id": 72,
+      "nameEn": "Lime Wool Slab",
+      "name": "黄緑の羊毛のハーフブロック",
+      "mapColor": "#87CA23",
+      "blocks": [
+        {
+          "key": "lime_wool_slab",
+          "displayName": "黄緑の羊毛のハーフブロック",
+          "displayNameEn": "Lime Wool Slab",
+          "name": "minecraft:lime_wool_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true,
+          "defaultEnabled": false
+        },
+        {
+          "key": "lime_wool_double_slab",
+          "displayName": "黄緑の羊毛の二段ハーフブロック",
+          "displayNameEn": "Lime Wool Double Slab",
+          "name": "minecraft:lime_wool_double_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "flammable": true,
+          "defaultEnabled": false
+        }
+      ],
+      "status": "thirdParty",
+      "statusNote": "gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #74AE1E"
+    },
+    {
+      "id": 73,
+      "nameEn": "Green Wool Slab",
+      "name": "緑の羊毛のハーフブロック",
+      "mapColor": "#66821A",
+      "blocks": [
+        {
+          "key": "green_wool_slab",
+          "displayName": "緑の羊毛のハーフブロック",
+          "displayNameEn": "Green Wool Slab",
+          "name": "minecraft:green_wool_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true,
+          "defaultEnabled": false
+        },
+        {
+          "key": "green_wool_double_slab",
+          "displayName": "緑の羊毛の二段ハーフブロック",
+          "displayNameEn": "Green Wool Double Slab",
+          "name": "minecraft:green_wool_double_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "flammable": true,
+          "defaultEnabled": false
+        }
+      ],
+      "status": "thirdParty",
+      "statusNote": "gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #587016"
+    },
+    {
+      "id": 74,
+      "nameEn": "Cyan Wool Slab",
+      "name": "青緑の羊毛のハーフブロック",
+      "mapColor": "#1AA0A0",
+      "blocks": [
+        {
+          "key": "cyan_wool_slab",
+          "displayName": "青緑の羊毛のハーフブロック",
+          "displayNameEn": "Cyan Wool Slab",
+          "name": "minecraft:cyan_wool_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true,
+          "defaultEnabled": false
+        },
+        {
+          "key": "cyan_wool_double_slab",
+          "displayName": "青緑の羊毛の二段ハーフブロック",
+          "displayNameEn": "Cyan Wool Double Slab",
+          "name": "minecraft:cyan_wool_double_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "flammable": true,
+          "defaultEnabled": false
+        }
+      ],
+      "status": "thirdParty",
+      "statusNote": "gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #168A8A"
+    },
+    {
+      "id": 75,
+      "nameEn": "Light Blue Wool Slab",
+      "name": "空色の羊毛のハーフブロック",
+      "mapColor": "#41B8DD",
+      "blocks": [
+        {
+          "key": "light_blue_wool_slab",
+          "displayName": "空色の羊毛のハーフブロック",
+          "displayNameEn": "Light Blue Wool Slab",
+          "name": "minecraft:light_blue_wool_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true,
+          "defaultEnabled": false
+        },
+        {
+          "key": "light_blue_wool_double_slab",
+          "displayName": "空色の羊毛の二段ハーフブロック",
+          "displayNameEn": "Light Blue Wool Double Slab",
+          "name": "minecraft:light_blue_wool_double_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "flammable": true,
+          "defaultEnabled": false
+        }
+      ],
+      "status": "thirdParty",
+      "statusNote": "gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #389EBE"
+    },
+    {
+      "id": 76,
+      "nameEn": "Blue Wool Slab",
+      "name": "青の羊毛のハーフブロック",
+      "mapColor": "#333F95",
+      "blocks": [
+        {
+          "key": "blue_wool_slab",
+          "displayName": "青の羊毛のハーフブロック",
+          "displayNameEn": "Blue Wool Slab",
+          "name": "minecraft:blue_wool_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true,
+          "defaultEnabled": false
+        },
+        {
+          "key": "blue_wool_double_slab",
+          "displayName": "青の羊毛の二段ハーフブロック",
+          "displayNameEn": "Blue Wool Double Slab",
+          "name": "minecraft:blue_wool_double_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "flammable": true,
+          "defaultEnabled": false
+        }
+      ],
+      "status": "thirdParty",
+      "statusNote": "gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #2C3680"
+    },
+    {
+      "id": 77,
+      "nameEn": "Purple Wool Slab",
+      "name": "紫の羊毛のハーフブロック",
+      "mapColor": "#9038BA",
+      "blocks": [
+        {
+          "key": "purple_wool_slab",
+          "displayName": "紫の羊毛のハーフブロック",
+          "displayNameEn": "Purple Wool Slab",
+          "name": "minecraft:purple_wool_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true,
+          "defaultEnabled": false
+        },
+        {
+          "key": "purple_wool_double_slab",
+          "displayName": "紫の羊毛の二段ハーフブロック",
+          "displayNameEn": "Purple Wool Double Slab",
+          "name": "minecraft:purple_wool_double_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "flammable": true,
+          "defaultEnabled": false
+        }
+      ],
+      "status": "thirdParty",
+      "statusNote": "gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #7C30A0"
+    },
+    {
+      "id": 78,
+      "nameEn": "Magenta Wool Slab",
+      "name": "赤紫の羊毛のハーフブロック",
+      "mapColor": "#CA54C1",
+      "blocks": [
+        {
+          "key": "magenta_wool_slab",
+          "displayName": "赤紫の羊毛のハーフブロック",
+          "displayNameEn": "Magenta Wool Slab",
+          "name": "minecraft:magenta_wool_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true,
+          "defaultEnabled": false
+        },
+        {
+          "key": "magenta_wool_double_slab",
+          "displayName": "赤紫の羊毛の二段ハーフブロック",
+          "displayNameEn": "Magenta Wool Double Slab",
+          "name": "minecraft:magenta_wool_double_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "flammable": true,
+          "defaultEnabled": false
+        }
+      ],
+      "status": "thirdParty",
+      "statusNote": "gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #AE48A6"
+    },
+    {
+      "id": 79,
+      "nameEn": "Pink Wool Slab",
+      "name": "桃色の羊毛のハーフブロック",
+      "mapColor": "#F491AE",
+      "blocks": [
+        {
+          "key": "pink_wool_slab",
+          "displayName": "桃色の羊毛のハーフブロック",
+          "displayNameEn": "Pink Wool Slab",
+          "name": "minecraft:pink_wool_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "needsSupport": true,
+          "flammable": true,
+          "defaultEnabled": false
+        },
+        {
+          "key": "pink_wool_double_slab",
+          "displayName": "桃色の羊毛の二段ハーフブロック",
+          "displayNameEn": "Pink Wool Double Slab",
+          "name": "minecraft:pink_wool_double_slab",
+          "states": {
+            "minecraft:vertical_half": "bottom"
+          },
+          "version": 18168865,
+          "flammable": true,
+          "defaultEnabled": false
+        }
+      ],
+      "status": "thirdParty",
+      "statusNote": "gd-codes/mc-pixelart-maker (MIT, Bedrock, determined experimentally) normal #D27D96"
     }
   ]
 }

@@ -48,6 +48,12 @@ public sealed class CalibrationResult
     /// <summary>Largest deviation of the east/west-only and flat controls from the normal colour.</summary>
     public double ControlDeviation { get; init; }
 
+    /// <summary>Candidate shading models scored against the measurements (best first).</summary>
+    public List<ModelScore> Models { get; init; } = [];
+    public ModelScore? BestModel { get; init; }
+    /// <summary>Brightness of ±1 / ±2 steps on even and odd pixels.</summary>
+    public List<ParityMeasurement> Parity { get; init; } = [];
+
     // Colour pad
     public List<MeasuredColour> Colours { get; init; } = [];
 
@@ -58,16 +64,24 @@ public sealed class CalibrationResult
     {
         if (Pad.Kind != PadKind.Shading || BrightStep is null || DarkStep is null || NormalFactor <= 0) return null;
         int normal = (int)Math.Round(NormalFactor * 255);
+        var best = BestModel?.Model;
+        // Light and dark steps are kept separately; they are not merged into one threshold.
         return new ShadeMultipliers
         {
             Normal = normal,
             Bright = (int)Math.Round(normal * BrightRatio),
             Dark = (int)Math.Round(normal * DarkRatio),
             MinStep = Math.Max(BrightStep.Value, DarkStep.Value),
+            BrightStep = BrightStep.Value,
+            DarkStep = DarkStep.Value,
+            Model = best?.Kind ?? ShadingModelKind.Threshold,
+            Rounding = best?.Rounding ?? ShadeRounding.FromBase,
+            ModelId = best?.Id ?? "",
             Verified = true,
             Status = ColorStatus.Verified,
             StepStatus = ColorStatus.Verified,
-            StatusNote = $"Bedrock {gameVersion}, shading pad, map {Map.Id}, {DateTime.Now:yyyy-MM-dd}" + (Graded ? " (graded shading seen)" : ""),
+            StatusNote = $"Bedrock {gameVersion}, shading pad, map {Map.Id}, {DateTime.Now:yyyy-MM-dd}, best model {best?.Id ?? "?"}"
+                + (BestModel is { } s ? $" (validation {s.ValidationAccuracy:P1}, exact {s.ExactRate:P1})" : "") + (Graded ? ", graded shading seen" : ""),
         };
     }
 
@@ -233,6 +247,18 @@ public static class Calibrator
                 : T($"{c} も通常のブロックと同じ規則でした。", $"{c} follows the same rule as full blocks."));
         }
 
+        // Candidate models (Java, step 2, gd-codes rounding, checkerboard, graded, and the fitted thresholds).
+        var eval = ModelEvaluation.Evaluate(measured, profile);
+        if (eval.Best is { } bestScore)
+            notes.Add(T($"最も一致したモデル: {bestScore.Model.Name}（検証データの分類一致 {bestScore.ValidationAccuracy:P1}・RGB 完全一致 {bestScore.ExactRate:P1}）",
+                $"Best matching model: {bestScore.Model.Id} (validation class accuracy {bestScore.ValidationAccuracy:P1}, exact RGB {bestScore.ExactRate:P1})"));
+        foreach (var p in eval.Parity.Where(p => !double.IsNaN(p.EvenRatio) && !double.IsNaN(p.OddRatio) && Math.Abs(p.EvenRatio - p.OddRatio) > Tolerance))
+            notes.Add(T($"段差 {p.Delta:+0;-0} で偶数・奇数の座標の明るさが違います（{p.EvenRatio:0.000} / {p.OddRatio:0.000}）: 座標の偶奇による補正があります。",
+                $"Step {p.Delta:+0;-0} differs between even and odd pixels ({p.EvenRatio:0.000} / {p.OddRatio:0.000}): a parity correction exists."));
+        if (brightStep is int bsA && darkStep is int dsA && bsA != dsA)
+            notes.Add(T($"明と暗で必要な段差が違います（明 +{bsA}・暗 −{dsA}）。別々の値として保存します。",
+                $"Light and dark need different steps (+{bsA} / −{dsA}); stored separately."));
+
         return new CalibrationResult
         {
             Pad = r.Pad, Map = r.Map, GameVersion = r.GameVersion, Measured = r.Measured, Predicted = r.Predicted,
@@ -240,6 +266,8 @@ public static class Calibrator
             MeanDeltaE = r.MeanDeltaE, MaxDeltaE = r.MaxDeltaE, Exact = r.Exact, Notes = notes,
             Steps = steps, BrightStep = brightStep, DarkStep = darkStep, Graded = graded, BrightRatio = brightRatio,
             DarkRatio = darkRatio, NormalFactor = normalFactor, ControlDeviation = control,
+            Models = eval.Scores.OrderByDescending(s => s.ValidationAccuracy).ThenByDescending(s => s.ExactRate).ToList(),
+            BestModel = eval.Best, Parity = eval.Parity,
         };
     }
 
@@ -277,6 +305,16 @@ public static class Calibrator
         sb.AppendLine(T($"測定点 {r.Covered}/{r.SampleCount}、予測と完全一致 {r.Exact}、色差 ΔE2000 平均 {r.MeanDeltaE:0.00}・最大 {r.MaxDeltaE:0.00}",
             $"Samples {r.Covered}/{r.SampleCount}, exactly as predicted {r.Exact}, ΔE2000 mean {r.MeanDeltaE:0.00}, max {r.MaxDeltaE:0.00}"));
         foreach (var n in r.Notes) sb.AppendLine("• " + n);
+        if (r.Models.Count > 0)
+        {
+            sb.AppendLine(T("モデルの比較（分類一致: 全体 / 検証、RGB 完全一致、平均誤差、最大誤差）:",
+                "Models (class accuracy: all / validation, exact RGB, mean error, max error):"));
+            foreach (var s in r.Models)
+                sb.AppendLine($"  {s.Model.Id,-16} {s.ClassAccuracy,7:P1} / {s.ValidationAccuracy,7:P1}  {s.ExactRate,7:P1}  {s.MeanAbsError,6:0.00}  {s.MaxError,4}");
+        }
+        if (r.Parity.Count > 0)
+            sb.AppendLine(T("偶奇別の明るさ（偶数 / 奇数）: ", "Brightness on even / odd pixels: ") +
+                string.Join("  ", r.Parity.Select(p => $"{p.Delta:+0;-0}: {p.EvenRatio:0.000}/{p.OddRatio:0.000}")));
         if (r.Steps.Count > 0)
         {
             sb.AppendLine(T("段差ごとの明るさ（通常 = 1.000）:", "Brightness per step (normal = 1.000):"));
@@ -330,6 +368,41 @@ public static class Calibrator
                 else unexplained[c] = unexplained.GetValueOrDefault(c) + 1;
             }
         return (drawn, per, unexplained.Select(kv => (kv.Key, kv.Value)).OrderByDescending(t => t.Value).ToList());
+    }
+
+    /// <summary>
+    /// Which rounding explains the light and dark pixels of drawn maps: Java's base × m / 255 or gd-codes' rounding from
+    /// the normal colour. Normal pixels are the same in both and are not counted. Pixels explained by exactly one model
+    /// decide between them.
+    /// </summary>
+    public static (int Shaded, int Both, int OnlyFromBase, int OnlyFromNormal, int Neither) RoundingCheck(
+        IEnumerable<RgbaImage> maps, IEnumerable<Rgba> baseColours, ShadeMultipliers m)
+    {
+        var fromBase = new HashSet<Rgba>();
+        var fromNormal = new HashSet<Rgba>();
+        var normal = new HashSet<Rgba>();
+        foreach (var b in baseColours.Distinct())
+        {
+            normal.Add(ShadingModel.Shaded(b, Shade.Normal, m, ShadeRounding.FromBase));
+            foreach (var s in new[] { Shade.Dark, Shade.Bright })
+            {
+                fromBase.Add(ShadingModel.Shaded(b, s, m, ShadeRounding.FromBase));
+                fromNormal.Add(ShadingModel.Shaded(b, s, m, ShadeRounding.FromNormal));
+            }
+        }
+        int shaded = 0, both = 0, onlyBase = 0, onlyNormal = 0, neither = 0;
+        foreach (var img in maps)
+            for (int i = 0; i < img.Width * img.Height; i++)
+            {
+                if (img.Pixels[i * 4 + 3] == 0) continue;
+                var c = new Rgba(img.Pixels[i * 4], img.Pixels[i * 4 + 1], img.Pixels[i * 4 + 2]);
+                bool a = fromBase.Contains(c), n = fromNormal.Contains(c);
+                if (normal.Contains(c) && !a && !n) continue; // a normal pixel
+                if (!a && !n) { if (!normal.Contains(c)) neither++; continue; }
+                shaded++;
+                if (a && n) both++; else if (a) onlyBase++; else onlyNormal++;
+            }
+        return (shaded, both, onlyBase, onlyNormal, neither);
     }
 
     // ---------------------------------------------------------------- helpers

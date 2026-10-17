@@ -37,6 +37,8 @@ public sealed class BmapProject
     public double DitherStrength { get; set; } = 1.0;
     /// <summary>Maximum staircase height (0 = unlimited).</summary>
     public int MaxHeight { get; set; }
+    /// <summary>Shading model chosen by the user ("" = the colour profile's own rule).</summary>
+    public string ShadingModelId { get; set; } = "";
     public double ShadePenalty { get; set; }
     public bool Serpentine { get; set; } = true;
     /// <summary>Dither in linear light (default since v0.4.0).</summary>

@@ -148,9 +148,27 @@ public sealed class ShadeMultipliers
     public int MinStep { get; init; } = 1;
     public ColorStatus Status { get; init; } = ColorStatus.Estimated;
     public string StatusNote { get; init; } = "";
-    /// <summary>Provenance of <see cref="MinStep"/> (separate from the multipliers, which are easier to confirm).</summary>
+    /// <summary>Provenance of the steps (separate from the multipliers, which are easier to confirm).</summary>
     public ColorStatus StepStatus { get; init; } = ColorStatus.Estimated;
-    [JsonIgnore] public int Step => Math.Max(1, MinStep);
+    /// <summary>Height difference needed for the light shade (null = <see cref="MinStep"/>). Measured separately from the dark one.</summary>
+    public int? BrightStep { get; init; }
+    /// <summary>Height difference needed for the dark shade (null = <see cref="MinStep"/>).</summary>
+    public int? DarkStep { get; init; }
+    /// <summary>Which shading model the game follows (see BMAP.Shading.ShadingModel).</summary>
+    public BMAP.Shading.ShadingModelKind Model { get; init; } = BMAP.Shading.ShadingModelKind.Threshold;
+    public BMAP.Shading.ShadeRounding Rounding { get; init; } = BMAP.Shading.ShadeRounding.FromBase;
+    /// <summary>Id of the candidate model the values came from (calibration), if any.</summary>
+    public string ModelId { get; init; } = "";
+
+    [JsonIgnore] public int UpThreshold => Math.Max(1, BrightStep ?? MinStep);
+    [JsonIgnore] public int DownThreshold => Math.Max(1, DarkStep ?? MinStep);
+    /// <summary>Steps used when building staircases: the checkerboard model needs 2 to be reliable on every pixel.</summary>
+    [JsonIgnore] public int BuildUp => Model == BMAP.Shading.ShadingModelKind.Checker ? Math.Max(2, UpThreshold) : UpThreshold;
+    [JsonIgnore] public int BuildDown => Model == BMAP.Shading.ShadingModelKind.Checker ? Math.Max(2, DownThreshold) : DownThreshold;
+    /// <summary>The larger build step (height limits count in units of it).</summary>
+    [JsonIgnore] public int Step => Math.Max(BuildUp, BuildDown);
+    [JsonIgnore] public BMAP.Shading.ShadingModel ShadingModel =>
+        new(ModelId.Length > 0 ? ModelId : "profile", "profile", Model, UpThreshold, DownThreshold, Rounding, StatusNote);
 
     public int Get(Shade s) => s switch { Shade.Dark => Dark, Shade.Bright => Bright, _ => Normal };
 }
@@ -196,11 +214,7 @@ public sealed class ColorProfile
         return Shaded(block.BaseColor, shade);
     }
 
-    public Rgba Shaded(Rgba c, Shade shade)
-    {
-        int m = Shades.Get(shade);
-        return new Rgba((byte)(c.R * m / 255), (byte)(c.G * m / 255), (byte)(c.B * m / 255));
-    }
+    public Rgba Shaded(Rgba c, Shade shade) => BMAP.Shading.ShadingModel.Shaded(c, shade, Shades, Shades.Rounding);
 
     public static ColorProfile LoadJson(string json)
     {
@@ -266,6 +280,27 @@ public sealed class ColorProfile
             Updated = DateTime.Now.ToString("yyyy-MM-dd"), Notes = Notes, Shades = shades ?? Shades, ColourSets = sets,
         };
         copy.Link();
+        return copy;
+    }
+
+    /// <summary>
+    /// Returns a copy that follows another shading model (chosen by the user, e.g. "step 2" before it is measured).
+    /// The multipliers are kept; the steps are marked with the model's source, not as verified.
+    /// </summary>
+    public ColorProfile WithShadingModel(BMAP.Shading.ShadingModel model)
+    {
+        var s = Shades;
+        var shades = new ShadeMultipliers
+        {
+            Dark = s.Dark, Normal = s.Normal, Bright = s.Bright, Verified = s.Verified, Status = s.Status,
+            MinStep = Math.Max(model.BrightStep, model.DarkStep), BrightStep = model.BrightStep, DarkStep = model.DarkStep,
+            Model = model.Kind, Rounding = model.Rounding, ModelId = model.Id,
+            StepStatus = ColorStatus.ThirdParty, StatusNote = s.StatusNote + $" | steps from model {model.Id} ({model.Source})",
+        };
+        var copy = new ColorProfile
+        {
+            Id = Id, Name = Name, GameVersion = GameVersion, Updated = Updated, Notes = Notes, Shades = shades, ColourSets = ColourSets,
+        };
         return copy;
     }
 
