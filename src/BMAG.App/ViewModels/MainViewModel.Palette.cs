@@ -44,6 +44,8 @@ public sealed partial class MainViewModel
     public RelayCommand ImportBpFolderCommand { get; private set; } = null!;
     public RelayCommand ImportBpFileCommand { get; private set; } = null!;
 
+    public bool TexturesMissing => !Textures.IsAvailable;
+
     public string TextureStatus => Textures.IsAvailable
         ? L["TexturesReady"] + (Textures.ResourcePack != null ? $" ({Path.GetFileName(Textures.ResourcePack)})" : "")
         : L["NoTextures"];
@@ -76,7 +78,7 @@ public sealed partial class MainViewModel
         foreach (var p in Calibrator.LoadUserProfiles()) Profiles.Add(p);
         var first = Profiles.FirstOrDefault(p => p.Id == ColorProfile.DefaultId) ?? Profiles.First();
         SelectProfile(first, null);
-        Textures.Changed += () => Avalonia.Threading.Dispatcher.UIThread.Post(() => { Raise(nameof(TextureStatus)); LoadIcons(); RefreshPreview(); });
+        Textures.Changed += () => Avalonia.Threading.Dispatcher.UIThread.Post(() => { Raise(nameof(TextureStatus)); Raise(nameof(TexturesMissing)); LoadIcons(); RefreshPreview(); });
     }
 
     /// <summary>Switches the colour profile and rebuilds the rows, keeping the selection where possible.</summary>

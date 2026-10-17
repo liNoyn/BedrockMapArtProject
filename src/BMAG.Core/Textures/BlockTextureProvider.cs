@@ -29,6 +29,12 @@ public sealed class BlockTextureProvider
     {
         CacheDirectory = cacheDirectory ?? Environment.GetEnvironmentVariable("BMAG_TEXTURE_CACHE") ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BMAG", "textures", "vanilla");
+        // Textures copied next to the executable at build time (see BMAG.App.csproj) are used when present.
+        if (cacheDirectory is null)
+        {
+            var bundled = Path.Combine(AppContext.BaseDirectory, "textures", "vanilla");
+            if (File.Exists(Path.Combine(bundled, "blocks.json"))) BundledDirectory = bundled;
+        }
         LoadIndex();
     }
 
@@ -37,6 +43,8 @@ public sealed class BlockTextureProvider
     /// <summary>Extra resource pack (folder) searched before the cache.</summary>
     public string? ResourcePack { get; private set; }
     public bool IsAvailable => _blocks != null && _terrain != null;
+    /// <summary>Textures shipped next to BMAG.exe (fetched by the build), or null.</summary>
+    public string? BundledDirectory { get; }
 
     public event Action? Changed;
 
@@ -62,6 +70,7 @@ public sealed class BlockTextureProvider
     private IEnumerable<string> Roots()
     {
         if (ResourcePack != null) yield return ResourcePack;
+        if (BundledDirectory != null) yield return BundledDirectory;
         yield return CacheDirectory;
     }
 
