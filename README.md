@@ -1,164 +1,180 @@
-# Bedrock Map Art Generator (BMAG)
+# Bedrock Map Art Project (BMAP)
 
-> **🚧 開発中のプロジェクトです。** 機能は一通り動きますが、ゲーム内での動作確認はまだ済んでいません
-> （下の「検証状況」を参照）。リリース版はまだありません。ソースからビルドしてお使いください。
+**English** | [日本語](README_JP.md)
 
-画像から Minecraft 統合版（Bedrock Edition）のマップアートを作る Windows 用デスクトップアプリです。
-[MapartCraft](https://github.com/rebane2001/mapartcraft)（Java 版向け Web アプリ）の機能と画面構成を統合版向けに作り直したもので、
-画像をブロックの地図色に減色し、**`.mcstructure` ファイル**（構造ブロックで読み込める 64×64 分割、またはマップ単位・全体 1 ファイル）と
-建築ガイド（テクスチャ付き配置図・行ごとの手順・素材 CSV・配置座標）を出力します。
+> **🚧 Work in progress.** Everything works, but nothing has been verified in the game yet
+> (see "Verification status" below). There is no release yet; build from source.
 
-画面は MapartCraft と同じ 3 列構成です: 左に **ブロック選択**、中央に **マッププレビュー**（地図色・元画像・差分・陰影解析・
-建築ビュー 2D / 3D・高さマップ）、右に **マップ設定**・出力ボタン・**陰影・建築チェック**・**材料**。日本語と英語に対応しています（右上で切り替え）。
+A Windows desktop app that turns images into map art for **Minecraft Bedrock Edition**.
+It rebuilds the features and the screen layout of [MapartCraft](https://github.com/rebane2001/mapartcraft) (a web app for
+Java Edition) for Bedrock: the image is reduced to block map colours and exported as **`.mcstructure` files** (64 × 64
+pieces for structure blocks, one per map, or one file) with a build guide (textured placement plans, row-by-row steps,
+material CSV and world coordinates).
 
-技術: C# / .NET 8 / Avalonia 11（GUI）、SkiaSharp（画像処理）。Little-Endian NBT と `.mcstructure`、3D ビューのソフトウェアレンダラーは
-外部ライブラリを使わずに自前で実装しています。
+The window has MapartCraft's three columns: **block selection** on the left, the **map preview** in the middle (map
+colours, original, difference, shading analysis, 2D / 3D build views, height map) and **map settings**, export buttons,
+the **shading & build check** and the **materials** on the right. The UI is in English and Japanese (switch at the top right).
 
-## 主な機能
+Built with C# / .NET 8 / Avalonia 11 and SkiaSharp. Little-endian NBT, `.mcstructure`, all dithering and the 3D software
+renderer are implemented in the project without further libraries.
 
-**ブロック選択（MapartCraft と同じ方式）**
-- Minecraft の地図色ごとに 60 の色セット、合計 323 ブロック（MapartCraft の全ブロックに対応する統合版ブロック）。
-  使いたいブロックをクリックで **いくつでも** 選べます。行の左には暗・通常・明の 3 段階の地図色と選択数が出ます。
-- 同じ色のブロックを複数選ぶと、その色のピクセルを均等に分担します（地図上の見た目は同じで素材を分散できます）。
-  分け方は「まとまりで」（マップごと・行ごとに連続した範囲。建築しやすい）か「ばらばら」を選べます。
-- ブロックの識別子と状態は Mojang 公式のブロックメタデータ（Bedrock 1.26）で検証し、全状態を出力します。
-- プリセット: 各色 1 ブロック / サバイバル向け / サバイバル向け・全部 / 支え不要 / すべてのブロック / カーペット /
-  コンクリート / 羊毛 / グレースケール / なし、ユーザー定義プリセットの保存（以前の形式のプリセットも読み込めます）。
-- カスタムブロック: 手入力、またはビヘイビアパック（フォルダ / `.mcpack` / `.mcaddon`）の `minecraft:map_color` から読み込み。
-- **ブロックのアイコン**: Minecraft のテクスチャで表示します。初回のビルド時に Mojang 公式の
-  [bedrock-samples](https://github.com/Mojang/bedrock-samples) から必要なテクスチャを `.textures/` に取得し、
-  `BMAG.exe` と同じフォルダの `textures/` に入れるので、起動した時点からアイコンが出ます
-  （Minecraft EULA が適用されます。テクスチャは本リポジトリには含めていません）。
-  オフラインでビルドした場合は、アプリ内の「Minecraft のテクスチャを取得」ボタンから取得できます。
-  手持ちのリソースパックのフォルダを指定することもできます。
+> Renamed in v0.4.0 from **Bedrock Map Art Generator (BMAG)** to **Bedrock Map Art Project (BMAP)**. Settings, presets and
+> custom blocks in `%APPDATA%\BMAG` are copied to `%APPDATA%\BMAP` on first start, and `*.bmag.json` projects still open.
 
-**変換・建築**
-- 画像: PNG / JPEG / WebP / BMP / GIF / TIFF。アニメーション GIF・WebP と複数ページ TIFF はフレームを選択可能。
-  動画（mp4 など）は ffmpeg があれば指定した秒数のフレームを取り込みます。
-- 切り抜き（なし / 中央 / 手動）、Fit / Fill / Stretch、Lanczos / バイリニア / 最近傍、明るさ・コントラスト・彩度・ガンマ・シャープ。
-- 透明部分: 背景色となめらかに合成 / ディザ合成 / 透明を保持（ブロックなし）。
-- 色差: Oklab（既定）/ CIELAB ΔE76 / CIEDE2000 / 重み付き RGB / RGB。
-- リサイズはリニア光で行い（ガンマ補正）、細かい明暗の模様でも明るさが変わりません。
-- 誤差拡散は蛇行走査（すじ状の模様を抑える）、ディザの強さを調整可能。
-- ディザリング: Floyd–Steinberg、Jarvis–Judice–Ninke（MinAvgErr）、Burkes、Sierra Lite、Stucki、Atkinson、
-  Bayer 2×2 / 4×4 / 8×8、Ordered 3×3。
-- 3D（階段）: なし（平面）/ Classic / Valley / 全面暗 / 全面明。
-- **陰影規則の解析**（詳しくは [docs/shading-rules.md](docs/shading-rules.md)）
-  - 地図シミュレーター: ブロックの配置だけから地図を描き直し、計画した色と 1 ピクセルずつ照合します（全方式で一致をテスト）。
-  - 陰影・建築チェック: 予定と違うピクセル、北隣が空で地形しだいのピクセル、落下・破損するブロック、
-    暗・通常・明の数、最も高い列、段差と落差の数を表示します。陰影解析ビューで場所も確認できます。
-  - 陰影テストパッド: 段差の大きさ・階段・ジグザグ・東西の高さ違いを並べた地図 1 枚分の構造物と、BMAG の予測地図を出力します。
-    ゲームで地図を作って見比べれば、統合版の陰影規則をワールドデータを読まずに確認できます。
-- **3D マップアートの高さ最適化**
-  - 「最大の高さ」（Valley 階段）を決めると、その高さの中で一番きれいになる陰影を計算します（ディザなし・規則ディザでは
-    列ごとの動的計画法による最適解、誤差拡散では各ピクセルで高さを超えないように選択）。
-  - 「この画像に最適な高さを分析」: 平面・各高さ・無制限で変換し、見た目の色差（少しぼかして比べた色の違い）と
-    建築の高さを一覧にして、効果がほぼ頭打ちになる高さをおすすめします。例: ある写真では無制限 83 ブロックに対し
-    高さ 17 ブロックで改善の 93% を得られました。
-  - 「背景色を平面で出せる色にする」: 真っ白などは「明」の陰影でしか出せず背景全体が階段になります。
-    平面で出せる近い色にすると、同じ画像でおすすめの高さが 17 → 4 ブロックに下がりました（色差はほぼ同じ）。
-  - 「高さを抑える」: 色の差が小さいときは段差を作らず平らにします。
-  - 平らな部分で全列が同じ行で下がって暗い横線になるのを防ぐため、下がる位置を列ごとに分散させます。
-  - 置く高さの診断: 必要な高さ、置ける Y の範囲（建築上限 Y 319 / 下限 Y -64）、推奨 Y、
-    地形の映り込み・支え行・雲などの注意点を表示し、設定した Y が範囲外なら警告します。
-  - 高さマップ表示（青 = 低い → 赤 = 高い、等高線付き）。
-- 手修正: 建築ビュー 2D でブロックを 1 ピクセルずつ塗れます（元に戻す・自動に戻す、プロジェクトに保存）。
-- Bedrock 固有: 草ブロックとオーク・ジャングル・アカシア・ダークオークの葉はバイオームで地図色が変わるため、既定では使いません。
-- 支えブロック: なし / 必要なブロックの下だけ / すべて（サバイバル向け・最適化）/ すべて（二重）。
-- ブロック種類の上限、支えブロックの種類、地図の範囲に合わせたワールド座標。
+## Features
 
-**プレビュー・ガイド**
-- ブロック地図色（予測）/ 元画像（ドラッグで切り抜き）/ 差分 / 陰影解析 / 建築ビュー 2D（テクスチャ・高さ・チャンク境界・マウスで
-  ブロックと座標を表示）/ 高さマップ。
-- **建築ビュー 3D**: マウスで自由に回転・移動・ズーム、遠近法。テクスチャ / 地図に写る色 / 陰影 / 高さ の色分け、
-  アンビエントオクルージョンと太陽の影、チャンク・地図の境界線、表示する高さの上限（1 段ずつ建てる用）、
-  最も高い列への移動、マウスを重ねたブロックの強調と座標・陰影の表示。
-- 素材リスト: マップ別、スタック数、代替ブロック、**所持数と不足数**、CSV 保存。
-- 建築の進捗: マップごとの状態（未着手 / 作業中 / 完了 / スキップ / 要修正）と、2D ビューのクリックでチャンク単位の完了記録。
-  プロジェクトファイルに保存されます。
-- 出力: `.mcstructure`（64×64 / マップ単位 / 全体）と zip、`配置方法.txt`（各ファイルの座標と `/structure load` コマンド）、
-  `placement.csv`、配置図 PNG（色・テクスチャ）、行ごとの手順、`placements.csv`、`materials.csv`。ビヘイビアパックは任意。
+**Block selection (as in MapartCraft)**
+- 60 colour sets (one per map colour) with 323 blocks: the Bedrock equivalents of every MapartCraft block. Pick
+  **any number** of blocks per colour; each row shows the dark / normal / light map colour and how many are selected.
+- Several blocks of one colour share its pixels equally (same map, materials spread out), either in stretches (easy to
+  build) or scattered.
+- Block identifiers and states are validated against Mojang's block metadata (Bedrock 1.26); all states are written.
+- Presets (one per colour, survival, survival – all, no support needed, all blocks, carpets, concrete, wool, greyscale,
+  none) and your own presets.
+- Custom blocks: by hand or from a behavior pack's `minecraft:map_color` (folder, `.mcpack`, `.mcaddon`).
+- **Block icons** from the Minecraft textures. The first build downloads them from Mojang's official
+  [bedrock-samples](https://github.com/Mojang/bedrock-samples) into `.textures/` and copies them next to `BMAP.exe`, so icons
+  are there from the first start (Minecraft EULA applies; the textures are not part of this repository). Offline builds
+  can fetch them from the app; a resource pack folder can be used too.
 
-## ビルドと起動
+**Conversion**
+- Images: PNG, JPEG, WebP, BMP, GIF, TIFF; frames of animated GIF / WebP and multi-page TIFF; video frames with ffmpeg.
+- Crop (off / centre / manual, also by dragging), fit / fill / stretch, Lanczos / bilinear / nearest, brightness,
+  contrast, saturation, gamma, sharpen. Transparency: blend, dither, or keep (no block).
+- Colour distance: Oklab (default), CIELAB ΔE76, CIEDE2000, weighted RGB, RGB. Resizing in linear light.
+- **Dithering**
+  - Error diffusion: Floyd–Steinberg, Jarvis–Judice–Ninke, Burkes, Sierra Lite, Stucki, Atkinson. The error is diffused
+    **in linear light** (default), so dithered areas keep their brightness when seen from a distance; serpentine scan and
+    adjustable strength.
+  - **Knoll pattern dithering** (Thomas Knoll's method used in Photoshop) with a Bayer 8 × 8 or blue-noise matrix: every
+    colour is approximated by a mix of map colours, laid out as a regular pattern. 35–41 % lower colour error than Bayer.
+  - Ordered: blue noise 64 × 64 (generated with void-and-cluster), Bayer 2 × 2 / 4 × 4 / 8 × 8, ordered 3 × 3.
+  - All methods are compared in [docs/benchmarks.md](docs/benchmarks.md).
 
-```bash
-dotnet build BMAG.sln
-```
+**3D map art (staircasing) and the shading rule**
+- 3D: off (flat), Classic, Valley, full dark, full light.
+- **Shading rule analysis** (details in [docs/shading-rules.md](docs/shading-rules.md), Japanese)
+  - Map simulator: redraws the map from the block positions alone and compares it pixel by pixel with the planned
+    colours (tested to match in every staircase, support and dithering mode).
+  - Shading & build check: pixels that differ from the plan, pixels whose shade depends on the terrain (empty column to
+    the north), blocks that would fall or break, dark / normal / light counts, the tallest column, steps and drops; the
+    shading analysis view shows where they are.
+  - Shading test pad: a one-map structure with steps of different sizes, stairs, zigzags and east/west height differences,
+    plus the predicted map. Build it, make a map and compare to check Bedrock's rule without reading any world data.
+- **Height optimisation**
+  - With a maximum height (Valley), the best shading within that height is computed (per-column dynamic programming,
+    optimal without dithering, with ordered or Knoll dithering; a per-pixel limit with error diffusion).
+  - "Find the best height for this image" converts flat, with each limit and unlimited, measures the difference seen from a
+    distance (linear-light blur + CIEDE2000) and recommends where the curve flattens. Example: a photo needing 37 blocks
+    unlimited got 83 % of the improvement at 7 blocks.
+  - "Use a background colour that stays flat" (pure white only exists in the light shade), "keep it low", scattered drop
+    rows so flat areas get no dark lines, placement check (Y −64 … 319, recommended Y), height map.
+- Support blocks: none / under blocks that need it / all (survival, optimised) / all (double); verified never to show on the map.
+- Manual pixel painting in the 2D build view (undo, back to automatic, saved in the project).
+- Bedrock specifics: grass and some leaves change map colour with the biome and are off by default.
 
-初回のビルドはテクスチャの取得のため 1 分ほどかかります（インターネット接続が必要。取得しない場合は `-p:BundleTextures=false`）。
+**Previews and guides**
+- Predicted map colours, original, difference, shading analysis, 2D build view (textures, heights, chunk borders,
+  coordinates), height map.
+- **3D build view**: free orbit / pan / zoom, perspective (perspective-correct textures); texture / map colour / shade /
+  height colouring; ambient occlusion and sun shadows; chunk and map lines; a height slice for building layer by layer;
+  jump to the tallest column; hover highlight with coordinates and shade. 8 × 8 maps (5.4 M faces) are ready in about a second.
+- Material list per map with stacks, alternatives, **owned and missing** counts and CSV export; build progress per map and chunk.
+- Output: `.mcstructure` (64 × 64 / per map / whole) and a zip, placement instructions with `/structure load` commands,
+  `placement.csv`, placement images, row-by-row steps, `materials.csv`, map preview PNG; behavior pack optional.
+
+## Build and run
 
 ```bash
-dotnet run --project src/BMAG.App
+dotnet build BMAP.sln
+```
+
+The first build downloads the textures (about a minute, needs internet; skip with `-p:BundleTextures=false`).
+
+```bash
+dotnet run --project src/BMAP.App
 ```
 
 ```bash
-dotnet test tests/BMAG.Tests
+dotnet test tests/BMAP.Tests
 ```
 
-配布用 zip（.NET 不要の単一 exe。テクスチャは含めず、初回起動時に取得を案内します）:
+Release zip (single exe, no .NET needed; textures are offered on first start):
 
 ```bash
 powershell -ExecutionPolicy Bypass -File tools/publish.ps1
 ```
 
-## .mcstructure の読み込み方
+Command line (`BMAP.Cli`): `build` (export), `analyze` (height analysis), `bench` (compare dithering and metrics),
+`render` (3D view to PNG with timings per stage), `textures`. Run without arguments for usage.
 
-1. 出力フォルダの `mcstructure` にファイルがあります（`配置方法.txt` に各ファイルの座標とコマンド）。
-2. ゲームで `/give @s structure_block` → 構造ブロックを置き「読み込み」モード → 「インポート」でファイルを選択。
-3. オフセットを合わせて読み込むか、インポート後に `配置方法.txt` の `/structure load` コマンドを実行します。
+## Loading .mcstructure files
 
-## 構成
+1. The files are in the `mcstructure` folder of the output (the placement text lists coordinates and commands).
+2. In game: `/give @s structure_block`, place it, set it to Load, and Import the file.
+3. Load it with the right offset, or run the `/structure load` command from the placement text after importing.
 
-| プロジェクト | 内容 |
+## Layout
+
+| Path | Contents |
 |---|---|
-| `src/BMAG.Core` | UI に依存しない処理一式（下表） |
-| `src/BMAG.App` | Avalonia GUI（日本語 / 英語） |
-| `src/BMAG.Cli` | コマンドライン（`build` / `analyze`（高さ分析）/ `render`（3D ビューを PNG に）/ `textures`。引数なしで使い方を表示） |
-| `tools/publish.ps1` | 配布用 zip の作成 |
-| `tools/make-icon.ps1` | アプリアイコンの生成 |
-| `tests/BMAG.Tests` | xUnit テスト |
-| `tools/PaletteGen` | `tools/PaletteGen/blocks.txt` から `palettes/bedrock-full-v2.json` を生成（Mojang のメタデータで検証） |
-| `palettes/` | 色プロファイル（JSON、Core に埋め込み） |
+| `src/BMAP.Core` | Everything independent of the UI (see below) |
+| `src/BMAP.App` | Avalonia GUI (English / Japanese) |
+| `src/BMAP.Cli` | Command line |
+| `tests/BMAP.Tests` | xUnit tests |
+| `tools/PaletteGen` | Builds `palettes/bedrock-full-v2.json` from `blocks.txt` (validated against Mojang's metadata) |
+| `tools/publish.ps1`, `tools/make-icon.ps1` | Release zip, app icon |
+| `docs/` | [Shading rules](docs/shading-rules.md), [benchmarks](docs/benchmarks.md) |
 
-| 設計書 | 実装 |
+| Feature | Code (`src/BMAP.Core`) |
 |---|---|
-| ImageCore | `Imaging/`（デコード、TIFF・フレーム・動画、切り抜き、リサイズ、補正、分割） |
-| ColorEngine | `ColorEngine/ColorMath.cs` |
-| BlockPaletteEngine | `Palette/`（色セット、カスタムブロック）, `BlockEngine/PaletteSelection.cs`（選択・プリセット） |
-| ColorQuantizer | `BlockEngine/ColorQuantizer.cs` |
-| BlockLayoutGenerator | `BlockEngine/BlockLayout.cs`（階段方式・支えブロック） |
-| BuildGuideGenerator | `BlockEngine/BuildGuideGenerator.cs`, `Materials.cs` |
-| PreviewCore | `Preview/LayoutRenderer.cs`（2D）, `Preview/Viewer3D.cs`（3D） |
-| 陰影規則・地図シミュレーター | `Shading/`（`MapShading.cs`, `ShadingTestPad.cs`） |
-| StructureExporter | `Export/` |
-| テクスチャ | `Textures/`（ダウンロード・リソースパック・TGA） |
-| ProjectCore | `Project/BmagProject.cs`（`*.bmag.json`） |
+| Image processing | `Imaging/` |
+| Colour spaces and distances | `ColorEngine/ColorMath.cs` |
+| Blocks and colour sets | `Palette/`, `BlockEngine/PaletteSelection.cs` |
+| Quantizing and dithering | `BlockEngine/ColorQuantizer.cs` (`.Knoll.cs`), `BlueNoise.cs` |
+| Staircases and supports | `BlockEngine/BlockLayout.cs`, `ColumnIndex.cs` |
+| Height analysis and placement | `BlockEngine/HeightAdvisor.cs` |
+| Shading rule and map simulator | `Shading/` |
+| 2D / 3D previews | `Preview/LayoutRenderer.cs`, `Preview/Viewer3D.cs` |
+| Export, guides, materials | `Export/`, `BlockEngine/BuildGuideGenerator.cs`, `Materials.cs` |
+| Textures | `Textures/` |
+| Projects | `Project/BmapProject.cs` (`*.bmap.json`) |
 
-## 検証状況（重要）
+## Verification status
 
-開発環境から実際のゲームは操作できないため、次の点はまだ **ゲーム内で確認していません**。
+The game cannot be driven from the development environment, so these points are **not verified in game yet**:
 
-| 項目 | 状況 |
+| Item | Status |
 |---|---|
-| ブロックの地図色 | Minecraft の地図の基本色（Java 版の値）を **推定値** として使用（全ブロック未検証） |
-| 陰影の規則と倍率（180/220/255） | Java 版の規則を仮定。陰影テストパッドで実機と見比べて確認できます |
-| ブロック識別子・状態 | Mojang 公式メタデータ（1.26.50）で全 323 ブロックを検証済み。構造物としての読み込みは未確認 |
+| Block map colours | Minecraft's map base colours (Java values) used as **estimates**; no block verified |
+| Shading rule and multipliers (180 / 220 / 255) | Java's rule assumed; check with the shading test pad |
+| Block identifiers and states | All 323 validated against Mojang's metadata (1.26.50); loading as structures not checked |
 
-問題があればログ（`%LOCALAPPDATA%\BMAG\logs`）をご確認ください。
+Logs are in `%LOCALAPPDATA%\BMAP\logs`.
 
-## 既知の制限
+## Known limitations
 
-- APNG は最初のフレームのみ。動画の読み込みには ffmpeg（PATH 上か BMAG と同じフォルダ）が必要です。
-- 水（深さで陰影が変わる）は MapartCraft と同じく対象外です。
-- 地図データの直接生成（ワールドへの書き込み）は、調整が難しいため v0.3.0 で削除しました。
-- バイオームで色が変わるブロック（草・一部の葉）の色はバイオームを指定できません。
-- 構造ブロックでインポートした構造物の名前（mystructure:…）はゲームのバージョンによって異なる可能性があります。
+- APNG: first frame only. Video needs ffmpeg (on PATH or next to BMAP).
+- Water (shade by depth) is not supported, as in MapartCraft.
+- Writing map data directly into worlds was removed in v0.3.0 (too hard to get right).
+- Biome-tinted blocks (grass, some leaves) cannot be given a biome.
+- The name of imported structures (`mystructure:…`) may differ between game versions.
 
-## ライセンス・謝辞
+## Projects and references
+
+- [MapartCraft](https://github.com/rebane2001/mapartcraft) (rebane2001, GPL-3.0): colour set grouping, screen layout and
+  many features. No MapartCraft code or images are included.
+- [Cartographer](https://github.com/julienvincent/cartographer): a map art converter with several staircasing algorithms.
+- Pekka Väänänen, [Revisiting Yliluoma's ordered dither algorithm](https://30fps.net/pages/revisiting-yliluoma-2/):
+  Knoll's pattern dithering, and why to dither in linear light.
+- R. Ulichney, "The void-and-cluster method for dither array generation" (1993): blue noise.
+- B. Ottosson, [Oklab](https://bottosson.github.io/posts/oklab/) (2020); G. Sharma et al., "The CIEDE2000 color-difference
+  formula" (2005).
+- S. Abasi et al., "Distance metrics for very large color differences" (2020, HyAB): tried, measured worse for this use, not adopted.
+
+## License
 
 [MIT License](LICENSE)
 
-- ブロックの色セットの分け方と機能の多くは [MapartCraft](https://github.com/rebane2001/mapartcraft)（GPL-3.0）を参考にしています。
-  MapartCraft のコードや画像は含んでいません（独自に実装しています）。
-- Minecraft は Mojang Studios / Microsoft の商標です。本プロジェクトは Mojang Studios / Microsoft とは関係ありません。
-  ブロックのテクスチャは利用者の PC にダウンロードされるもので、本プロジェクトには含まれません。
+Minecraft is a trademark of Mojang Studios / Microsoft. This project is not affiliated with Mojang Studios or Microsoft.
+Block textures are downloaded to the user's PC and are not part of this project.

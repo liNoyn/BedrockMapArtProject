@@ -1,0 +1,248 @@
+using System.Text;
+using BMAP.Imaging;
+
+Console.OutputEncoding = Encoding.UTF8;
+
+if (args.Length == 0)
+{
+    Console.WriteLine("""
+        BMAP CLI
+          build <image> <outDir> [--maps 2x2] [--dither none|fs|jjn|burkes|sierra|stucki|atkinson|bayer2|bayer4|ordered3]
+                [--staircase flat|classic|valley|dark|bright] [--support none|important|all|double] [--preset 0-7]
+                [--origin mapX,mapZ,y] [--name n]
+                                         ブロック建築データ（.mcstructure とガイド）を出力
+          analyze <image> [--maps 1x1] [--dither none|fs|bayer4] [--preset n] [--bg #RRGGBB]
+                                         3D マップアートの高さと画質の関係を解析
+          bench <image>... [--maps 1x1]  ディザリング・色差の方式を比較（画質と速度）
+          render <image> <out.png> [--maps 1x1] [--mode texture|map|shade|height] [--yaw 35] [--pitch 40] [--zoom 0]
+                [--size 1200x800] [--textures dir] [--grid] [--nolight]
+                                         3D ビューを PNG に描画（各段階の処理時間を表示）
+          textures [cacheDir]            ブロックテクスチャを取得
+        """);
+    return 0;
+}
+
+try
+{
+    switch (args[0])
+    {
+        case "build":
+        {
+            // build <image> <outDir> [--maps 2x2] [--dither <mode>] [--staircase flat|classic|valley|dark|bright]
+            //       [--support none|important|all|double] [--preset <index>] [--origin mapX,mapZ,y] [--name n]
+            var opts = ParseOptions(args.Skip(3));
+            var (mx, my) = ParseGrid(opts.GetValueOrDefault("maps", "1x1"));
+            var settings = new ImageSettings { MapsX = mx, MapsY = my };
+            var img = ImagePipeline.Process(ImageCodec.Load(args[1]), settings);
+            var profile = BMAP.Palette.ColorProfile.LoadBuiltIn();
+            var qopt = new BMAP.BlockEngine.QuantizeOptions
+            {
+                Dither = opts.GetValueOrDefault("dither", "none") switch
+                {
+                    "fs" => BMAP.BlockEngine.DitherMode.FloydSteinberg,
+                    "jjn" => BMAP.BlockEngine.DitherMode.JarvisJudiceNinke,
+                    "burkes" => BMAP.BlockEngine.DitherMode.Burkes,
+                    "sierra" => BMAP.BlockEngine.DitherMode.SierraLite,
+                    "stucki" => BMAP.BlockEngine.DitherMode.Stucki,
+                    "atkinson" => BMAP.BlockEngine.DitherMode.Atkinson,
+                    "bayer2" => BMAP.BlockEngine.DitherMode.Bayer2,
+                    "bayer4" => BMAP.BlockEngine.DitherMode.Bayer4,
+                    "ordered3" => BMAP.BlockEngine.DitherMode.Ordered3,
+                    _ => BMAP.BlockEngine.DitherMode.None,
+                },
+                Mode = opts.GetValueOrDefault("staircase", "flat") switch
+                {
+                    "classic" => BMAP.BlockEngine.StaircaseMode.Classic,
+                    "valley" or "true" => BMAP.BlockEngine.StaircaseMode.Valley,
+                    "dark" => BMAP.BlockEngine.StaircaseMode.FullDark,
+                    "bright" => BMAP.BlockEngine.StaircaseMode.FullBright,
+                    _ => BMAP.BlockEngine.StaircaseMode.Flat,
+                },
+            };
+            var support = opts.GetValueOrDefault("support", "important") switch
+            {
+                "none" => BMAP.BlockEngine.SupportMode.None,
+                "all" => BMAP.BlockEngine.SupportMode.AllOptimized,
+                "double" => BMAP.BlockEngine.SupportMode.AllDouble,
+                _ => BMAP.BlockEngine.SupportMode.Important,
+            };
+            var presets = BMAP.BlockEngine.BlockPreset.BuiltIns(profile);
+            var preset = presets[int.Parse(opts.GetValueOrDefault("preset", "0"))];
+            var q = BMAP.BlockEngine.ColorQuantizer.Quantize(img, profile, preset.ToSelection(), qopt);
+            var layout = BMAP.BlockEngine.BlockLayout.Generate(q, profile.Find("cobblestone")!, 380, support);
+            var materials = BMAP.BlockEngine.MaterialCalculator.Calculate(layout, mx);
+            BMAP.BlockEngine.WorldOrigin? origin = null;
+            if (opts.TryGetValue("origin", out var o))
+            {
+                var p = o.Split(',').Select(int.Parse).ToArray();
+                origin = BMAP.BlockEngine.WorldOrigin.AlignedToMap(p[0], p[1], p[2]);
+            }
+            string name = opts.GetValueOrDefault("name", Path.GetFileNameWithoutExtension(args[1]));
+            BMAP.BlockEngine.BuildGuideGenerator.WriteAll(Path.Combine(args[2], "guide"), layout, q, profile, materials, mx, my, origin, name);
+            var result = BMAP.Export.StructureExporter.Export(args[2], name, layout, mx, new BMAP.Export.StructureExportOptions(), origin);
+            Console.WriteLine($"blocks={materials.Sum(m => m.Count)} types={q.EntryIndex.Distinct().Count()} maxHeight={layout.MaxHeight} structures={result.Tiles.Count} pack={result.McpackPath}");
+            break;
+        }
+
+        case "analyze":
+        {
+            // analyze <image> [--maps 1x1] [--dither none|fs|bayer4] [--preset 0-7]: quality vs height for 3D map art.
+            var opts = ParseOptions(args.Skip(2));
+            var (mx, my) = ParseGrid(opts.GetValueOrDefault("maps", "1x1"));
+            var img = ImagePipeline.Process(ImageCodec.Load(args[1]), new ImageSettings { MapsX = mx, MapsY = my, BackgroundColor = opts.GetValueOrDefault("bg", "#FFFFFF") });
+            var profile = BMAP.Palette.ColorProfile.LoadBuiltIn();
+            var preset = BMAP.BlockEngine.BlockPreset.BuiltIns(profile)[int.Parse(opts.GetValueOrDefault("preset", "0"))];
+            var dither = opts.GetValueOrDefault("dither", "none") switch
+            {
+                "fs" => BMAP.BlockEngine.DitherMode.FloydSteinberg,
+                "bayer4" => BMAP.BlockEngine.DitherMode.Bayer4,
+                _ => BMAP.BlockEngine.DitherMode.None,
+            };
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var rows = BMAP.BlockEngine.HeightAdvisor.Analyze(img, profile, preset.ToSelection(),
+                new BMAP.BlockEngine.QuantizeOptions { Mode = BMAP.BlockEngine.StaircaseMode.Valley, Dither = dither },
+                profile.Find("cobblestone")!, BMAP.BlockEngine.SupportMode.None);
+            Console.WriteLine("mode      limit  maxH  build  ΔE     quality  blocks");
+            foreach (var r in rows)
+                Console.WriteLine($"{r.Mode,-9} {(r.Mode == BMAP.BlockEngine.StaircaseMode.Flat ? "-" : r.Limit == 0 ? "∞" : r.Limit.ToString()),5} {r.MaxHeight,5} {r.BuildHeight,6} {r.MeanDeltaE,6:0.00} {r.Quality,7:0}% {r.Blocks,7}{(r.Recommended ? "  <= recommended" : "")}");
+            Console.WriteLine($"({sw.ElapsedMilliseconds} ms)");
+            break;
+        }
+
+        case "render":
+        {
+            // render <image> <out.png> [--staircase valley] [--mode texture|map|shade|height] [--yaw 35] [--pitch 40] [--zoom 0]
+            //        [--size 1200x800] [--textures dir] [--focus x,z]: renders the 3D build view to a PNG (for docs and checks).
+            var opts = ParseOptions(args.Skip(3));
+            var (rmx, rmy) = ParseGrid(opts.GetValueOrDefault("maps", "1x1"));
+            var stage = System.Diagnostics.Stopwatch.StartNew();
+            void Lap(string what) { Console.WriteLine($"  {what,-12} {stage.ElapsedMilliseconds,6} ms"); stage.Restart(); }
+            var img = ImagePipeline.Process(ImageCodec.Load(args[1]), new ImageSettings { MapsX = rmx, MapsY = rmy });
+            Lap("image");
+            var profile = BMAP.Palette.ColorProfile.LoadBuiltIn();
+            var mode = opts.GetValueOrDefault("staircase", "valley") == "flat" ? BMAP.BlockEngine.StaircaseMode.Flat : BMAP.BlockEngine.StaircaseMode.Valley;
+            var q = BMAP.BlockEngine.ColorQuantizer.Quantize(img, profile, BMAP.BlockEngine.BlockPreset.BuiltIns(profile)[0].ToSelection(),
+                new BMAP.BlockEngine.QuantizeOptions { Mode = mode, Dither = BMAP.BlockEngine.DitherMode.FloydSteinberg });
+            Lap("quantize");
+            var layout = BMAP.BlockEngine.BlockLayout.Generate(q, profile.Find("cobblestone")!, 0, BMAP.BlockEngine.SupportMode.AllOptimized);
+            Lap("layout");
+            var report = BMAP.Shading.ShadingAnalyzer.Analyze(layout, profile, q.Preview);
+            Lap("analysis");
+            var mesh = BMAP.Preview.SceneMesh.Build(layout, BMAP.Preview.LayoutRegion.All(layout), true, null, report);
+            Lap("mesh");
+            var (w, h) = ParseGrid(opts.GetValueOrDefault("size", "1200x800"));
+            var cam = mesh.FitCamera(w, h, double.Parse(opts.GetValueOrDefault("yaw", "35")), double.Parse(opts.GetValueOrDefault("pitch", "40")));
+            if (double.Parse(opts.GetValueOrDefault("zoom", "0")) is > 0 and var z) cam = cam with { Zoom = z };
+            var tex = opts.TryGetValue("textures", out var td) ? new BMAP.Textures.BlockTextureProvider(td) : null;
+            var vmode = opts.GetValueOrDefault("mode", "texture") switch
+            {
+                "map" => BMAP.Preview.ViewColorMode.MapColor, "shade" => BMAP.Preview.ViewColorMode.Shade,
+                "height" => BMAP.Preview.ViewColorMode.Height, _ => BMAP.Preview.ViewColorMode.Texture,
+            };
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var r = BMAP.Preview.Viewer3D.Render(mesh, profile, cam, w, h, tex is { IsAvailable: true } ? tex.GetIcon : null,
+                new BMAP.Preview.View3DOptions { Mode = vmode, Lighting = !opts.ContainsKey("nolight"), Grid = opts.ContainsKey("grid") });
+            Lap("render");
+            ImageCodec.SavePng(r.Image, args[2]);
+            Console.WriteLine($"faces={mesh.FaceCount} render={sw.ElapsedMilliseconds}ms maxY={report.MaxY} mismatches={report.Mismatches} exact={report.IsExact}");
+            break;
+        }
+
+        case "bench":
+        {
+            // bench <image>... [--maps 1x1]: compares dithering methods and colour metrics (quality and speed).
+            var images = args.Skip(1).Where(a => !a.StartsWith("--")).ToList();
+            var opts = ParseOptions(args.Skip(1));
+            var (mx, my) = ParseGrid(opts.GetValueOrDefault("maps", "1x1"));
+            var profile = BMAP.Palette.ColorProfile.LoadBuiltIn();
+            var sel = BMAP.BlockEngine.BlockPreset.BuiltIns(profile)[0].ToSelection();
+            var configs = new List<(string Name, BMAP.BlockEngine.QuantizeOptions O)>();
+            foreach (var st in new[] { BMAP.BlockEngine.StaircaseMode.Flat, BMAP.BlockEngine.StaircaseMode.Valley })
+            {
+                var b = new BMAP.BlockEngine.QuantizeOptions { Mode = st };
+                configs.Add(($"{st} none oklab", b with { Dither = BMAP.BlockEngine.DitherMode.None }));
+                configs.Add(($"{st} none de2000", b with { Dither = BMAP.BlockEngine.DitherMode.None, Metric = BMAP.ColorEngine.ColorMetric.Ciede2000 }));
+                foreach (var d in new[] { BMAP.BlockEngine.DitherMode.FloydSteinberg, BMAP.BlockEngine.DitherMode.JarvisJudiceNinke, BMAP.BlockEngine.DitherMode.SierraLite })
+                {
+                    configs.Add(($"{st} {d} srgb", b with { Dither = d, LinearDiffusion = false }));
+                    configs.Add(($"{st} {d} linear", b with { Dither = d }));
+                }
+                foreach (var d in new[] { BMAP.BlockEngine.DitherMode.Bayer4, BMAP.BlockEngine.DitherMode.Bayer8, BMAP.BlockEngine.DitherMode.BlueNoise })
+                    configs.Add(($"{st} {d}", b with { Dither = d }));
+                foreach (var d in new[] { BMAP.BlockEngine.DitherMode.KnollBayer, BMAP.BlockEngine.DitherMode.KnollBlueNoise })
+                {
+                    configs.Add(($"{st} {d} srgb", b with { Dither = d, LinearDiffusion = false }));
+                    configs.Add(($"{st} {d} linear", b with { Dither = d }));
+                }
+                if (st == BMAP.BlockEngine.StaircaseMode.Valley)
+                    foreach (var d in new[] { BMAP.BlockEngine.DitherMode.None, BMAP.BlockEngine.DitherMode.FloydSteinberg, BMAP.BlockEngine.DitherMode.Bayer8, BMAP.BlockEngine.DitherMode.KnollBayer })
+                        configs.Add(($"Valley<=4 {d}", b with { Dither = d, MaxHeight = 4 }));
+            }
+            var totals = configs.ToDictionary(c => c.Name, _ => (P: 0.0, D: 0.0, Ms: 0L));
+            foreach (var path in images)
+            {
+                var img = ImagePipeline.Process(ImageCodec.Load(path), new ImageSettings { MapsX = mx, MapsY = my });
+                foreach (var (name, o) in configs)
+                {
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    var q = BMAP.BlockEngine.ColorQuantizer.Quantize(img, profile, sel, o);
+                    long ms = sw.ElapsedMilliseconds;
+                    var t = totals[name];
+                    totals[name] = (t.P + BMAP.BlockEngine.HeightAdvisor.PerceivedDeltaE(img, q.Preview),
+                        t.D + BMAP.BlockEngine.HeightAdvisor.DistanceDeltaE2000(img, q.Preview), t.Ms + ms);
+                }
+                Console.Error.WriteLine("done " + Path.GetFileName(path));
+            }
+            Console.WriteLine($"{"config",-38} {"blurΔE76",9} {"linΔE2000",10} {"ms",7}   (means over {images.Count} images)");
+            foreach (var (name, _) in configs)
+            {
+                var t = totals[name];
+                Console.WriteLine($"{name,-38} {t.P / images.Count,9:0.000} {t.D / images.Count,10:0.000} {t.Ms / images.Count,7}");
+            }
+            break;
+        }
+
+        case "textures":
+        {
+            // textures [cacheDir]: downloads block textures from Mojang's bedrock-samples (Minecraft EULA applies).
+            Console.WriteLine("Downloading block textures from github.com/Mojang/bedrock-samples (© Mojang AB, Minecraft EULA applies).");
+            var provider = new BMAP.Textures.BlockTextureProvider(args.Length > 1 ? args[1] : null);
+            int n = await provider.DownloadAsync(BMAP.Palette.ColorProfile.LoadBuiltIn().Blocks, new Progress<string>(Console.WriteLine));
+            var missing = BMAP.Palette.ColorProfile.LoadBuiltIn().Blocks.Where(b => provider.GetIcon(b) is null).Select(b => b.Key).ToList();
+            Console.WriteLine($"textures={n} cache={provider.CacheDirectory} missing={missing.Count} {string.Join(",", missing)}");
+            if (missing.Count == 0) File.WriteAllText(Path.Combine(provider.CacheDirectory, ".complete"), DateTime.UtcNow.ToString("O"));
+            else return 3;
+            break;
+        }
+
+        default:
+            Console.Error.WriteLine($"不明なコマンド: {args[0]}");
+            return 1;
+    }
+    return 0;
+}
+catch (Exception ex)
+{
+    Console.Error.WriteLine("エラー: " + ex);
+    return 2;
+}
+
+static Dictionary<string, string> ParseOptions(IEnumerable<string> args)
+{
+    var dict = new Dictionary<string, string>();
+    var list = args.ToList();
+    for (int i = 0; i < list.Count; i++)
+    {
+        if (!list[i].StartsWith("--")) continue;
+        string key = list[i][2..];
+        bool hasValue = i + 1 < list.Count && !list[i + 1].StartsWith("--");
+        dict[key] = hasValue ? list[++i] : "true";
+    }
+    return dict;
+}
+
+static (int, int) ParseGrid(string s)
+{
+    var p = s.ToLowerInvariant().Split('x');
+    return (int.Parse(p[0]), int.Parse(p[1]));
+}

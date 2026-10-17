@@ -5,19 +5,19 @@
 param([string]$Runtime = 'win-x64')
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
-[xml]$proj = Get-Content (Join-Path $root 'src\BMAG.App\BMAG.App.csproj')
+[xml]$proj = Get-Content (Join-Path $root 'src\BMAP.App\BMAP.App.csproj')
 $version = ($proj.Project.PropertyGroup | Where-Object { $_.Version } | Select-Object -First 1).Version
-$out = Join-Path $root "artifacts\BMAG-$version-$Runtime"
+$out = Join-Path $root "artifacts\BMAP-$version-$Runtime"
 if (Test-Path $out) { Remove-Item -Recurse -Force $out }
-dotnet publish (Join-Path $root 'src\BMAG.App\BMAG.App.csproj') -c Release -r $Runtime --self-contained true `
+dotnet publish (Join-Path $root 'src\BMAP.App\BMAP.App.csproj') -c Release -r $Runtime --self-contained true `
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:BundleTextures=false -o $out
 if ($LASTEXITCODE -ne 0) { throw 'publish failed' }
-dotnet publish (Join-Path $root 'src\BMAG.Cli\BMAG.Cli.csproj') -c Release -r $Runtime --self-contained true `
+dotnet publish (Join-Path $root 'src\BMAP.Cli\BMAP.Cli.csproj') -c Release -r $Runtime --self-contained true `
   -p:PublishSingleFile=true -o (Join-Path $out 'cli')
 if ($LASTEXITCODE -ne 0) { throw 'cli publish failed' }
 Copy-Item (Join-Path $root 'README.md'), (Join-Path $root 'LICENSE') $out
 Get-ChildItem $out -Filter *.pdb -Recurse | Remove-Item
-Remove-Item (Join-Path $out 'BMAG.Cli.runtimeconfig.json') -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $out 'BMAP.Cli.runtimeconfig.json') -ErrorAction SilentlyContinue
 $zip = "$out.zip"
 if (Test-Path $zip) { Remove-Item $zip }
 Compress-Archive -Path (Join-Path $out '*') -DestinationPath $zip
