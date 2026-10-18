@@ -55,9 +55,15 @@ public static class VerificationKit
 {
     public const string Namespace = "bmap_kit";
 
-    public static string Create(string folder, ColorProfile profile, int baseY = -60, bool english = false)
+    /// <summary>All parts; <c>parts</c> picks some of them (a second session only needs what is still open).</summary>
+    public static readonly string[] AllParts = ["colour_pad", "flat", "classic", "valley_2x2", "large_4x4"];
+
+    public static string Create(string folder, ColorProfile profile, int baseY = -60, bool english = false,
+        IReadOnlyCollection<string>? parts = null, string name = "BMAP_verification_kit")
     {
-        string dir = Path.Combine(folder, "BMAP_verification_kit");
+        parts ??= ["colour_pad", "flat", "classic", "valley_2x2"];
+        foreach (var p in parts) if (!AllParts.Contains(p)) throw new ArgumentException($"unknown kit part {p}");
+        string dir = Path.Combine(folder, name);
         if (Directory.Exists(dir)) Directory.Delete(dir, true);
         Directory.CreateDirectory(dir);
         var support = profile.Find("cobblestone") ?? profile.Blocks.First();
@@ -66,6 +72,7 @@ public static class VerificationKit
         var pieces = new List<(KitItem Item, List<StructureTile> Tiles, WorldOrigin Origin)>();
 
         // 1. Colour pad: every block, three shades (map 0, 0).
+        if (parts.Contains("colour_pad"))
         {
             var pad = ShadingTestPad.CreateColourPad(profile, support, profile.Shades.Step, english);
             var origin = WorldOrigin.AlignedToMap(0, 0, baseY);
@@ -83,13 +90,14 @@ public static class VerificationKit
         // 2-4. Map art in each mode, from a generated test card (no third-party image).
         var recommended = presets[0].ToSelection();
         var oneEach = presets.Single(p => p.NameEn == "One block per colour").ToSelection();
-        (string Id, string Ja, string En, int MapX, int MapZ, int Maps, StaircaseMode Mode, int MaxHeight, PaletteSelection Sel)[] builds =
+        (string Id, string Ja, string En, int MapX, int MapZ, int Maps, StaircaseMode Mode, int MaxHeight, PaletteSelection Sel, StructureSplit Split)[] builds =
         [
-            ("flat", "平面（1 枚）", "Flat (1 map)", 1, 0, 1, StaircaseMode.Flat, 0, recommended),
-            ("classic", "Classic 階段（1 枚）", "Classic staircase (1 map)", 2, 0, 1, StaircaseMode.Classic, 0, recommended),
-            ("valley_2x2", "Valley 階段（2 x 2 枚・高さ上限 32・落下 / 支えの要るブロックあり）", "Valley staircase (2 x 2 maps, height limit 32, falling and support blocks)", 3, 0, 2, StaircaseMode.Valley, 32, oneEach),
+            ("flat", "平面（1 枚）", "Flat (1 map)", 1, 0, 1, StaircaseMode.Flat, 0, recommended, StructureSplit.PerMap),
+            ("classic", "Classic 階段（1 枚）", "Classic staircase (1 map)", 2, 0, 1, StaircaseMode.Classic, 0, recommended, StructureSplit.PerMap),
+            ("valley_2x2", "Valley 階段（2 x 2 枚・高さ上限 32・落下 / 支えの要るブロックあり）", "Valley staircase (2 x 2 maps, height limit 32, falling and support blocks)", 3, 0, 2, StaircaseMode.Valley, 32, oneEach, StructureSplit.PerMap),
+            ("large_4x4", "Valley 階段（4 x 4 枚・64 x 64 のピースに分割・高さ上限 16）", "Valley staircase (4 x 4 maps, 64 x 64 pieces, height limit 16)", 5, 0, 4, StaircaseMode.Valley, 16, recommended, StructureSplit.Tiles64),
         ];
-        foreach (var b in builds)
+        foreach (var b in builds.Where(b => parts.Contains(b.Id)))
         {
             var img = TestCard(b.Maps * 128, b.Maps * 128);
             var q = HeightPlanner.Quantize(img, profile, b.Sel, new QuantizeOptions { Mode = b.Mode, Dither = DitherMode.Optimized, MaxHeight = b.MaxHeight },
@@ -102,25 +110,25 @@ public static class VerificationKit
             ImageCodec.SavePng(MapSimulator.Simulate(layout, profile).Image, Path.Combine(sub, "predicted_map.png"));
             var materials = MaterialCalculator.Calculate(layout, b.Maps);
             BuildGuideGenerator.WriteAll(Path.Combine(sub, "guide"), layout, q, profile, materials, b.Maps, b.Maps, origin, b.Id, english);
-            StructureExporter.Export(sub, b.Id, layout, b.Maps, new StructureExportOptions { Split = StructureSplit.PerMap, English = english }, origin);
+            StructureExporter.Export(sub, b.Id, layout, b.Maps, new StructureExportOptions { Split = b.Split, English = english }, origin);
             var item = new KitItem
             {
                 Id = b.Id, Title = english ? b.En : b.Ja, MapX = b.MapX, MapZ = b.MapZ, MapsX = b.Maps, MapsY = b.Maps,
                 Predicted = Path.GetRelativePath(dir, Path.Combine(sub, "predicted_map.png")),
             };
             items.Add(item);
-            pieces.Add((item, StructureExporter.Split(layout, b.Maps, new StructureExportOptions { Split = StructureSplit.PerMap }), origin));
+            pieces.Add((item, StructureExporter.Split(layout, b.Maps, new StructureExportOptions { Split = b.Split }), origin));
         }
 
         var manifest = new KitManifest { BaseY = baseY, ProfileId = profile.Id, Created = DateTime.Now.ToString("yyyy-MM-dd HH:mm"), Items = items };
         File.WriteAllText(Path.Combine(dir, "kit.json"), manifest.ToJson(), new UTF8Encoding(false));
-        WritePack(dir, pieces);
+        WritePack(dir, pieces, name);
         File.WriteAllText(Path.Combine(dir, english ? "HOW-TO.txt" : "手順.txt"), Instructions(manifest, english), new UTF8Encoding(true));
         return dir;
     }
 
     /// <summary>One behavior pack with every piece and a function per part (absolute coordinates).</summary>
-    private static void WritePack(string dir, List<(KitItem Item, List<StructureTile> Tiles, WorldOrigin Origin)> pieces)
+    private static void WritePack(string dir, List<(KitItem Item, List<StructureTile> Tiles, WorldOrigin Origin)> pieces, string name)
     {
         string pack = Path.Combine(dir, "BMAP_kit_BP");
         string structures = Path.Combine(pack, "structures", Namespace);
@@ -130,7 +138,7 @@ public static class VerificationKit
         var manifest = new
         {
             format_version = 2,
-            header = new { name = "BMAP verification kit", description = "Bedrock Map Art Project", uuid = Guid.NewGuid().ToString(), version = new[] { 1, 0, 0 }, min_engine_version = new[] { 1, 20, 0 } },
+            header = new { name = name.Replace('_', ' '), description = "Bedrock Map Art Project", uuid = Guid.NewGuid().ToString(), version = new[] { 1, 0, 0 }, min_engine_version = new[] { 1, 20, 0 } },
             modules = new[] { new { type = "data", uuid = Guid.NewGuid().ToString(), version = new[] { 1, 0, 0 } } },
         };
         File.WriteAllText(Path.Combine(pack, "manifest.json"), JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false));
@@ -148,8 +156,21 @@ public static class VerificationKit
             int cx = 128 * item.MapX - 64 + item.MapsX * 64, cz = 128 * item.MapZ - 64 + item.MapsY * 64;
             File.WriteAllText(Path.Combine(functions, "goto_" + item.Id + ".mcfunction"),
                 $"tp @s {cx} 200 {cz}\ngamemode creative @s\n", new UTF8Encoding(false));
+            // Larger parts: one goto / load pair per map, as structure load needs the chunks around each piece loaded.
+            if (item.MapsX * item.MapsY > 1)
+                for (int row = 0; row < item.MapsY; row++)
+                    for (int col = 0; col < item.MapsX; col++)
+                    {
+                        int n = row * item.MapsX + col + 1;
+                        var mine = tiles.Where(t => t.MapNumbers.Length > 0 && t.MapNumbers[0] == n).OrderBy(t => t.Order).ToList();
+                        var sb = new StringBuilder($"# {item.Id}: map {n} (map {item.MapX + col}, {item.MapZ + row})\n");
+                        foreach (var t in mine) sb.AppendLine($"structure load {Namespace}:{item.Id}_{t.Id} {o.X + t.OffsetX} {o.Y + t.OffsetY} {o.Z + t.OffsetZ}");
+                        File.WriteAllText(Path.Combine(functions, $"{item.Id}_m{n}.mcfunction"), sb.ToString(), new UTF8Encoding(false));
+                        File.WriteAllText(Path.Combine(functions, $"goto_{item.Id}_m{n}.mcfunction"),
+                            $"tp @s {128 * (item.MapX + col)} 200 {128 * (item.MapZ + row)}\ngamemode creative @s\n", new UTF8Encoding(false));
+                    }
         }
-        string mcpack = Path.Combine(dir, "BMAP_verification_kit.mcpack");
+        string mcpack = Path.Combine(dir, name + ".mcpack");
         StructureExporter.ZipDirectory(pack, mcpack);
     }
 
@@ -160,11 +181,11 @@ public static class VerificationKit
         {
             sb.AppendLine("BMAP verification kit — checks block colours and .mcstructure loading in game. The world is never changed by BMAP.");
             sb.AppendLine();
-            sb.AppendLine("1. Create a new world: Flat (superflat), creative, cheats on. Activate BMAP_verification_kit.mcpack as a behavior pack.");
+            sb.AppendLine("1. Create a new world: Flat (superflat), creative, cheats on. Activate the .mcpack in this folder as a behavior pack.");
             sb.AppendLine("   Suggested: /gamerule doDaylightCycle false, /time set noon, /gamerule doMobSpawning false.");
             sb.AppendLine($"2. For each part below: /function bmap/kit/goto_<id>, wait a few seconds until the area has loaded, then /function bmap/kit/<id>.");
             sb.AppendLine("3. /give @s empty_map — use it (scale 0, do not zoom out) inside each map area and fly over the whole area until it is fully drawn.");
-            sb.AppendLine("   One map per map area: the 2 x 2 valley needs 4 maps. Keep the maps in your inventory.");
+            sb.AppendLine("   One map per map area. Parts of several maps are placed map by map (commands below): goto, wait, load, draw that map, next.");
             sb.AppendLine("4. Leave the world and close Minecraft so the maps are saved.");
             sb.AppendLine("5. BMAP CLI: verify <world folder> <this folder>  (or send the world folder name).");
         }
@@ -172,11 +193,11 @@ public static class VerificationKit
         {
             sb.AppendLine("BMAP 実機検証キット — ブロックの地図色と .mcstructure の読み込みをゲーム内で確かめます。BMAP はワールドを変更しません。");
             sb.AppendLine();
-            sb.AppendLine("1. 新しいワールドを作ります: フラット（スーパーフラット）・クリエイティブ・チート有効。BMAP_verification_kit.mcpack をビヘイビアパックとして有効にします。");
+            sb.AppendLine("1. 新しいワールドを作ります: フラット（スーパーフラット）・クリエイティブ・チート有効。このフォルダの .mcpack をビヘイビアパックとして有効にします。");
             sb.AppendLine("   おすすめ: /gamerule doDaylightCycle false、/time set noon、/gamerule doMobSpawning false");
             sb.AppendLine("2. 下の各パートで、/function bmap/kit/goto_<id> を実行し、周りが読み込まれるまで数秒待ってから /function bmap/kit/<id> を実行します。");
             sb.AppendLine("3. /give @s empty_map で白紙の地図を出し、各マップの範囲の中で使います（縮尺 0。拡大しないでください）。範囲全体の上を飛んで、すべて描かれるまで待ちます。");
-            sb.AppendLine("   マップ 1 枚の範囲ごとに地図 1 枚です（2 x 2 の Valley は 4 枚）。地図は持ったままにしてください。");
+            sb.AppendLine("   マップ 1 枚の範囲ごとに地図 1 枚です。複数枚のパートは、下のコマンドで 1 枚分ずつ「移動 → 待つ → 置く → その地図を描く」を繰り返します。");
             sb.AppendLine("4. ワールドを出て Minecraft を終了し、地図を保存させます。");
             sb.AppendLine("5. BMAP CLI: verify <ワールドのフォルダ> <このフォルダ>（またはワールドのフォルダ名を教えてください）。");
         }
@@ -185,6 +206,11 @@ public static class VerificationKit
         {
             int x0 = 128 * i.MapX - 64, z0 = 128 * i.MapZ - 64;
             sb.AppendLine($"- {i.Id}: {i.Title}  X {x0}..{x0 + 128 * i.MapsX - 1}, Z {z0}..{z0 + 128 * i.MapsY - 1}, Y {m.BaseY}~");
+            if (i.MapsX * i.MapsY == 1)
+                sb.AppendLine($"    /function bmap/kit/goto_{i.Id}   →   /function bmap/kit/{i.Id}");
+            else
+                for (int n = 1; n <= i.MapsX * i.MapsY; n++)
+                    sb.AppendLine($"    {n,2}: /function bmap/kit/goto_{i.Id}_m{n}   →   /function bmap/kit/{i.Id}_m{n}");
         }
         return sb.ToString();
     }

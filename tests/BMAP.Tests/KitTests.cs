@@ -12,7 +12,25 @@ public class KitTests
 {
     private static readonly ColorProfile Profile = ColorProfile.LoadBuiltIn();
 
-    private static string MakeKit() => VerificationKit.Create(TestHelpers.TempDir(), Profile);
+    private static string MakeKit() => VerificationKit.Create(TestHelpers.TempDir(), Profile, parts: VerificationKit.AllParts);
+
+    [Fact]
+    public void LargePart_IsSplitIntoPieces_AndEveryPieceIsLoadedByExactlyOneMapFunction()
+    {
+        string kit = VerificationKit.Create(TestHelpers.TempDir(), Profile, parts: ["large_4x4"]);
+        string fn = Path.Combine(kit, "BMAP_kit_BP", "functions", "bmap", "kit");
+        var all = File.ReadAllLines(Path.Combine(fn, "large_4x4.mcfunction")).Where(l => l.StartsWith("structure load")).ToList();
+        var perMap = Enumerable.Range(1, 16).SelectMany(n => File.ReadAllLines(Path.Combine(fn, $"large_4x4_m{n}.mcfunction")).Where(l => l.StartsWith("structure load"))).ToList();
+        Assert.Equal(all.OrderBy(l => l), perMap.OrderBy(l => l));
+        Assert.True(all.Count >= 16 * 4, $"{all.Count} pieces"); // 64 x 64 pieces: at least 4 per map
+        foreach (var line in all)
+        {
+            var s = McStructure.FromBytes(File.ReadAllBytes(Path.Combine(kit, "BMAP_kit_BP", "structures", VerificationKit.Namespace, line.Split(' ')[2].Split(':')[1] + ".mcstructure")));
+            Assert.InRange(s.SizeX, 1, 64);
+            Assert.InRange(s.SizeZ, 1, 64);
+        }
+        Assert.True(File.Exists(Path.Combine(fn, "goto_large_4x4_m16.mcfunction")));
+    }
 
     /// <summary>
     /// Only the behavior pack is used: structure files plus the coordinates in the functions, as the game would place
@@ -106,7 +124,7 @@ public class KitTests
                 }
         }
         var (tiles, diffs) = VerificationKit.Verify(kit, maps);
-        Assert.Equal(1 + 1 + 1 + 4, tiles.Count);
+        Assert.Equal(1 + 1 + 1 + 4 + 16, tiles.Count);
         Assert.All(tiles.Where(t => t.Item != "flat"), t => Assert.Equal(t.Compared, t.Exact));
         var flat = tiles.Single(t => t.Item == "flat");
         Assert.Equal(5, flat.Unexplored);
