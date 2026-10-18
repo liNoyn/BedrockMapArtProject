@@ -55,8 +55,9 @@ renderer are implemented in the project without further libraries.
 
 **3D map art (staircasing) and the shading rule**
 - 3D: off (flat), Classic, Valley, full dark, full light.
-- **Shading model**: step 1 (Java), step 2 (gd-codes, Nukkit), step 2 with gd-codes rounding, or alternating by parity
-  (hypothesis). Light and dark steps are handled separately; a rule measured in game is stored in the colour profile.
+- **Shading model**: by default the rule measured on Bedrock 1.26.51 (±1 alternates by coordinate parity, ±2 or more
+  always). With the build aligned to the map grid, single steps are used where the parity allows, 23–27 % lower than
+  always stepping by 2. Step 1 (Java), step 2 (gd-codes, Nukkit) and others can be chosen.
 - **Shading rule analysis** (details in [docs/shading-rules.md](docs/shading-rules.md), Japanese)
   - Map simulator: redraws the map from the block positions alone and compares it pixel by pixel with the planned
     colours (tested to match in every staircase, support and dithering mode).
@@ -171,7 +172,7 @@ The game cannot be driven from the development environment, so these points are 
 | Shade multipliers 180 / 220 / 255 | **Verified** on 12 maps (~190 k pixels) drawn by Bedrock 1.21.132 – 1.26.51 |
 | Base colours of the colour sets | **13 of 60 verified**; the rest are Java values (estimates) |
 | Rounding | **Verified**: base × multiplier / 255, rounded down (gd-codes' rounding does not match) |
-| Smallest height step that changes the shade (1 or 2) | **Not verified**; gd-codes and Nukkit use 2. Measure it with the shading test pad; switch with the shading model |
+| Step rule | **Verified** (1.26.51): ±1 alternates by coordinate parity (+1 is light where x + z is odd, −1 dark where even), ±2 or more always. Used by default |
 | Which block gives which colour | Not verified; measure with the colour test pad |
 | Block identifiers and states | All 323 validated against Mojang's metadata (1.26.50); loading as structures not checked |
 

@@ -43,6 +43,18 @@ public sealed class BlockLayout
     public int Step { get; init; } = 1;
     public int UpStep { get; init; } = 1;
     public int DownStep { get; init; } = 1;
+    /// <summary>
+    /// Steps depend on the pixel parity (see <see cref="QuantizeResult.ParityShading"/>): light needs +1 where
+    /// x + row is odd and +2 where even, dark needs −1 where even and −2 where odd. Only valid when the build is placed on
+    /// the map grid (otherwise the parity in the world is unknown and steps of 2 are used).
+    /// </summary>
+    public bool ParitySteps { get; init; }
+    /// <summary>True when the game shades by the parity rule (used to show the right shade in the 3D view).</summary>
+    public bool ParityShading { get; init; }
+
+    /// <summary>Height difference needed for a light / dark pixel at layout (x, z).</summary>
+    public static int UpAt(int x, int z, int up, bool parity) => parity ? (((x + z - 1) & 1) == 1 ? 1 : 2) : up;
+    public static int DownAt(int x, int z, int down, bool parity) => parity ? (((x + z - 1) & 1) == 0 ? 1 : 2) : down;
     /// <summary>Extra support block positions (x, y, z) below the visible blocks.</summary>
     public HashSet<(int X, int Y, int Z)> SupportPositions { get; init; } = [];
 
@@ -81,9 +93,14 @@ public sealed class BlockLayout
         return _placements = list;
     }
 
+    /// <param name="onMapGrid">
+    /// The build will be placed aligned to the map grid (BMAP's world position option), so the pixel parity in the world
+    /// is known and parity-dependent single steps can be used.
+    /// </param>
     public static BlockLayout Generate(QuantizeResult q, BlockDefinition supportBlock, int maxHeight = 0,
-        SupportMode supports = SupportMode.None, StaircaseMode? mode = null)
+        SupportMode supports = SupportMode.None, StaircaseMode? mode = null, bool onMapGrid = false)
     {
+        bool parity = q.ParityShading && onMapGrid;
         var staircase = mode ?? q.Mode;
         int step = Math.Max(1, q.Step);
         int up = Math.Max(1, q.UpStep), down = Math.Max(1, q.DownStep);
@@ -96,8 +113,8 @@ public sealed class BlockLayout
             cells[x] = SupportEntry;
             for (int r = 0; r < q.Height; r++) cells[(r + 1) * w + x] = q.Get(x, r);
             if (staircase == StaircaseMode.Flat) continue;
-            if (staircase == StaircaseMode.Classic) ClassicColumn(q, x, w, depth, heights, up, down);
-            else ValleyColumn(q, x, w, depth, heights, up, down);
+            if (staircase == StaircaseMode.Classic) ClassicColumn(q, x, w, depth, heights, up, down, parity);
+            else ValleyColumn(q, x, w, depth, heights, up, down, parity);
         }
 
         var supportSet = new HashSet<(int, int, int)>();
@@ -162,6 +179,7 @@ public sealed class BlockLayout
         {
             Width = w, Depth = depth, Cells = cells, Heights = heights, Entries = q.Entries, SupportBlock = supportBlock,
             Mode = staircase, Supports = supports, SupportPositions = supportSet, Step = step, UpStep = up, DownStep = down,
+            ParitySteps = parity, ParityShading = q.ParityShading,
         };
         if (maxHeight > 0 && layout.MaxHeight > maxHeight)
             throw new InvalidOperationException($"高さ {layout.MaxHeight} が上限 {maxHeight} を超えています。Flat 方式・Valley 方式にするか、ディザリングを変更してください。");
@@ -173,13 +191,13 @@ public sealed class BlockLayout
         q.Get(x, z - 1) < 0 ? Shade.Normal : q.GetShade(x, z - 1);
 
     /// <summary>Running height from the support row, then shifted so the column's lowest block is at 0.</summary>
-    private static void ClassicColumn(QuantizeResult q, int x, int w, int depth, int[] heights, int up, int down)
+    private static void ClassicColumn(QuantizeResult q, int x, int w, int depth, int[] heights, int up, int down, bool parity)
     {
         int h = 0, min = 0;
         heights[x] = 0;
         for (int z = 1; z < depth; z++)
         {
-            h += PixelShade(q, x, z) switch { Shade.Bright => up, Shade.Dark => -down, _ => 0 };
+            h += PixelShade(q, x, z) switch { Shade.Bright => UpAt(x, z, up, parity), Shade.Dark => -DownAt(x, z, down, parity), _ => 0 };
             heights[z * w + x] = h;
             min = Math.Min(min, h);
         }
@@ -187,7 +205,7 @@ public sealed class BlockLayout
     }
 
     /// <summary>Lowest heights that still give every pixel its shade ("valley" staircasing).</summary>
-    private static void ValleyColumn(QuantizeResult q, int x, int w, int depth, int[] heights, int up, int down)
+    private static void ValleyColumn(QuantizeResult q, int x, int w, int depth, int[] heights, int up, int down, bool parity)
     {
         // need[z]: minimal height of cell z so that all shades south of it are still reachable with heights >= 0.
         var need = new int[depth];
@@ -195,7 +213,7 @@ public sealed class BlockLayout
         {
             need[z] = PixelShade(q, x, z + 1) switch
             {
-                Shade.Dark => need[z + 1] + down,
+                Shade.Dark => need[z + 1] + DownAt(x, z + 1, down, parity),
                 Shade.Normal => need[z + 1],
                 _ => 0,
             };
@@ -208,7 +226,7 @@ public sealed class BlockLayout
             {
                 Shade.Dark => need[z],
                 Shade.Normal => prev,
-                _ => Math.Max(need[z], prev + up),
+                _ => Math.Max(need[z], prev + UpAt(x, z, up, parity)),
             };
         }
     }

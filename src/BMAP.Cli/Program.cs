@@ -75,14 +75,15 @@ try
             var presets = BMAP.BlockEngine.BlockPreset.BuiltIns(profile);
             var preset = presets[int.Parse(opts.GetValueOrDefault("preset", "0"))];
             var q = BMAP.BlockEngine.ColorQuantizer.Quantize(img, profile, preset.ToSelection(), qopt);
-            var layout = BMAP.BlockEngine.BlockLayout.Generate(q, profile.Find("cobblestone")!, 380, support);
-            var materials = BMAP.BlockEngine.MaterialCalculator.Calculate(layout, mx);
             BMAP.BlockEngine.WorldOrigin? origin = null;
             if (opts.TryGetValue("origin", out var o))
             {
                 var p = o.Split(',').Select(int.Parse).ToArray();
                 origin = BMAP.BlockEngine.WorldOrigin.AlignedToMap(p[0], p[1], p[2]);
             }
+            // Single parity steps only when the build is placed on the map grid (--origin).
+            var layout = BMAP.BlockEngine.BlockLayout.Generate(q, profile.Find("cobblestone")!, 380, support, onMapGrid: origin != null);
+            var materials = BMAP.BlockEngine.MaterialCalculator.Calculate(layout, mx);
             string name = opts.GetValueOrDefault("name", Path.GetFileNameWithoutExtension(args[1]));
             BMAP.BlockEngine.BuildGuideGenerator.WriteAll(Path.Combine(args[2], "guide"), layout, q, profile, materials, mx, my, origin, name);
             var result = BMAP.Export.StructureExporter.Export(args[2], name, layout, mx, new BMAP.Export.StructureExportOptions(), origin);
@@ -319,7 +320,7 @@ try
             var profile = BMAP.Palette.ColorProfile.LoadBuiltIn();
             var support = profile.Find("cobblestone")!;
             var pad = args[1] == "colours" || args[1] == "colors"
-                ? BMAP.Shading.ShadingTestPad.CreateColourPad(profile, support, int.Parse(opts.GetValueOrDefault("step", "1")))
+                ? BMAP.Shading.ShadingTestPad.CreateColourPad(profile, support, int.Parse(opts.GetValueOrDefault("step", profile.Shades.Step.ToString())))
                 : BMAP.Shading.ShadingTestPad.Create(profile, support);
             var p = opts.GetValueOrDefault("origin", "0,0,64").Split(',').Select(int.Parse).ToArray();
             var origin = BMAP.BlockEngine.WorldOrigin.AlignedToMap(p[0], p[1], p[2]);

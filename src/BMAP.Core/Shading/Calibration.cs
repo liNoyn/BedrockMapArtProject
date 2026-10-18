@@ -48,6 +48,14 @@ public sealed class CalibrationResult
     /// <summary>Largest deviation of the east/west-only and flat controls from the normal colour.</summary>
     public double ControlDeviation { get; init; }
 
+    /// <summary>Multipliers fitted as integers (base x m / 255 rounded down), 0 when not measured.</summary>
+    public int FittedDark { get; init; }
+    public int FittedNormal { get; init; }
+    public int FittedBright { get; init; }
+    /// <summary>Smallest step that changed the shade on at least some pixels (e.g. on every other one).</summary>
+    public int? PartialBrightStep { get; init; }
+    public int? PartialDarkStep { get; init; }
+
     /// <summary>Candidate shading models scored against the measurements (best first).</summary>
     public List<ModelScore> Models { get; init; } = [];
     public ModelScore? BestModel { get; init; }
@@ -63,14 +71,14 @@ public sealed class CalibrationResult
     public ShadeMultipliers? MeasuredRule(string gameVersion)
     {
         if (Pad.Kind != PadKind.Shading || BrightStep is null || DarkStep is null || NormalFactor <= 0) return null;
-        int normal = (int)Math.Round(NormalFactor * 255);
+        int normal = FittedNormal > 0 ? FittedNormal : (int)Math.Round(NormalFactor * 255);
         var best = BestModel?.Model;
         // Light and dark steps are kept separately; they are not merged into one threshold.
         return new ShadeMultipliers
         {
             Normal = normal,
-            Bright = (int)Math.Round(normal * BrightRatio),
-            Dark = (int)Math.Round(normal * DarkRatio),
+            Bright = FittedBright > 0 ? FittedBright : Math.Min(255, (int)Math.Round(normal * BrightRatio)),
+            Dark = FittedDark > 0 ? FittedDark : (int)Math.Round(normal * DarkRatio),
             MinStep = Math.Max(BrightStep.Value, DarkStep.Value),
             BrightStep = BrightStep.Value,
             DarkStep = DarkStep.Value,
@@ -200,12 +208,40 @@ public static class Calibrator
         steps = steps.OrderBy(s => s.Case).ThenBy(s => s.Delta).ToList();
 
         var full = steps.Where(s => s.Case == "full").ToDictionary(s => s.Delta);
-        int? brightStep = full.Values.Where(s => s.Delta > 0 && s.Ratio > 1 + Tolerance).Select(s => (int?)s.Delta).Min();
-        int? darkStep = full.Values.Where(s => s.Delta < 0 && s.Ratio < 1 - Tolerance).Select(s => (int?)-s.Delta).Min();
-        double brightRatio = brightStep is int bs ? full[bs].Ratio : 1;
-        double darkRatio = darkStep is int ds ? full[-ds].Ratio : 1;
-        bool graded = full.Values.Any(s => s.Delta > 0 && brightStep is int b && s.Delta > b && Math.Abs(s.Ratio - brightRatio) > Tolerance)
-                      || full.Values.Any(s => s.Delta < 0 && darkStep is int d && -s.Delta > d && Math.Abs(s.Ratio - darkRatio) > Tolerance);
+        // Classify every full-block sample against the flat colour of its strip. A step can change the shade on every
+        // pixel ("reliable") or only on some (e.g. alternating by coordinate parity); both are reported.
+        var classified = measured.Where(kv => kv.Key.Case == "full" && kv.Key.Delta is not null && reference.ContainsKey(kv.Key.Group))
+            .Select(kv => (S: kv.Key, C: kv.Value, R: Ratio(kv.Value, reference[kv.Key.Group])))
+            .Where(t => !double.IsNaN(t.R))
+            .Select(t => (t.S, t.C, t.R, Class: t.R > 1 + Tolerance ? Shade.Bright : t.R < 1 - Tolerance ? Shade.Dark : Shade.Normal))
+            .ToList();
+        double Share(int delta, Shade cls) =>
+            classified.Where(t => t.S.Delta == delta) is var g && g.Any() ? g.Count(t => t.Class == cls) / (double)g.Count() : 0;
+        int? Reliable(int sign, Shade cls) => Enumerable.Range(1, 4).Where(k => Share(sign * k, cls) >= 0.95).Select(k => (int?)k).FirstOrDefault();
+        int? Partial(int sign, Shade cls) => Enumerable.Range(1, 4).Where(k => Share(sign * k, cls) >= 0.05).Select(k => (int?)k).FirstOrDefault();
+        int? brightStep = Reliable(+1, Shade.Bright), darkStep = Reliable(-1, Shade.Dark);
+        int? brightPartial = Partial(+1, Shade.Bright), darkPartial = Partial(-1, Shade.Dark);
+        // Brightness of shaded pixels only (mixing light and normal pixels of a partial step would give a false value).
+        double MeanRatio(Shade cls) => classified.Where(t => t.Class == cls).Select(t => t.R).DefaultIfEmpty(1).Average();
+        double brightRatio = MeanRatio(Shade.Bright), darkRatio = MeanRatio(Shade.Dark);
+        // Graded: shaded pixels are brighter / darker for larger steps.
+        bool Spread(Shade cls) => classified.Where(t => t.Class == cls).GroupBy(t => Math.Abs(t.S.Delta!.Value))
+            .Select(g => g.Average(t => t.R)).ToList() is { Count: > 1 } m && m.Max() - m.Min() > Tolerance;
+        bool graded = Spread(Shade.Bright) || Spread(Shade.Dark);
+        // Multipliers: the integer m with base x m / 255 (rounded down) equal to the measured colour for most samples.
+        (int M, double Rate) Fit(Shade cls, IEnumerable<(PadSample S, Rgba C)> src)
+        {
+            var list = src.Select(t => (t.C, Block: profile.Find(t.S.Block))).Where(t => t.Block is { BiomeTinted: false })
+                .Select(t => (t.C, Base: t.Block!.BaseColor)).ToList();
+            if (list.Count == 0) return (0, 0);
+            var best = Enumerable.Range(100, 156).Select(m => (M: m, N: list.Count(t =>
+                t.Base.R * m / 255 == t.C.R && t.Base.G * m / 255 == t.C.G && t.Base.B * m / 255 == t.C.B)))
+                .OrderByDescending(x => x.N).ThenBy(x => Math.Abs(x.M - (cls == Shade.Dark ? 180 : cls == Shade.Bright ? 255 : 220))).First();
+            return (best.M, best.N / (double)list.Count);
+        }
+        var fitNormal = Fit(Shade.Normal, classified.Where(t => t.S.Delta == 0).Select(t => (t.S, t.C)));
+        var fitBright = Fit(Shade.Bright, classified.Where(t => t.Class == Shade.Bright).Select(t => (t.S, t.C)));
+        var fitDark = Fit(Shade.Dark, classified.Where(t => t.Class == Shade.Dark).Select(t => (t.S, t.C)));
 
         // Normal colour / profile base colour, from fixed-colour full blocks.
         var factors = measured.Where(kv => kv.Key.Delta == 0 && kv.Key.Case is "full" or "flat")
@@ -225,11 +261,18 @@ public static class Calibrator
                 Orientation = r.Orientation, OffsetX = r.OffsetX, OffsetZ = r.OffsetZ, Covered = 0, SampleCount = r.SampleCount, Notes = notes,
             };
         notes.Add(brightStep is int b2
-            ? T($"明るくなる最小の段差: +{b2}（明 / 通常 = {brightRatio:0.000}）", $"Smallest step that gives the light shade: +{b2} (light / normal = {brightRatio:0.000})")
-            : T("明るくなる段差が見つかりませんでした。", "No step produced the light shade."));
+            ? T($"必ず明るくなる最小の段差: +{b2}（明 / 通常 = {brightRatio:0.000}）", $"Smallest step that always gives the light shade: +{b2} (light / normal = {brightRatio:0.000})")
+            : T("必ず明るくなる段差が見つかりませんでした。", "No step always produced the light shade."));
+        if (brightPartial is int bp && bp != brightStep)
+            notes.Add(T($"段差 +{bp} では {Share(bp, Shade.Bright):P0} のピクセルだけが明るくなりました。", $"Step +{bp} made only {Share(bp, Shade.Bright):P0} of the pixels light."));
         notes.Add(darkStep is int d2
-            ? T($"暗くなる最小の段差: −{d2}（暗 / 通常 = {darkRatio:0.000}）", $"Smallest step that gives the dark shade: −{d2} (dark / normal = {darkRatio:0.000})")
-            : T("暗くなる段差が見つかりませんでした。", "No step produced the dark shade."));
+            ? T($"必ず暗くなる最小の段差: −{d2}（暗 / 通常 = {darkRatio:0.000}）", $"Smallest step that always gives the dark shade: −{d2} (dark / normal = {darkRatio:0.000})")
+            : T("必ず暗くなる段差が見つかりませんでした。", "No step always produced the dark shade."));
+        if (darkPartial is int dp && dp != darkStep)
+            notes.Add(T($"段差 −{dp} では {Share(-dp, Shade.Dark):P0} のピクセルだけが暗くなりました。", $"Step −{dp} made only {Share(-dp, Shade.Dark):P0} of the pixels dark."));
+        if (fitNormal.M > 0)
+            notes.Add(T($"倍率（基本色 × m ÷ 255 の切り捨てで一致する m）: 暗 {fitDark.M}（{fitDark.Rate:P0}）・通常 {fitNormal.M}（{fitNormal.Rate:P0}）・明 {fitBright.M}（{fitBright.Rate:P0}）",
+                $"Multipliers (m with base x m / 255 rounded down matching): dark {fitDark.M} ({fitDark.Rate:P0}), normal {fitNormal.M} ({fitNormal.Rate:P0}), light {fitBright.M} ({fitBright.Rate:P0})"));
         if (graded) notes.Add(T("段差の大きさで明るさが変わっています（段階的な陰影）。", "The brightness changes with the size of the step (graded shading)."));
         if (control > Tolerance)
             notes.Add(T($"対照実験（東西の段差・平ら）が通常色から {control:P1} ずれています。東西の高さも影響している可能性があります。",
@@ -266,6 +309,8 @@ public static class Calibrator
             MeanDeltaE = r.MeanDeltaE, MaxDeltaE = r.MaxDeltaE, Exact = r.Exact, Notes = notes,
             Steps = steps, BrightStep = brightStep, DarkStep = darkStep, Graded = graded, BrightRatio = brightRatio,
             DarkRatio = darkRatio, NormalFactor = normalFactor, ControlDeviation = control,
+            FittedDark = fitDark.M, FittedNormal = fitNormal.M, FittedBright = fitBright.M,
+            PartialBrightStep = brightPartial, PartialDarkStep = darkPartial,
             Models = eval.Scores.OrderByDescending(s => s.ValidationAccuracy).ThenByDescending(s => s.ExactRate).ToList(),
             BestModel = eval.Best, Parity = eval.Parity,
         };

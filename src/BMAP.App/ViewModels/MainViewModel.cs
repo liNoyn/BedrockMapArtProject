@@ -422,7 +422,7 @@ public sealed partial class MainViewModel : ViewModelBase
         _edits.ApplyTo(q, Profile);
         _quantized = q;
         var support = SelectedSupportBlock ?? Profile.Find("cobblestone") ?? Profile.Blocks.First();
-        try { _layout = BlockLayout.Generate(q, support, 0, SupportModeOption.Value); }
+        try { _layout = BlockLayout.Generate(q, support, 0, SupportModeOption.Value, onMapGrid: UseOrigin); }
         catch (InvalidOperationException ex) { _layout = null; Log(ex.Message); }
         AnalyzeShading();
     }

@@ -109,3 +109,45 @@ public class CheckerArithmeticTests
         Assert.Equal(Shade.Normal, exact.Classify(-1, 1, 0));
     }
 }
+
+/// <summary>Staircases for the parity rule measured on Bedrock 1.26.51 (±1 alternates by x + row, ±2 always).</summary>
+public class ParityStairTests
+{
+    private static readonly ColorProfile Profile = ColorProfile.LoadBuiltIn();
+    private static ColorProfile Checker => new()
+    {
+        Id = "checker", Name = "checker", ColourSets = Profile.ColourSets,
+        Shades = new ShadeMultipliers { Model = ShadingModelKind.Checker, BrightStep = 2, DarkStep = 2 },
+    };
+
+    [Theory]
+    [InlineData(BMAP.BlockEngine.StaircaseMode.Valley, BMAP.BlockEngine.DitherMode.FloydSteinberg)]
+    [InlineData(BMAP.BlockEngine.StaircaseMode.Classic, BMAP.BlockEngine.DitherMode.None)]
+    [InlineData(BMAP.BlockEngine.StaircaseMode.Valley, BMAP.BlockEngine.DitherMode.KnollBayer)]
+    public void ParitySteps_SimulateExactly_AndBuildLower(BMAP.BlockEngine.StaircaseMode mode, BMAP.BlockEngine.DitherMode dither)
+    {
+        var game = Checker;
+        var q = BMAP.BlockEngine.ColorQuantizer.Quantize(TestHelpers.Gradient(128, 128), game,
+            BMAP.BlockEngine.BlockPreset.BuiltIns(game)[0].ToSelection(), new BMAP.BlockEngine.QuantizeOptions { Mode = mode, Dither = dither });
+        Assert.True(q.ParityShading);
+        var cobble = game.Find("cobblestone")!;
+        var onGrid = BMAP.BlockEngine.BlockLayout.Generate(q, cobble, 0, BMAP.BlockEngine.SupportMode.Important, onMapGrid: true);
+        var anywhere = BMAP.BlockEngine.BlockLayout.Generate(q, cobble, 0, BMAP.BlockEngine.SupportMode.Important, onMapGrid: false);
+        Assert.True(onGrid.ParitySteps);
+        Assert.False(anywhere.ParitySteps);
+        Assert.Equal(0, ShadingAnalyzer.Analyze(onGrid, game, q.Preview).Mismatches);
+        Assert.Equal(0, ShadingAnalyzer.Analyze(anywhere, game, q.Preview).Mismatches);
+        Assert.True(onGrid.MaxHeight < anywhere.MaxHeight, $"{onGrid.MaxHeight} vs {anywhere.MaxHeight}");
+    }
+
+    [Fact]
+    public void StepTwoStairs_AreWrongWithAStepOneLayout()
+    {
+        // A Java-style layout (steps of 1) drawn by the measured Bedrock rule loses about half of its shades.
+        var java = new ColorProfile { Id = "java", Name = "java", Shades = new ShadeMultipliers(), ColourSets = Profile.ColourSets };
+        var q = BMAP.BlockEngine.ColorQuantizer.Quantize(TestHelpers.Gradient(64, 64), java,
+            BMAP.BlockEngine.BlockPreset.BuiltIns(java)[0].ToSelection(), new BMAP.BlockEngine.QuantizeOptions { Mode = BMAP.BlockEngine.StaircaseMode.Valley });
+        var javaLayout = BMAP.BlockEngine.BlockLayout.Generate(q, Profile.Find("cobblestone")!);
+        Assert.True(ShadingAnalyzer.Analyze(javaLayout, Checker, q.Preview).Mismatches > 0);
+    }
+}

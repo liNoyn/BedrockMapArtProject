@@ -443,7 +443,9 @@ public class BlockTests
     public void SceneMesh_ShadowsAndOcclusion_DarkenTheFootOfAStep()
     {
         // A wall of height 3 south-east of a low floor: the floor right next to the wall is in its shadow / corner.
-        var q = Quantize(TestHelpers.Gradient(16, 16), opt: new QuantizeOptions { Mode = StaircaseMode.Valley });
+        // Java-style steps of 1 (with the measured Bedrock rule the gradient climbs 2 per row and is all in shadow).
+        var java = new ColorProfile { Id = "java", Name = "java", Shades = new ShadeMultipliers(), ColourSets = Profile.ColourSets };
+        var q = ColorQuantizer.Quantize(TestHelpers.Gradient(16, 16), java, Everything, new QuantizeOptions { Mode = StaircaseMode.Valley });
         var layout = BlockLayout.Generate(q, Cobble);
         var mesh = SceneMesh.Build(layout, LayoutRegion.All(layout), includeSupports: true);
         Assert.Contains(mesh.Faces, f => f.Dir == 0 && f.Sun == 1);

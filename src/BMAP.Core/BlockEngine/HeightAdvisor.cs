@@ -27,7 +27,7 @@ public static class HeightAdvisor
     /// </summary>
     public static List<HeightOption> Analyze(RgbaImage image, ColorProfile profile, PaletteSelection selection,
         QuantizeOptions options, BlockDefinition supportBlock, SupportMode supports, IEnumerable<int>? limits = null,
-        IProgress<int>? progress = null, CancellationToken ct = default)
+        IProgress<int>? progress = null, CancellationToken ct = default, bool onMapGrid = false)
     {
         var mode = options.Mode is StaircaseMode.Classic or StaircaseMode.Valley ? options.Mode : StaircaseMode.Valley;
         var raw = new List<(StaircaseMode Mode, int Limit, int MaxHeight, int BuildHeight, double Error, int Blocks)>();
@@ -36,7 +36,7 @@ public static class HeightAdvisor
         {
             ct.ThrowIfCancellationRequested();
             var q = ColorQuantizer.Quantize(image, profile, selection, options with { Mode = m, MaxHeight = limit }, ct);
-            var layout = BlockLayout.Generate(q, supportBlock, 0, supports);
+            var layout = BlockLayout.Generate(q, supportBlock, 0, supports, onMapGrid: onMapGrid);
             int top = 0, bottom = int.MaxValue;
             for (int i = 0; i < layout.Cells.Length; i++)
             {

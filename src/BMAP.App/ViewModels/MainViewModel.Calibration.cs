@@ -23,7 +23,7 @@ public sealed partial class MainViewModel
     public string CalibrationReport { get => _calibrationReport; set => Set(ref _calibrationReport, value); }
     private CalibrationResult? _calResult;
     private RgbaImage? _calImage;
-    private int _colourPadStep = 1;
+    private int _colourPadStep = 2; // the measured Bedrock rule shades every pixel only for steps of 2 or more
     public int ColourPadStep { get => _colourPadStep; set => Set(ref _colourPadStep, Math.Clamp(value, 1, 8)); }
 
     public RelayCommand ExportColourPadCommand { get; private set; } = null!;
