@@ -95,7 +95,7 @@ renderer are implemented in the project without further libraries.
 
 **In-game calibration (read only)** — details in [docs/calibration.md](docs/calibration.md) (Japanese)
 - Exports a shading test pad (steps −4 … +4 with full blocks, carpets and slabs, east/west steps, empty north column,
-  biome tints) and a colour test pad with all 323 blocks; `pad.json` records every sample position.
+  biome tints) and a colour test pad with all 355 blocks; `pad.json` records every sample position.
 - After the game has drawn a map of the pad, BMAP reads the map (`map_<ID>`, `colors`) from a **temporary copy** of the
   world database and compares it with the prediction. Worlds are never written. Map orientation, offsets and unexplored
   pixels are handled.
@@ -185,11 +185,11 @@ The game cannot be driven from the development environment, so these points are 
 | Item | Status |
 |---|---|
 | Shade multipliers 180 / 220 / 255 | **Verified** on 12 maps (~190 k pixels) drawn by Bedrock 1.21.132 – 1.26.51 |
-| Base colours of the colour sets | **13 of 60 verified**; the rest are Java values (estimates) |
+| Base colours of the colour sets | **13 of 79 verified**; the rest are Java values (estimates) or third-party values (gd-codes) |
 | Rounding | **Verified**: base × multiplier / 255, rounded down (gd-codes' rounding does not match) |
 | Step rule | **Verified** (1.26.51): ±1 alternates by coordinate parity (+1 is light where x + z is odd, −1 dark where even), ±2 or more always. Used by default |
 | Which block gives which colour | Not verified; measure with the colour test pad |
-| Block identifiers and states | All 323 validated against Mojang's metadata (1.26.50); loading as structures not checked |
+| Block identifiers and states | All 355 validated against Mojang's metadata (bedrock-samples); written structures match the game's own format byte for byte; loading in game not checked |
 
 Logs are in `%LOCALAPPDATA%\BMAP\logs`.
 
