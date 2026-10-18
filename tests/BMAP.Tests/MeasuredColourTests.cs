@@ -1,4 +1,4 @@
-﻿using BMAP.Palette;
+using BMAP.Palette;
 
 namespace BMAP.Tests;
 
@@ -26,6 +26,29 @@ public class MeasuredColourTests
             checkedCount++;
         }
         Assert.True(checkedCount > 1000, $"only {checkedCount} samples checked");
+        Assert.True(wrong.Count == 0, string.Join("\n", wrong));
+    }
+
+    /// <summary>The second measurement (palette after the fixes, no TNT): every block that is not biome-tinted, all shades, every sample.</summary>
+    [Fact]
+    public void Palette_MatchesTheSecondColourPad_EverySample()
+    {
+        var profile = ColorProfile.LoadBuiltIn();
+        string file = Path.Combine(TestHelpers.RepoRoot(), "palettes", "measured", "colour-pad-1.26.51-v2.csv");
+        int checkedCount = 0;
+        var wrong = new List<string>();
+        foreach (var line in File.ReadAllLines(file).Where(l => l.Length > 0 && !l.StartsWith('#')).Skip(1))
+        {
+            var p = line.Split(',');
+            var block = profile.Find(p[0])!;
+            Assert.NotNull(block);
+            Assert.Equal(p[3], p[4]); // all samples of a block and shade agreed
+            if (block.BiomeTinted) continue;
+            var c = profile.ColorOf(block, Enum.Parse<Shade>(p[1]));
+            if (c.ToHex() != p[2]) wrong.Add($"{p[0]} {p[1]}: palette {c.ToHex()}, game {p[2]}");
+            checkedCount++;
+        }
+        Assert.Equal(1038, checkedCount);
         Assert.True(wrong.Count == 0, string.Join("\n", wrong));
     }
 
