@@ -13,7 +13,9 @@ material CSV and world coordinates).
 
 The window has MapartCraft's three columns: **block selection** on the left, the **map preview** (map, original, shading,
 difference, calibration) and the **materials** in the middle, and **map settings** with the green export buttons on the
-right, one "label: control" per line with foldable sections. 3D, the placement plan and the height map open in a
+right, one "label: control" per line with foldable sections. The preview grows with its column (drag the splitters);
+"Enlarge" or a double-click shows it large in its own window (wheel to zoom, drag to pan, block position and map
+number under the cursor). 3D, the placement plan and the height map open in a
 separate window with "View in 3D" (MapartCraft's "View online"). The UI is in English and Japanese (switch at the top right).
 
 Built with C# / .NET 8 / Avalonia 11 and SkiaSharp. Little-endian NBT, `.mcstructure`, all dithering and the 3D software

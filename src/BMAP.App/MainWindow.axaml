@@ -50,7 +50,7 @@
       </DockPanel>
     </Border>
 
-    <Grid ColumnDefinitions="*,4,436,4,330">
+    <Grid ColumnDefinitions="*,4,600,4,330">
 
       <!-- ===================== Block selection ===================== -->
       <DockPanel Margin="10,4,6,6">
@@ -164,11 +164,12 @@
       <GridSplitter Grid.Column="1" Background="#2A2A2A" ResizeDirection="Columns" />
 
       <!-- ===================== Map preview + materials ===================== -->
-      <ScrollViewer Grid.Column="2">
+      <ScrollViewer x:Name="PreviewColumn" Grid.Column="2">
         <StackPanel Margin="8,4,8,8" Spacing="3">
           <TextBlock Classes="h2" Text="{Binding L[SecPreview]}" />
-          <!-- Square preview; click it to choose an image (MapartCraft "PICK IMAGE") -->
-          <Border Width="416" Height="416" Background="#7BAE7F" HorizontalAlignment="Left">
+          <!-- Square preview as wide as the column (drag the splitters to resize); click it to choose an image
+               (MapartCraft "PICK IMAGE"), double-click to enlarge. -->
+          <Border x:Name="PreviewBox" Width="580" Height="580" Background="#7BAE7F" HorizontalAlignment="Left">
             <Grid>
               <Image x:Name="PreviewImage" Source="{Binding Preview}" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="None"
                      Cursor="Cross" />
@@ -184,8 +185,10 @@
               </Button>
             </Grid>
           </Border>
-          <Grid ColumnDefinitions="*,Auto" Width="416" HorizontalAlignment="Left">
+          <Grid ColumnDefinitions="*,Auto,Auto">
             <TextBlock Text="{Binding OutputSizeText}" FontSize="12" VerticalAlignment="Center" />
+            <Button Grid.Column="2" x:Name="ZoomButton" Classes="small" Content="{Binding L[ZoomPreview]}" ToolTip.Tip="{Binding L[ZoomPreviewTip]}"
+                    IsEnabled="{Binding HasPreview}" Margin="6,0,0,0" VerticalAlignment="Center" />
             <ListBox Grid.Column="1" Classes="tabs" ItemsSource="{Binding PreviewModes}" SelectedItem="{Binding SelectedPreviewMode}">
               <ListBox.ItemsPanel>
                 <ItemsPanelTemplate>
@@ -194,7 +197,7 @@
               </ListBox.ItemsPanel>
             </ListBox>
           </Grid>
-          <TextBlock Classes="note" Text="{Binding PreviewInfo}" Width="416" HorizontalAlignment="Left" />
+          <TextBlock Classes="note" Text="{Binding PreviewInfo}" />
           <TextBlock Classes="note" Text="{Binding SourceInfo}" />
           <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding HasFrames}">
             <TextBlock Classes="lbl" Text="{Binding L[Frame]}" />

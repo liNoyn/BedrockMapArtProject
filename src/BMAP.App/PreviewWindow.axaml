@@ -1,0 +1,42 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:BMAP.App.ViewModels"
+        x:Class="BMAP.App.PreviewWindow"
+        x:DataType="vm:MainViewModel"
+        Title="{Binding L[ZoomTitle]}"
+        Icon="/Assets/bmap.ico"
+        Width="1100" Height="900" MinWidth="480" MinHeight="400">
+
+  <!-- The map preview enlarged: fit to the window, or zoom in with the wheel and drag to pan. -->
+  <DockPanel>
+    <Border DockPanel.Dock="Top" Background="#2B2B2B" Padding="10,6">
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <ListBox Classes="tabs" ItemsSource="{Binding PreviewModes}" SelectedItem="{Binding SelectedPreviewMode}">
+          <ListBox.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Horizontal" />
+            </ItemsPanelTemplate>
+          </ListBox.ItemsPanel>
+        </ListBox>
+        <Button x:Name="FitButton" Classes="small" Content="{Binding L[ZoomFit]}" Margin="10,0,0,0" />
+        <Button x:Name="OutButton" Classes="small" Content="−" MinWidth="26" />
+        <Button x:Name="InButton" Classes="small" Content="+" MinWidth="26" />
+        <Button x:Name="OneButton" Classes="small" Content="1:1" />
+        <TextBlock x:Name="ZoomText" VerticalAlignment="Center" FontSize="12" MinWidth="60" />
+      </StackPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Bottom" Background="#2B2B2B" Padding="10,3">
+      <StackPanel Orientation="Horizontal" Spacing="16">
+        <TextBlock x:Name="PixelText" FontSize="12" />
+        <TextBlock Text="{Binding L[ZoomHelp]}" FontSize="11" Opacity="0.6" />
+      </StackPanel>
+    </Border>
+
+    <Border x:Name="Surface" Background="#7BAE7F" ClipToBounds="True" Cursor="SizeAll">
+      <Canvas>
+        <Image x:Name="Picture" Source="{Binding Preview}" Stretch="Fill" RenderOptions.BitmapInterpolationMode="None" />
+      </Canvas>
+    </Border>
+  </DockPanel>
+</Window>
