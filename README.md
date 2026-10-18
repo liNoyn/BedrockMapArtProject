@@ -64,6 +64,8 @@ renderer are implemented in the project without further libraries.
     colour is approximated by a mix of map colours, laid out as a regular pattern. 35–41 % lower colour error than Bayer.
   - Ordered: blue noise 64 × 64 (generated with void-and-cluster), Bayer 2 × 2 / 4 × 4 / 8 × 8, ordered 3 × 3.
   - All methods are compared in [docs/benchmarks.md](docs/benchmarks.md).
+- **In-game verification kit** (CLI `kit` / `verify`): one behavior pack places the colour pad and a build in each mode;
+  afterwards the maps the game drew are compared with the predictions pixel by pixel ([docs/TODO.md](docs/TODO.md)).
 
 **3D map art (staircasing) and the shading rule**
 - 3D: off (flat), Classic, Valley, full dark, full light.

@@ -25,6 +25,8 @@ if (args.Length == 0)
           maps <world> [outDir]          ワールドの地図を一覧し、outDir があれば PNG で保存（データベースのコピーを読むだけ）
           pad shading|colours <outDir> [--origin mapX,mapZ,y] [--step n]
                                          キャリブレーション用テストパッド（.mcstructure と pad.json）を出力
+          kit <outDir> [--y -60] [--en]  実機検証キット（色パッド・平面 / Classic / Valley の建築・パック）を出力
+          verify <world> <kitDir> [--en] ゲームが描いた地図とキットの予測をピクセル単位で比較（読み取り専用）
           calibrate <world> <pad.json> [--out dir] [--en]
                                          ゲームが描いた地図からパッドを読み取り、陰影規則と地図色を測定
           textures [cacheDir]            ブロックテクスチャを取得
@@ -430,6 +432,51 @@ try
             var origin = BMAP.BlockEngine.WorldOrigin.AlignedToMap(p[0], p[1], p[2]);
             var files = BMAP.Shading.PadExporter.Export(args[2], pad, profile, origin, english: opts.ContainsKey("en"));
             Console.WriteLine($"{pad.Descriptor.Kind}: {pad.Descriptor.Samples.Count} samples -> {files}");
+            break;
+        }
+
+        case "kit":
+        {
+            // kit <outDir> [--y -60] [--en]: the in-game verification kit (colour pad + flat / classic / valley builds + pack).
+            var opts = ParseOptions(args.Skip(2));
+            var profile = BMAP.Palette.ColorProfile.LoadBuiltIn();
+            var dir = BMAP.Shading.VerificationKit.Create(args[1], profile, int.Parse(opts.GetValueOrDefault("y", "-60")), opts.ContainsKey("en"));
+            Console.WriteLine(dir);
+            break;
+        }
+
+        case "verify":
+        {
+            // verify <world> <kitDir> [--en]: compares the maps the game drew with the kit's predictions (read only).
+            var opts = ParseOptions(args.Skip(3));
+            bool en = opts.ContainsKey("en");
+            var world = BMAP.Bedrock.World.WorldInfo.Load(args[1]);
+            var maps = BMAP.Bedrock.MapRecord.ReadAll(args[1]);
+            Console.WriteLine($"{world.Name} [{world.Version}]: {maps.Count} maps");
+            var (tiles, diffs) = BMAP.Shading.VerificationKit.Verify(args[2], maps);
+            string outDir = Path.Combine(args[2], "verify_" + DateTime.Now.ToString("yyyyMMdd_HHmmss"));
+            Directory.CreateDirectory(outDir);
+            var sb = new StringBuilder($"{world.Name} [{world.Version}]\n{"part",-12} {"map",-8} {"map id",-14} {"compared",9} {"exact",7} {"share",8} {"unexplored",11}\n");
+            foreach (var t in tiles)
+                sb.AppendLine(t.MapId is null
+                    ? $"{t.Item,-12} {t.MapX},{t.MapZ,-6} {"(no map)",-14}"
+                    : $"{t.Item,-12} {t.MapX},{t.MapZ,-6} {t.MapId,-14} {t.Compared,9} {t.Exact,7} {t.ExactShare,8:P2} {t.Unexplored,11}");
+            foreach (var (id, img) in diffs) ImageCodec.SavePng(img.ScaleNearest(4), Path.Combine(outDir, $"diff_{id}.png"));
+            // The colour pad also gets the full calibration report (colours per block and shade).
+            var manifest = BMAP.Shading.KitManifest.Load(Path.Combine(args[2], "kit.json"));
+            var profile = BMAP.Palette.ColorProfile.LoadBuiltIn();
+            foreach (var item in manifest.Items.Where(i => i.Pad != null))
+            {
+                var pad = BMAP.Shading.PadDescriptor.Load(Path.Combine(args[2], item.Pad!));
+                var predicted = BMAP.Shading.MapSimulator.Simulate(BMAP.Shading.ShadingTestPad.Recreate(pad, profile).Layout, profile).Image;
+                if (BMAP.Shading.Calibrator.FindMap(maps, pad, predicted) is not { } map) { sb.AppendLine($"{item.Id}: no map for the calibration report"); continue; }
+                var r = BMAP.Shading.Calibrator.Analyze(pad, map, profile, world.Version ?? "?", en);
+                File.WriteAllText(Path.Combine(outDir, $"calibration_{item.Id}.txt"), BMAP.Shading.Calibrator.Report(r, en));
+                ImageCodec.SavePng(BMAP.Shading.Calibrator.ComparisonImage(r), Path.Combine(outDir, $"calibration_{item.Id}.png"));
+            }
+            File.WriteAllText(Path.Combine(outDir, "verify.txt"), sb.ToString(), new UTF8Encoding(true));
+            Console.Write(sb);
+            Console.WriteLine(outDir);
             break;
         }
 
