@@ -80,6 +80,44 @@ public class DitherTests
     }
 
     [Fact]
+    public void Optimized_HasNoPatchesInAPaleGradientWithBlockNoise()
+    {
+        // Flat pale pinks near the point where grey alone stops being the best plan, with 8x8 block noise of ±2 (as in
+        // compressed anime frames). One hard plan per colour bucket made the blocks flip between grey and
+        // white + pink: square patches. Inside each flat area the pink share must be even.
+        const int S = 64, T = 16;
+        string[] colours = ["#F4DADB", "#F3D7D9", "#F2D4D7", "#F1D1D5", "#F0CED3", "#EFCBD1"];
+        double worst = 0;
+        foreach (var hex in colours)
+        {
+            var c0 = Rgba.FromHex(hex);
+            var img = new RgbaImage(S * 2, S * 2);
+            for (int y = 0; y < img.Height; y++)
+                for (int x = 0; x < img.Width; x++)
+                {
+                    int n = (((x / 8) * 7 + (y / 8) * 13) % 5) - 2;
+                    int i = (y * img.Width + x) * 4;
+                    img.Pixels[i] = (byte)Math.Clamp(c0.R + n, 0, 255);
+                    img.Pixels[i + 1] = (byte)Math.Clamp(c0.G + n, 0, 255);
+                    img.Pixels[i + 2] = (byte)Math.Clamp(c0.B + n, 0, 255);
+                    img.Pixels[i + 3] = 255;
+                }
+            var q = Q(img, new QuantizeOptions { Dither = DitherMode.Optimized, Mode = StaircaseMode.Valley });
+            var shares = new List<double>();
+            for (int ty = T; ty < img.Height - T; ty += T) // away from the borders
+                for (int tx = T; tx < img.Width - T; tx += T)
+                {
+                    int pink = 0;
+                    for (int y = ty; y < ty + T; y++)
+                        for (int x = tx; x < tx + T; x++)
+                            if (q.Entries[q.Get(x, y)].Block.Key.StartsWith("pink")) pink++;
+                    shares.Add(pink / (double)(T * T));
+                }
+            worst = Math.Max(worst, shares.Max() - shares.Min());
+        }
+        Assert.True(worst < 0.15, $"pink share varies by {worst:0.00} inside a flat area");
+    }
+    [Fact]
     public void QualityScore_IsZeroForAnIdenticalImage_AndSeesNoise()
     {
         var img = TestHelpers.Gradient(64, 64);

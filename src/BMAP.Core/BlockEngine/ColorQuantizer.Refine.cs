@@ -114,10 +114,20 @@ public static partial class ColorQuantizer
         var ok = new Lab[n];
         for (int i = 0; i < n; i++) ok[i] = ColorMath.ToOklab(image.Pixels[i * 4], image.Pixels[i * 4 + 1], image.Pixels[i * 4 + 2]);
         float pw = (float)settings.PerceptualWeight;
+        double ph = settings.PixelHue;
         float PixelCost(int i, int c)
         {
             double dl = ck[c].L - ok[i].L, da = ck[c].A - ok[i].A, db = ck[c].B - ok[i].B;
-            return pw * (float)(dl * dl + da * da + db * db);
+            double cost = pw * (dl * dl + da * da + db * db);
+            if (ph > 0)
+            {
+                // Off-hue part of the colour relative to this pixel's hue (the same idea as the plan's PlanHue), so
+                // the optimiser itself prefers dots on the source's hue line: pink in a pale pink, not red in salmon.
+                double tA = ok[i].A, tB = ok[i].B, tC = Math.Sqrt(tA * tA + tB * tB);
+                double off = tC > 0.02 ? Math.Abs(ck[c].A * tB - ck[c].B * tA) / tC : Math.Sqrt(ck[c].A * ck[c].A + ck[c].B * ck[c].B);
+                cost += ph * off * off;
+            }
+            return (float)cost;
         }
 
         // Per pixel only candidates near the source colour are tried: the closest ones within Radius (Oklab) of the
@@ -227,10 +237,12 @@ public static partial class ColorQuantizer
         // Contrast inside a mix: differences in hue and vividness (a, b) weighted by ChromaSpread against lightness.
         double kc = settings.ChromaSpread;
         double S(Lab a, Lab b) => Math.Sqrt((a.L - b.L) * (a.L - b.L) + kc * ((a.A - b.A) * (a.A - b.A) + (a.B - b.B) * (a.B - b.B)));
-        double lambda = settings.PairLambda, mu = settings.PairQuad;
-        // Penalty for the contrast inside a mix: linear, plus a quadratic part so that extreme mixes (white with
-        // emerald for a pale green) lose against calm ones even when their average is closer.
-        double Spread(double s) => lambda * s + mu * s * s;
+        double lambda = settings.PairLambda, mu = settings.PairQuad, tol = settings.HueTolerance;
+        // Penalty for the contrast inside a mix: linear in the whole contrast, plus a quadratic part in the contrast
+        // ACROSS the target's hue (cross = spread of the signed off-hue distances). Red with yellow for a salmon orange
+        // lies on both sides of its hue and loses; white with pink for a pale pink lies along it and is not touched,
+        // so near-ties between "grey alone" and "white + pink" no longer flip whole areas (patches).
+        double Spread(double s, double cross) => lambda * s + mu * cross * cross;
         int pool = Math.Min(settings.PairPool, nc);
 
         // Plans per colour bucket (5 bits per channel) and shade group, from the bucket centre: deterministic.
@@ -258,9 +270,23 @@ public static partial class ColorQuantizer
                 // White and pink for a pale pink, or white and ice for a pale lavender, lie on that line; red and yellow
                 // for a salmon orange lie on either side of it and show as loud dots.
                 double tA = target.A, tB = target.B, tC = Math.Sqrt(tA * tA + tB * tB);
-                double Off(int c) => tC > 0.02 ? Math.Abs(ck[c].A * tB - ck[c].B * tA) / tC : Math.Sqrt(ck[c].A * ck[c].A + ck[c].B * ck[c].B);
+                // Signed distance from the target's hue line (neutral targets: chroma), and the penalised part beyond a
+                // small tolerance (a pink wool slightly off a pale pink's hue is fine).
+                double OffS(int c) => tC > 0.02 ? (ck[c].A * tB - ck[c].B * tA) / tC : Math.Sqrt(ck[c].A * ck[c].A + ck[c].B * ck[c].B);
+                double Off(int c) => Math.Max(0, Math.Abs(OffS(c)) - tol);
                 double best = D(ck[nearest], target) * (1 + beta) + gamma * Off(nearest);
                 int ba = nearest, bb = -1;
+                // Near-best plans are kept too (within PlanMargin): one hard choice per colour made neighbouring colours
+                // flip between plans (grey vs white + pink in a pale gradient), which showed as square patches.
+                double margin = settings.PlanMargin, relative = settings.PlanRelative;
+                double Cut() => best + margin + best * relative;
+                var top = new List<(double Cost, int A, int B, int C)> { (best, nearest, -1, -1) };
+                void Keep(double cost, int a, int b, int c3)
+                {
+                    if (cost > Cut()) return;
+                    top.Add((cost, a, b, c3));
+                    if (top.Count > 64) top.RemoveAll(p => p.Cost > Cut());
+                }
                 var partners = new List<(double Cost, int Id)>();
                 double partnerCut = double.MaxValue;
                 for (int i = 0; i < close.Length; i++)
@@ -276,9 +302,10 @@ public static partial class ColorQuantizer
                         double t = Math.Clamp(((tr - lin[a * 3]) * dx + (tg - lin[a * 3 + 1]) * dy + (tb - lin[a * 3 + 2]) * dz) / len, 0, 1);
                         if (t <= 0 || t >= 1) continue;
                         var mix = ColorMath.LinearToOklab(lin[a * 3] + t * dx, lin[a * 3 + 1] + t * dy, lin[a * 3 + 2] + t * dz);
-                        double cost = D(mix, target) + Spread(S(ck[a], ck[c]) * 2 * Math.Sqrt(t * (1 - t)))
+                        double cost = D(mix, target) + Spread(S(ck[a], ck[c]) * 2 * Math.Sqrt(t * (1 - t)), Math.Abs(OffS(a) - OffS(c)) * 2 * Math.Sqrt(t * (1 - t)))
                             + beta * ((1 - t) * D(ck[a], target) + t * D(ck[c], target)) + gamma * ((1 - t) * Off(a) + t * Off(c));
                         if (cost < best) { best = cost; ba = a; bb = c; }
+                        Keep(cost, a, c, -1);
                         if (cost < partnerCut) { partners.Add((cost, c)); if (partners.Count > 24) { partners.Sort(); partners.RemoveRange(12, partners.Count - 12); partnerCut = partners[^1].Cost; } }
                     }
                 // Three-colour mixes reach colours inside a triangle of map colours, which no pair can. Weights by least
@@ -308,25 +335,64 @@ public static partial class ColorQuantizer
                             var mix = ColorMath.LinearToOklab(lin[a * 3] + u * e1x + v * e2x, lin[a * 3 + 1] + u * e1y + v * e2y, lin[a * 3 + 2] + u * e1z + v * e2z);
                             double dab = S(ck[a], ck[b2]), dac = S(ck[a], ck[c]), dbc = S(ck[b2], ck[c]);
                             double spread = 2 * Math.Sqrt(w0 * u * dab * dab + w0 * v * dac * dac + u * v * dbc * dbc);
-                            double cost = D(mix, target) + Spread(spread)
+                            double oa = OffS(a), ob = OffS(b2), oc = OffS(c);
+                            double cross = 2 * Math.Sqrt(w0 * u * (oa - ob) * (oa - ob) + w0 * v * (oa - oc) * (oa - oc) + u * v * (ob - oc) * (ob - oc));
+                            double cost = D(mix, target) + Spread(spread, cross)
                                 + beta * (w0 * D(ck[a], target) + u * D(ck[b2], target) + v * D(ck[c], target))
                                 + gamma * (w0 * Off(a) + u * Off(b2) + v * Off(c));
                             if (cost < best) { best = cost; t1 = a; t2 = b2; t3 = c; }
+                            Keep(cost, a, b2, c);
                         }
-                if (t1 >= 0)
-                    return Array.IndexOf(new[] { t1, t2, t3 }, nearest) >= 0 ? [t1, t2, t3] : [t1, t2, t3, nearest];
-                return bb < 0 ? (ba == nearest ? [nearest] : [ba, nearest])
-                    : nearest == ba || nearest == bb ? [ba, bb] : [ba, bb, nearest];
+                // Colours of the best plan first, then of the near-best ones, then the nearest colour.
+                var list = new List<int>();
+                void Add(int id) { if (id >= 0 && !list.Contains(id)) list.Add(id); }
+                if (t1 >= 0) { Add(t1); Add(t2); Add(t3); } else { Add(ba); Add(bb); }
+                foreach (var p in top.Where(p => p.Cost <= Cut()).OrderBy(p => p.Cost).ThenBy(p => p.A).ThenBy(p => p.B).ThenBy(p => p.C))
+                {
+                    if (list.Count >= settings.PlanColours) break;
+                    Add(p.A); Add(p.B); Add(p.C);
+                }
+                Add(nearest);
+                return [.. list];
             });
         }
 
+        // Plans are also taken for a smoothed copy of the image: flat areas of compressed pictures carry blocky noise
+        // (8x8 JPEG blocks) that flipped neighbouring blocks between plans and showed as square patches. Each pixel
+        // gets its own plan's colours (sharp edges) and the smoothed one's (smooth transitions).
+        var smooth = settings.PlanBlur > 0 ? BlurLinear(image, settings.PlanBlur) : null;
         Parallel.For(0, h, new ParallelOptions { CancellationToken = ct }, y =>
         {
             for (int x = 0; x < w; x++)
             {
                 int i = y * w + x, cur = chosen[i];
                 if (cur < 0) continue;
-                var plan = Plan(image.Pixels[i * 4], image.Pixels[i * 4 + 1], image.Pixels[i * 4 + 2], sameShade ? (int)candidates[cur].Shade : -1);
+                int shade = sameShade ? (int)candidates[cur].Shade : -1;
+                int[] plan;
+                if (smooth is null) plan = Plan(image.Pixels[i * 4], image.Pixels[i * 4 + 1], image.Pixels[i * 4 + 2], shade);
+                else
+                {
+                    // Flat areas use only the smoothed colour's plan, so noise cannot flip blocks between plans; near
+                    // edges (where the smoothed colour differs) the pixel's own plan is added for its exact colour.
+                    plan = Plan(smooth[i * 3], smooth[i * 3 + 1], smooth[i * 3 + 2], shade);
+                    if (settings.PlanEdge <= 0)
+                    {
+                        // Union mode: the pixel's own plan and the smoothed one's.
+                        var po = Plan(image.Pixels[i * 4], image.Pixels[i * 4 + 1], image.Pixels[i * 4 + 2], shade);
+                        plan = [.. po, .. plan.Where(c => Array.IndexOf(po, c) < 0)];
+                    }
+                    else
+                    {
+                    var own = ColorMath.ToOklab(image.Pixels[i * 4], image.Pixels[i * 4 + 1], image.Pixels[i * 4 + 2]);
+                    var sm = ColorMath.ToOklab(smooth[i * 3], smooth[i * 3 + 1], smooth[i * 3 + 2]);
+                    double dl = own.L - sm.L, da = own.A - sm.A, db = own.B - sm.B;
+                    if (dl * dl + da * da + db * db > settings.PlanEdge * settings.PlanEdge)
+                    {
+                        var p1 = Plan(image.Pixels[i * 4], image.Pixels[i * 4 + 1], image.Pixels[i * 4 + 2], shade);
+                        plan = [.. p1, .. plan.Where(c => Array.IndexOf(p1, c) < 0)];
+                    }
+                    }
+                }
                 int count = Math.Min(plan.Length, take);
                 for (int t = 0; t < count; t++) { near[i * take + t] = plan[t]; nearCost[i * take + t] = pixelCost(i, plan[t]); }
                 counts[i] = count;
@@ -337,6 +403,83 @@ public static partial class ColorQuantizer
     }
 
     private static double Sq(double v) => v * v;
+
+    /// <summary>
+    /// Bilateral filter (5x5, spatial σ 1.2, range σ <paramref name="range"/> in sRGB steps): removes the small block
+    /// noise of compressed pictures in flat areas, which made the optimiser decide block by block (square patches of
+    /// pink and grey in a pale pink), while keeping lines and edges, which differ by far more. Transparent pixels are
+    /// left alone and do not contribute.
+    /// </summary>
+    internal static RgbaImage Denoise(RgbaImage img, double range)
+    {
+        int w = img.Width, h = img.Height;
+        var dst = img.Clone();
+        var spatial = new double[25];
+        for (int dy = -2; dy <= 2; dy++) for (int dx = -2; dx <= 2; dx++) spatial[(dy + 2) * 5 + dx + 2] = Math.Exp(-(dx * dx + dy * dy) / (2 * 1.2 * 1.2));
+        double inv = 1 / (2 * range * range);
+        var p = img.Pixels;
+        Parallel.For(0, h, y =>
+        {
+            for (int x = 0; x < w; x++)
+            {
+                int i = (y * w + x) * 4;
+                if (p[i + 3] == 0) continue;
+                double sr = 0, sg = 0, sb = 0, ws = 0;
+                for (int dy = -2; dy <= 2; dy++)
+                {
+                    int yy = y + dy;
+                    if (yy < 0 || yy >= h) continue;
+                    for (int dx = -2; dx <= 2; dx++)
+                    {
+                        int xx = x + dx;
+                        if (xx < 0 || xx >= w) continue;
+                        int j = (yy * w + xx) * 4;
+                        if (p[j + 3] == 0) continue;
+                        double d2 = Sq(p[j] - p[i]) + Sq(p[j + 1] - p[i + 1]) + Sq(p[j + 2] - p[i + 2]);
+                        double wt = spatial[(dy + 2) * 5 + dx + 2] * Math.Exp(-d2 * inv);
+                        sr += p[j] * wt; sg += p[j + 1] * wt; sb += p[j + 2] * wt; ws += wt;
+                    }
+                }
+                dst.Pixels[i] = (byte)Math.Round(sr / ws); dst.Pixels[i + 1] = (byte)Math.Round(sg / ws); dst.Pixels[i + 2] = (byte)Math.Round(sb / ws);
+            }
+        });
+        return dst;
+    }
+
+    /// <summary>Gaussian blur in linear light, returned as sRGB bytes (3 per pixel).</summary>
+    private static byte[] BlurLinear(RgbaImage img, double sigma)
+    {
+        int w = img.Width, h = img.Height, r = (int)Math.Ceiling(3 * sigma);
+        var k = new double[2 * r + 1];
+        for (int d = -r; d <= r; d++) k[d + r] = Math.Exp(-d * d / (2 * sigma * sigma));
+        var a = new double[w * h * 3];
+        for (int i = 0; i < w * h; i++) for (int ch = 0; ch < 3; ch++) a[i * 3 + ch] = ColorMath.SrgbToLinear(img.Pixels[i * 4 + ch]);
+        var t = new double[a.Length];
+        for (int pass = 0; pass < 2; pass++)
+        {
+            var src = pass == 0 ? a : t;
+            var dst = pass == 0 ? t : a;
+            var tmp = new double[src.Length];
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    double s0 = 0, s1 = 0, s2 = 0, ws = 0;
+                    for (int d = -r; d <= r; d++)
+                    {
+                        int sx = pass == 0 ? x + d : x, sy = pass == 0 ? y : y + d;
+                        if (sx < 0 || sy < 0 || sx >= w || sy >= h) continue;
+                        int j = (sy * w + sx) * 3;
+                        s0 += src[j] * k[d + r]; s1 += src[j + 1] * k[d + r]; s2 += src[j + 2] * k[d + r]; ws += k[d + r];
+                    }
+                    int o = (y * w + x) * 3;
+                    tmp[o] = s0 / ws; tmp[o + 1] = s1 / ws; tmp[o + 2] = s2 / ws;
+                }
+            Array.Copy(tmp, dst, tmp.Length);
+        }
+        var result = new byte[w * h * 3];
+        for (int i = 0; i < result.Length; i++) result[i] = (byte)Math.Clamp(Math.Round(ColorMath.LinearToSrgb(a[i])), 0, 255);
+        return result;
+    }
 
     /// <summary>The <paramref name="count"/> smallest of the first <paramref name="m"/> items, into <paramref name="result"/>.</summary>
     private static void PartialSort(int[] items, float[] keys, int m, int count, int[] result)
@@ -388,4 +531,20 @@ public sealed record RefineSettings
     public double PlanHue { get; init; }
     /// <summary>Quadratic part of the mix contrast penalty.</summary>
     public double PairQuad { get; init; }
+    /// <summary>Plans within this cost of the best one also lend their colours (smooth transitions between plans).</summary>
+    public double PlanMargin { get; init; }
+    /// <summary>At most this many colours from near-best plans per pixel.</summary>
+    public int PlanColours { get; init; } = 6;
+    /// <summary>Plans within this fraction of the best cost also lend their colours.</summary>
+    public double PlanRelative { get; init; }
+    /// <summary>Per-pixel weight of the squared off-hue distance in the optimiser.</summary>
+    public double PixelHue { get; init; }
+    /// <summary>Off-hue distance (Oklab) below which a colour counts as on the target's hue.</summary>
+    public double HueTolerance { get; init; }
+    /// <summary>Blur (σ px) of the copy whose plans are added to each pixel's own (0 = off).</summary>
+    public double PlanBlur { get; init; }
+    /// <summary>Oklab distance from the smoothed colour above which a pixel counts as an edge and keeps its own plan.</summary>
+    public double PlanEdge { get; init; } = 0.03;
+    /// <summary>Edge-preserving smoothing of the source first: range σ in sRGB steps (0 = off).</summary>
+    public double Denoise { get; init; }
 }
