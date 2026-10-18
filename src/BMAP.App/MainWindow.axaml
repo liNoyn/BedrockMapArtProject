@@ -336,13 +336,30 @@
           </Grid>
           <Border Classes="group" IsVisible="{Binding IsStaircase}">
             <StackPanel Spacing="2">
-              <Grid ColumnDefinitions="Auto,*" IsEnabled="{Binding CanLimitHeight}">
-                <TextBlock Classes="lbl" Text="{Binding L[MaxHeight]}" />
-                <NumericUpDown Grid.Column="1" Value="{Binding MaxHeight}" Minimum="0" Maximum="383" FormatString="0" ToolTip.Tip="{Binding L[MaxHeightHint]}" />
-              </Grid>
-              <Grid ColumnDefinitions="Auto,*">
+              <!-- Height: "no limit" or a limit from presets / a slider / a number, then what the build really needs. -->
+              <StackPanel Spacing="3" IsEnabled="{Binding CanLimitHeight}" ToolTip.Tip="{Binding L[MaxHeightHint]}">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                  <TextBlock Classes="lbl" Text="{Binding L[HeightLimitLabel]}" />
+                  <TextBlock Grid.Column="1" Text="{Binding MaxHeightText}" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" Margin="6,0,0,0" />
+                  <CheckBox Grid.Column="2" Content="{Binding L[HeightNoLimit]}" IsChecked="{Binding HeightUnlimited}" MinHeight="0" />
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HeightLimited}">
+                  <Slider Minimum="1" Maximum="96" Value="{Binding HeightSlider}" IsSnapToTickEnabled="True" TickFrequency="1" />
+                  <NumericUpDown Grid.Column="1" Value="{Binding MaxHeight}" Minimum="1" Maximum="383" FormatString="0" Width="92" Margin="6,0,0,0" />
+                </Grid>
+                <UniformGrid Columns="4" ToolTip.Tip="{Binding L[HeightPresetHint]}">
+                  <Button Classes="small" Content="{Binding L[HeightLow]}" Command="{Binding HeightLowCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,0,3,0" />
+                  <Button Classes="small" Content="{Binding L[HeightMedium]}" Command="{Binding HeightMediumCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,0,3,0" />
+                  <Button Classes="small" Content="{Binding L[HeightHigh]}" Command="{Binding HeightHighCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,0,3,0" />
+                  <Button Classes="small" Content="{Binding L[HeightNoLimit]}" Command="{Binding HeightNoLimitCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+                </UniformGrid>
+              </StackPanel>
+              <TextBlock Classes="note" Text="{Binding L[HeightClassicNote]}" IsVisible="{Binding !CanLimitHeight}" />
+              <TextBlock Text="{Binding BuildHeightText}" FontSize="12" Foreground="#9FD39F" TextWrapping="Wrap" />
+              <Grid ColumnDefinitions="Auto,*,44" Margin="0,2,0,0">
                 <TextBlock Classes="lbl" Text="{Binding L[ShadePenalty]}" ToolTip.Tip="{Binding L[ShadePenaltyHint]}" />
                 <Slider Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding ShadePenalty}" ToolTip.Tip="{Binding L[ShadePenaltyHint]}" />
+                <TextBlock Grid.Column="2" Classes="val" Text="{Binding ShadePenaltyText}" />
               </Grid>
               <TextBlock Classes="note" Text="{Binding L[ShadeRuleShort]}" ToolTip.Tip="{Binding L[ShadeRuleNote]}" />
             </StackPanel>

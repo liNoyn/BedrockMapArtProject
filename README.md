@@ -66,7 +66,9 @@ renderer are implemented in the project without further libraries.
 - 3D: off (flat), Classic, Valley, full dark, full light.
 - **Shading model**: by default the rule measured on Bedrock 1.26.51 (±1 alternates by coordinate parity, ±2 or more
   always). With the build aligned to the map grid (default), single steps are used where the parity allows and normal
-  pixels may drift by one, 27–37 % lower than always stepping by 2. With a height limit, the real layout height is
+  pixels may drift by one, 27–37 % lower than always stepping by 2. The **height limit** is set with a "no limit" box,
+  a slider, a number or the presets low 8 / medium 16 / high 32 / no limit; it is the height of the whole build,
+  support blocks included, and the height the build really needs (with its Y range) is shown below. With a height limit, the real layout height is
   measured so the limit is used fully.
 - **Shading rule analysis** (details in [docs/shading-rules.md](docs/shading-rules.md), Japanese)
   - Map simulator: redraws the map from the block positions alone and compares it pixel by pixel with the planned
