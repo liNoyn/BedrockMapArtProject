@@ -124,7 +124,7 @@ public class KitTests
                 }
         }
         var (tiles, diffs) = VerificationKit.Verify(kit, maps);
-        Assert.Equal(1 + 1 + 1 + 4 + 16 + 1, tiles.Count);
+        Assert.Equal(1 + 1 + 1 + 4 + 16 + 1 + 1, tiles.Count);
         Assert.All(tiles.Where(t => t.Item != "flat"), t => Assert.Equal(t.Compared, t.Exact));
         var flat = tiles.Single(t => t.Item == "flat");
         Assert.Equal(5, flat.Unexplored);

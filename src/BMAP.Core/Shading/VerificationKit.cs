@@ -26,7 +26,9 @@ public sealed record KitItem
 }
 
 /// <summary>A pool of still water: Size x Size water surface at map pixel (X, Z), Depth blocks deep, on a stone floor.</summary>
-public sealed record WaterPool(int X, int Z, int Size, int Depth);
+/// <param name="NorthDy">Height of the water surface minus the height the map sees just north of the pool (0 = same).</param>
+/// <param name="Bars">The north edge holds the water with iron bars (not drawn on maps) instead of a higher wall.</param>
+public sealed record WaterPool(int X, int Z, int Size, int Depth, int NorthDy = 0, bool Bars = false, int Width = 0);
 
 /// <summary>kit.json: what was placed where, so <see cref="VerificationKit.Verify"/> can compare the game's maps.</summary>
 public sealed record KitManifest
@@ -61,7 +63,7 @@ public static class VerificationKit
     public const string Namespace = "bmap_kit";
 
     /// <summary>All parts; <c>parts</c> picks some of them (a second session only needs what is still open).</summary>
-    public static readonly string[] AllParts = ["colour_pad", "flat", "classic", "valley_2x2", "large_4x4", "water"];
+    public static readonly string[] AllParts = ["colour_pad", "flat", "classic", "valley_2x2", "large_4x4", "water", "water_steps"];
 
     public static string Create(string folder, ColorProfile profile, int baseY = -60, bool english = false,
         IReadOnlyCollection<string>? parts = null, string name = "BMAP_verification_kit")
@@ -159,6 +161,60 @@ public static class VerificationKit
             };
             items.Add(item);
             pieces.Add((item, [new StructureTile { Id = "pools", Structure = s, OffsetX = 0, OffsetY = 0, OffsetZ = 0, MapNumbers = [1], Order = 0 }], origin));
+        }
+
+        // Water steps: is water shaded by the height of the block north of it, like other blocks? Each cell is a pool
+        // (water surface at y 4) whose north edge is seen by the map at another height: a higher stone wall (water
+        // lower: dark side), or a lower wall topped with iron bars that hold the water but are not drawn (water higher:
+        // light side). Two rows, with the cells shifted by one block between rows, so both pixel parities are covered.
+        if (parts.Contains("water_steps"))
+        {
+            var stone = new PaletteBlock("minecraft:stone", new Nbt.NbtCompound(), 18168865);
+            var water = new PaletteBlock("minecraft:water", new Nbt.NbtCompound { { "liquid_depth", new Nbt.NbtInt(0) } }, 18168865);
+            var bars = new PaletteBlock("minecraft:iron_bars", new Nbt.NbtCompound
+            {
+                { "minecraft:connection_east", new Nbt.NbtByte(0) }, { "minecraft:connection_north", new Nbt.NbtByte(0) },
+                { "minecraft:connection_south", new Nbt.NbtByte(0) }, { "minecraft:connection_west", new Nbt.NbtByte(0) },
+            }, 18168865);
+            const int Surface = 4, CellW = 10, CellD = 8, Height = 10;
+            var s = new McStructure(128, Height, 128);
+            var pools = new List<WaterPool>();
+            (int Dy, bool Bars)[] kinds = [(0, false), (-1, false), (-2, false), (-3, false), (-4, false), (1, true), (2, true), (3, true)];
+            for (int rowSet = 0; rowSet < 2; rowSet++)
+                for (int k = 0; k < kinds.Length; k++)
+                {
+                    var (dy, useBars) = kinds[k];
+                    int x0 = 4 + k * (CellW + 4) + rowSet, z0 = 8 + rowSet * 40;
+                    // Floor and walls (east, west, south at the surface height; north as the case requires).
+                    for (int z = z0; z < z0 + CellD; z++)
+                        for (int x = x0; x < x0 + CellW; x++)
+                        {
+                            s.SetBlock(x, 0, z, stone);
+                            bool edge = x == x0 || x == x0 + CellW - 1 || z == z0 + CellD - 1;
+                            bool north = z == z0 && !edge;
+                            if (north)
+                            {
+                                int wallTop = Surface - dy; // dy < 0: wall above the water; dy > 0: below it
+                                for (int y = 1; y <= Math.Min(wallTop, Height - 1); y++) s.SetBlock(x, y, z, stone);
+                                if (useBars) for (int y = wallTop + 1; y <= Surface; y++) s.SetBlock(x, y, z, bars);
+                            }
+                            else if (edge) for (int y = 1; y <= Surface; y++) s.SetBlock(x, y, z, stone);
+                            else for (int y = 1; y <= Surface; y++) s.SetBlock(x, y, z, water);
+                        }
+                    pools.Add(new WaterPool(x0 + 1, z0 + 1, CellD - 2, Surface, dy, useBars, CellW - 2));
+                }
+            int mapX = -1, mapZ = 1;
+            var origin = new WorldOrigin(128 * mapX - 64, baseY, 128 * mapZ - 64);
+            string sub = Path.Combine(dir, "water_steps");
+            Directory.CreateDirectory(sub);
+            ImageCodec.SavePng(new RgbaImage(128, 128), Path.Combine(sub, "predicted_map.png"));
+            var item = new KitItem
+            {
+                Id = "water_steps", Title = english ? "Water next to higher / lower blocks" : "高さの違うブロックの隣の水（陰影）", MapX = mapX, MapZ = mapZ,
+                Predicted = Path.GetRelativePath(dir, Path.Combine(sub, "predicted_map.png")), Pools = pools,
+            };
+            items.Add(item);
+            pieces.Add((item, [new StructureTile { Id = "cells", Structure = s, OffsetX = 0, OffsetY = 0, OffsetZ = 0, MapNumbers = [1], Order = 0 }], origin));
         }
 
         var manifest = new KitManifest { BaseY = baseY, ProfileId = profile.Id, Created = DateTime.Now.ToString("yyyy-MM-dd HH:mm"), Items = items };
@@ -269,6 +325,27 @@ public static class VerificationKit
             var map = maps.Where(r => r.Scale == 0 && r.Dimension == 0 && r.XCenter == 128 * item.MapX && r.ZCenter == 128 * item.MapZ)
                 .Select(r => r.ToImage()).FirstOrDefault(i => i != null);
             if (map is null) { sb.AppendLine($"{item.Id}: no map"); continue; }
+            if (item.Pools!.Any(p => p.Width > 0))
+            {
+                // Step cells: the row next to the north edge (shaded by it, if water is shaded at all) and the rest.
+                sb.AppendLine("north dy  bars  first row: even (x+z)            odd (x+z)                        | inner rows");
+                foreach (var p in item.Pools!)
+                {
+                    var even = new Dictionary<string, int>(); var odd = new Dictionary<string, int>(); var inner = new Dictionary<string, int>();
+                    for (int z = p.Z; z < p.Z + p.Size; z++)
+                        for (int x = p.X; x < p.X + p.Width; x++)
+                        {
+                            int i = (z * 128 + x) * 4;
+                            string c = map.Pixels[i + 3] == 0 ? "(unexplored)" : $"#{map.Pixels[i]:X2}{map.Pixels[i + 1]:X2}{map.Pixels[i + 2]:X2}";
+                            var d = z > p.Z + 1 ? inner : ((x + z) & 1) == 0 ? even : odd;
+                            if (z == p.Z + 1) continue;
+                            d[c] = d.GetValueOrDefault(c) + 1;
+                        }
+                    static string T(Dictionary<string, int> d) => string.Join(" ", d.OrderByDescending(kv => kv.Value).Take(2).Select(kv => $"{kv.Key} x{kv.Value}"));
+                    sb.AppendLine($"{p.NorthDy,8}  {(p.Bars ? "yes" : "no"),4}  {T(even),-32} {T(odd),-32} | {T(inner)}");
+                }
+                continue;
+            }
             sb.AppendLine("depth  even (x+z)                          odd (x+z)");
             foreach (var p in item.Pools!)
             {
