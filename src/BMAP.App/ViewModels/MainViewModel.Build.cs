@@ -253,7 +253,7 @@ public sealed partial class MainViewModel
         ApplyRecommendedYCommand = new RelayCommand(() => { if (_advice is { Fits: true } a) { UseOrigin = true; OriginY = a.RecommendedBaseY; } }, () => _advice is { Fits: true });
         Dithers =
         [
-            new(DitherMode.None, "SuNone", L), new(DitherMode.FloydSteinberg, "Floyd–Steinberg", L),
+            new(DitherMode.None, "SuNone", L), new(DitherMode.Optimized, "DitherOptimized", L), new(DitherMode.FloydSteinberg, "Floyd–Steinberg", L),
             new(DitherMode.JarvisJudiceNinke, "Jarvis–Judice–Ninke (MinAvgErr)", L), new(DitherMode.Burkes, "Burkes", L),
             new(DitherMode.SierraLite, "Sierra Lite", L), new(DitherMode.Stucki, "Stucki", L), new(DitherMode.Atkinson, "Atkinson", L),
             new(DitherMode.KnollBayer, "DitherKnollBayer", L), new(DitherMode.KnollBlueNoise, "DitherKnollBlue", L),
@@ -277,7 +277,7 @@ public sealed partial class MainViewModel
             new(ProgressState.Done, "PrDone", L), new(ProgressState.Skipped, "PrSkipped", L), new(ProgressState.NeedsFix, "PrNeedsFix", L),
         ];
         _metric = Metrics[0];
-        _dither = Dithers[0];
+        _dither = Dithers.First(d => d.Value == DitherMode.Optimized);
         _staircase = Staircases[0];
         _supportMode = SupportModes[1];
         ExportBlockCommand = new RelayCommand(ExportBlockAsync, () => _layout != null && !IsBusy);

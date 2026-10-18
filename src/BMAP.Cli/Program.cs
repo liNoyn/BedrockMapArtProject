@@ -14,6 +14,9 @@ if (args.Length == 0)
           analyze <image> [--maps 1x1] [--dither none|fs|bayer4] [--preset n] [--bg #RRGGBB]
                                          3D マップアートの高さと画質の関係を解析
           bench <image>... [--maps 1x1]  ディザリング・色差の方式を比較（画質と速度）
+          convert <image> <out.png> [--dither Optimized] [--staircase valley|flat] [--max n] [--maps 1x1]
+                                         変換結果を元画像と並べて保存し、色差を表示
+          nearest #RRGGBB... [--n 8]     一番近い地図色（陰影つき）を一覧
           render <image> <out.png> [--maps 1x1] [--mode texture|map|shade|height] [--yaw 35] [--pitch 40] [--zoom 0]
                 [--size 1200x800] [--textures dir] [--grid] [--nolight]
                                          3D ビューを PNG に描画（各段階の処理時間を表示）
@@ -205,6 +208,71 @@ try
             {
                 var t = totals[name];
                 Console.WriteLine($"{name,-38} {t.P / images.Count,9:0.000} {t.D / images.Count,10:0.000} {t.Ms / images.Count,7}");
+            }
+            break;
+        }
+
+        case "convert":
+        {
+            // convert <image> <out.png> [--maps 1x1] [--dither <mode>] [--staircase flat|valley] [--metric oklab|de2000]
+            //         [--max n] [--scale 4]: source (resampled) and result side by side, with the quality numbers.
+            var opts = ParseOptions(args.Skip(3));
+            var (mx, my) = ParseGrid(opts.GetValueOrDefault("maps", "1x1"));
+            var img = ImagePipeline.Process(ImageCodec.Load(args[1]), new ImageSettings { MapsX = mx, MapsY = my });
+            var profile = BMAP.Palette.ColorProfile.LoadBuiltIn();
+            var sel = BMAP.BlockEngine.BlockPreset.BuiltIns(profile)[int.Parse(opts.GetValueOrDefault("preset", "0"))].ToSelection();
+            var qopt = new BMAP.BlockEngine.QuantizeOptions
+            {
+                Dither = Enum.Parse<BMAP.BlockEngine.DitherMode>(opts.GetValueOrDefault("dither", "KnollBayer"), true),
+                Mode = opts.GetValueOrDefault("staircase", "valley") == "flat" ? BMAP.BlockEngine.StaircaseMode.Flat : BMAP.BlockEngine.StaircaseMode.Valley,
+                Metric = Enum.Parse<BMAP.ColorEngine.ColorMetric>(opts.GetValueOrDefault("metric", "oklab"), true),
+                MaxHeight = int.Parse(opts.GetValueOrDefault("max", "0")),
+                Refine = opts.ContainsKey("refine") ? new BMAP.BlockEngine.RefineSettings
+                {
+                    Space = Enum.Parse<BMAP.BlockEngine.RefineSpace>(opts.GetValueOrDefault("space", "oklab"), true),
+                    PixelWeight = double.Parse(opts.GetValueOrDefault("pw", "0.15"), System.Globalization.CultureInfo.InvariantCulture),
+                    Weight1 = double.Parse(opts.GetValueOrDefault("w1", "1"), System.Globalization.CultureInfo.InvariantCulture),
+                    Weight2 = double.Parse(opts.GetValueOrDefault("w2", "1"), System.Globalization.CultureInfo.InvariantCulture),
+                    Neighbours = int.Parse(opts.GetValueOrDefault("nb", "16")),
+                    DarkWeight = double.Parse(opts.GetValueOrDefault("dw", "0.5"), System.Globalization.CultureInfo.InvariantCulture),
+                } : null,
+            };
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var q = BMAP.BlockEngine.ColorQuantizer.Quantize(img, profile, sel, qopt);
+            long ms = sw.ElapsedMilliseconds;
+            int scale = int.Parse(opts.GetValueOrDefault("scale", "4")), w = img.Width, h = img.Height;
+            var sheet = new RgbaImage(w * scale * 2 + scale * 2, h * scale);
+            for (int y = 0; y < h * scale; y++)
+                for (int x = 0; x < w * scale; x++)
+                {
+                    int si = ((y / scale) * w + x / scale) * 4;
+                    int a = (y * sheet.Width + x) * 4, b = (y * sheet.Width + x + w * scale + scale * 2) * 4;
+                    for (int ch = 0; ch < 4; ch++) { sheet.Pixels[a + ch] = img.Pixels[si + ch]; sheet.Pixels[b + ch] = q.Preview.Pixels[si + ch]; }
+                }
+            ImageCodec.SavePng(sheet, args[2]);
+            double px = 0;
+            for (int i = 0; i < w * h; i++)
+                px += BMAP.ColorEngine.ColorMath.DeltaE2000(BMAP.ColorEngine.ColorMath.ToLab(img.Pixels[i * 4], img.Pixels[i * 4 + 1], img.Pixels[i * 4 + 2]),
+                    BMAP.ColorEngine.ColorMath.ToLab(q.Preview.Pixels[i * 4], q.Preview.Pixels[i * 4 + 1], q.Preview.Pixels[i * 4 + 2]));
+            Console.WriteLine($"pxΔE2000={px / (w * h):0.000} blurΔE76={BMAP.BlockEngine.HeightAdvisor.PerceivedDeltaE(img, q.Preview):0.000} linΔE2000={BMAP.BlockEngine.HeightAdvisor.DistanceDeltaE2000(img, q.Preview):0.000} colours={q.EntryIndex.Distinct().Count()} {ms} ms");
+            break;
+        }
+
+        case "nearest":
+        {
+            // nearest #RRGGBB... [--n 8] [--preset 0]: the closest map colours (all shades) with ΔE2000.
+            var opts = ParseOptions(args.Skip(1));
+            var profile = BMAP.Palette.ColorProfile.LoadBuiltIn();
+            var entries = BMAP.BlockEngine.BlockPreset.BuiltIns(profile)[int.Parse(opts.GetValueOrDefault("preset", "0"))].ToSelection().Resolve(profile);
+            var cands = BMAP.BlockEngine.ColorQuantizer.BuildCandidates(profile, entries, BMAP.BlockEngine.StaircaseMode.Valley);
+            foreach (var hex in args.Skip(1).Where(a => a.StartsWith("#")))
+            {
+                var c = Rgba.FromHex(hex);
+                var lab = BMAP.ColorEngine.ColorMath.ToLab(c.R, c.G, c.B);
+                Console.WriteLine(hex);
+                foreach (var (cand, d) in cands.Select(k => (k, BMAP.ColorEngine.ColorMath.DeltaE2000(lab, BMAP.ColorEngine.ColorMath.ToLab(k.Color.R, k.Color.G, k.Color.B))))
+                    .OrderBy(t => t.Item2).Take(int.Parse(opts.GetValueOrDefault("n", "8"))))
+                    Console.WriteLine($"  {d,6:0.00}  #{cand.Color.R:X2}{cand.Color.G:X2}{cand.Color.B:X2}  {cand.Shade,-6} {entries[cand.Entry].Block.Name}");
             }
             break;
         }
