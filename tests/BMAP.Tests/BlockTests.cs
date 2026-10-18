@@ -26,11 +26,12 @@ public class BlockTests
         // 61 map colours minus water, plus Bedrock-only sets (birch / spruce leaves, sculk, 16 wool slabs), all measured
         // with the colour pad on Bedrock 1.26.51 (palettes/measured).
         Assert.Equal(79, Profile.ColourSets.Count);
-        Assert.Equal(351, Profile.Blocks.Count());
+        Assert.Equal(443, Profile.Blocks.Count());
         Assert.All(Profile.ColourSets, s => Assert.Equal(ColorStatus.Verified, s.Status));
         Assert.Equal("#995ACD", Profile.ColourSets.Single(s => s.NameEn == "Purple").MapColor);
         Assert.Equal("#700200", Profile.ColourSets.Single(s => s.NameEn == "Nether").MapColor);
         // Measured blocks of other colour sets than in Java.
+        Assert.Equal("Deepslate", Profile.ColourSets.Single(s => s.Blocks.Any(b => b.Key == "deepslate_tiles")).NameEn);
         Assert.Equal("Yellow", Profile.ColourSets.Single(s => s.Blocks.Any(b => b.Key == "bamboo_block_x")).NameEn);
         Assert.Equal("Nether", Profile.ColourSets.Single(s => s.Blocks.Any(b => b.Key == "crimson_slab")).NameEn);
         Assert.Equal("Cyan", Profile.ColourSets.Single(s => s.Blocks.Any(b => b.Key == "warped_slab")).NameEn);

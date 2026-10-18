@@ -188,3 +188,23 @@ already keep colours calm. Corpus, one map each, Valley:
 
 The 2 x 2 hair that broke into patches in v0.11 stays even. Known limitation: very pale pinks right at the tie between
 "grey alone" and "white + pink" (#F2D4D7–#F1D1D5) still turn grey with stripes under block noise (docs/TODO.md).
+## Random search over the optimiser (v0.13.0)
+
+A random search over the optimiser's settings on the whole corpus (score = near + far + 0.5 x speckle; illustrations
+count twice) picked a balanced point: lower per-pixel weights (0.03 / 0.05), a wider far kernel (σ 3, weight 2),
+σ1 1.25, softer plan penalties (hue 0.4, quad 0.5, tolerance 0.03) and two passes of neighbour swaps. The most
+accurate point found (pw 0.02) was a little closer still but visibly grainier. Corpus, one map each, Valley:
+
+| setting | group | px | near | far | speckle |
+|---|---|---:|---:|---:|---:|
+| Floyd–Steinberg | illustrations | 8.07 | 3.44 | 2.39 | 3.43 |
+| v0.12.0 (+ swaps) | illustrations | 7.80 | 2.92 | 1.69 | 4.15 |
+| **v0.13.0** | illustrations | 8.12 | **2.58** | **1.26** | 4.90 |
+| Floyd–Steinberg | photos | 7.65 | 1.87 | 0.77 | 3.44 |
+| v0.12.0 (+ swaps) | photos | 7.38 | 2.24 | 0.88 | 2.94 |
+| **v0.13.0** | photos | 7.67 | 1.98 | **0.67** | 3.43 |
+| v0.12.0 (+ swaps) | flat pale colours | 14.75 | 3.18 | 1.78 | 12.00 |
+| **v0.13.0** | flat pale colours | 15.05 | **2.70** | **1.35** | 12.82 |
+
+2 x 2 (illustration 1): near 3.44 → 2.51, far 1.88 → 0.98, and fewer grey patches in the pale pink hair. The trade is
+a little more fine grain up close (speckle +0.7). Salmon (#F47B4D) stays orange + pink without red dots.

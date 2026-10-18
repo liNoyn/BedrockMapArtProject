@@ -29,6 +29,12 @@ B|end_stone_brick_slab|minecraft:end_stone_brick_slab||S2|End Stone Brick Slab|�
 B|bone_block|minecraft:bone_block|pillar_axis=y||Bone Block|骨ブロック
 B|birch_pressure_plate|minecraft:birch_pressure_plate||S|Birch Pressure Plate|シラカバの感圧板
 B|ochre_froglight|minecraft:ochre_froglight|pillar_axis=y|2|Ochre Froglight|黄土色のフロッグライト
+B|stripped_birch_log|minecraft:stripped_birch_log|||Stripped Birch Log|樹皮を剥いだシラカバの原木
+B|birch_wood|minecraft:birch_wood|||Birch Wood|シラカバの木
+B|stripped_birch_wood|minecraft:stripped_birch_wood|||Stripped Birch Wood|樹皮を剥いだシラカバの木
+B|cut_sandstone|minecraft:cut_sandstone|||Cut Sandstone|研がれた砂岩
+B|chiseled_sandstone|minecraft:chiseled_sandstone|||Chiseled Sandstone|模様入りの砂岩
+B|smooth_sandstone|minecraft:smooth_sandstone|||Smooth Sandstone|滑らかな砂岩
 
 CS|2|Cobweb|クモの巣|199,199,199|pad=199,199,199@1.26.51
 B|cobweb|minecraft:web||S|Cobweb|クモの巣
@@ -50,6 +56,7 @@ B|iron_trapdoor|minecraft:iron_trapdoor||S1|Iron Trapdoor|鉄のトラップド�
 # not drawn on Bedrock maps (the block below shows), colour pad 1.26.51: B|iron_bars|minecraft:iron_bars||S|Iron Bars|鉄格子
 B|heavy_weighted_pressure_plate|minecraft:heavy_weighted_pressure_plate||S1|Heavy Weighted Pressure Plate|重量感圧板（重）
 B|brewing_stand|minecraft:brewing_stand||S1|Brewing Stand|醸造台
+B|pale_oak_leaves|minecraft:pale_oak_leaves|persistent_bit=true|F|Pale Oak Leaves|ペールオークの葉
 
 CS|6|Leaves|葉|0,124,0|pad=0,124,0@1.26.51
 B|oak_leaves|minecraft:oak_leaves|persistent_bit=true|FTX|Oak Leaves|オークの葉
@@ -57,6 +64,7 @@ B|jungle_leaves|minecraft:jungle_leaves|persistent_bit=true|FTX|Jungle Leaves|�
 B|acacia_leaves|minecraft:acacia_leaves|persistent_bit=true|FTX|Acacia Leaves|アカシアの葉
 B|dark_oak_leaves|minecraft:dark_oak_leaves|persistent_bit=true|FTX|Dark Oak Leaves|ダークオークの葉
 B|azalea_leaves|minecraft:azalea_leaves|persistent_bit=true|F|Azalea Leaves|ツツジの葉
+B|azalea_leaves_flowered|minecraft:azalea_leaves_flowered|persistent_bit=true|F|Flowering Azalea Leaves|開花したツツジの葉
 
 CS|7|Clay|粘土|164,168,184|pad=164,168,184@1.26.51
 B|clay|minecraft:clay|||Clay|粘土ブロック
@@ -73,6 +81,11 @@ B|granite|minecraft:granite|||Granite|花崗岩
 B|granite_slab|minecraft:granite_slab||S|Granite Slab|花崗岩のハーフブロック
 B|jungle_pressure_plate|minecraft:jungle_pressure_plate||S|Jungle Pressure Plate|ジャングルの感圧板
 B|packed_mud|minecraft:packed_mud|||Packed Mud|固めた泥
+B|polished_granite|minecraft:polished_granite|||Polished Granite|磨かれた花崗岩
+B|jungle_wood|minecraft:jungle_wood|||Jungle Wood|ジャングルの木
+B|stripped_jungle_log|minecraft:stripped_jungle_log|||Stripped Jungle Log|樹皮を剥いだジャングルの原木
+B|stripped_jungle_wood|minecraft:stripped_jungle_wood|||Stripped Jungle Wood|樹皮を剥いだジャングルの木
+B|brown_mushroom_block|minecraft:brown_mushroom_block|||Brown Mushroom Block|茶色いキノコブロック
 
 CS|9|Stone|石|112,112,112|seen=91,370,89|pad=112,112,112@1.26.51
 B|cobblestone|minecraft:cobblestone|||Cobblestone|丸石
@@ -97,6 +110,17 @@ B|oak_planks|minecraft:oak_planks||F|Oak Planks|オークの板材
 B|oak_slab|minecraft:oak_slab||SF|Oak Slab|オークのハーフブロック
 B|crafting_table|minecraft:crafting_table||F|Crafting Table|作業台
 B|oak_pressure_plate|minecraft:wooden_pressure_plate||S|Oak Pressure Plate|オークの感圧板
+B|oak_wood|minecraft:oak_wood|||Oak Wood|オークの木
+B|stripped_oak_log|minecraft:stripped_oak_log|||Stripped Oak Log|樹皮を剥いだオークの原木
+B|stripped_oak_wood|minecraft:stripped_oak_wood|||Stripped Oak Wood|樹皮を剥いだオークの木
+B|bookshelf|minecraft:bookshelf||F|Bookshelf|本棚
+B|barrel|minecraft:barrel||F|Barrel|樽
+B|noteblock|minecraft:noteblock||F|Note Block|音符ブロック
+B|cartography_table|minecraft:cartography_table||F|Cartography Table|製図台
+B|fletching_table|minecraft:fletching_table||F|Fletching Table|矢細工台
+B|smithing_table|minecraft:smithing_table|||Smithing Table|鍛冶台
+B|loom|minecraft:loom||F|Loom|機織り機
+B|beehive|minecraft:beehive||F|Beehive|養蜂箱
 
 CS|12|Quartz|クォーツ|255,252,245|seen=166,76645,816|pad=255,252,245@1.26.51
 B|birch_log_x|minecraft:birch_log|pillar_axis=x|F|Birch Log (horizontal)|シラカバの原木（横）
@@ -105,11 +129,21 @@ B|diorite_slab|minecraft:diorite_slab||S|Diorite Slab|閃緑岩のハーフブ�
 B|quartz_block|minecraft:quartz_block|pillar_axis=y|1|Block of Quartz|クォーツブロック
 B|quartz_slab|minecraft:quartz_slab||S1|Quartz Slab|クォーツのハーフブロック
 B|sea_lantern|minecraft:sea_lantern||2|Sea Lantern|シーランタン
+B|quartz_pillar|minecraft:quartz_pillar|||Quartz Pillar|クォーツの柱
+B|chiseled_quartz_block|minecraft:chiseled_quartz_block|||Chiseled Quartz Block|模様入りのクォーツブロック
+B|smooth_quartz|minecraft:smooth_quartz|||Smooth Quartz Block|滑らかなクォーツブロック
+B|quartz_bricks|minecraft:quartz_bricks|||Quartz Bricks|クォーツレンガ
+B|polished_diorite|minecraft:polished_diorite|||Polished Diorite|磨かれた閃緑岩
+B|pale_oak_planks|minecraft:pale_oak_planks||F|Pale Oak Planks|ペールオークの板材
+B|pale_oak_log|minecraft:pale_oak_log||F|Pale Oak Log|ペールオークの原木
+B|stripped_pale_oak_log|minecraft:stripped_pale_oak_log||F|Stripped Pale Oak Log|樹皮を剥いだペールオークの原木
 
 CS|13|White|白色|255,255,255|seen=868,3073,958|pad=255,255,255@1.26.51
 @DYE|white
 B|snow_block|minecraft:snow|||Snow Block|雪ブロック
 B|snow_layer|minecraft:snow_layer||S|Snow|雪
+B|lodestone|minecraft:lodestone||2|Lodestone|ロードストーン
+B|target|minecraft:target|||Target|的
 
 CS|14|Orange|橙色|216,127,51|seen=69,102,290|pad=216,127,51@1.26.51
 @DYE|orange
@@ -127,11 +161,20 @@ B|raw_copper_block|minecraft:raw_copper_block||1|Block of Raw Copper|銅の原�
 B|waxed_copper_block|minecraft:waxed_copper||1|Waxed Block of Copper|錆止めされた銅ブロック
 B|waxed_cut_copper_slab|minecraft:waxed_cut_copper_slab||S1|Waxed Cut Copper Slab|錆止めされた切り込み入りの銅のハーフブロック
 B|acacia_pressure_plate|minecraft:acacia_pressure_plate||S|Acacia Pressure Plate|アカシアの感圧板
+B|smooth_red_sandstone|minecraft:smooth_red_sandstone|||Smooth Red Sandstone|滑らかな赤い砂岩
+B|cut_red_sandstone|minecraft:cut_red_sandstone|||Cut Red Sandstone|研がれた赤い砂岩
+B|chiseled_red_sandstone|minecraft:chiseled_red_sandstone|||Chiseled Red Sandstone|模様入りの赤い砂岩
+B|carved_pumpkin|minecraft:carved_pumpkin|||Carved Pumpkin|くり抜かれたカボチャ
+B|stripped_acacia_log|minecraft:stripped_acacia_log||F|Stripped Acacia Log|樹皮を剥いだアカシアの原木
+B|waxed_cut_copper|minecraft:waxed_cut_copper||1|Waxed Cut Copper|錆止めされた切り込み入りの銅
+B|waxed_chiseled_copper|minecraft:waxed_chiseled_copper||1|Waxed Chiseled Copper|錆止めされた模様入りの銅
+B|waxed_copper_grate|minecraft:waxed_copper_grate||1|Waxed Copper Grate|錆止めされた銅の格子
 
 CS|15|Magenta|赤紫色|178,76,216|pad=178,76,216@1.26.51
 @DYE|magenta
 B|purpur_block|minecraft:purpur_block|pillar_axis=y|2|Purpur Block|プルプァブロック
 B|purpur_slab|minecraft:purpur_slab||S2|Purpur Slab|プルプァのハーフブロック
+B|purpur_pillar|minecraft:purpur_pillar|||Purpur Pillar|プルプァの柱
 
 CS|16|Light Blue|空色|102,153,216|seen=0,3,8|pad=102,153,216@1.26.51
 @DYE|light_blue
@@ -147,6 +190,9 @@ B|bamboo_mosaic|minecraft:bamboo_mosaic||F|Bamboo Mosaic|竹の寄木細工
 B|bamboo_mosaic_slab|minecraft:bamboo_mosaic_slab||SF|Bamboo Mosaic Slab|竹の寄木細工のハーフブロック
 B|bamboo_pressure_plate|minecraft:bamboo_pressure_plate||S|Bamboo Pressure Plate|竹の感圧板
 B|bamboo_block_x|minecraft:bamboo_block|pillar_axis=x|F|Block of Bamboo (horizontal)|竹ブロック（横）
+B|stripped_bamboo_block|minecraft:stripped_bamboo_block||F|Block of Stripped Bamboo|皮を剥いだ竹ブロック
+B|bee_nest|minecraft:bee_nest||F|Bee Nest|ミツバチの巣
+B|wet_sponge|minecraft:wet_sponge||2|Wet Sponge|濡れたスポンジ
 
 CS|18|Lime|黄緑色|127,204,25|pad=127,204,25@1.26.51
 @DYE|lime
@@ -165,9 +211,12 @@ B|dead_bubble_coral_block|minecraft:dead_bubble_coral_block||1|Dead Bubble Coral
 B|dead_fire_coral_block|minecraft:dead_fire_coral_block||1|Dead Fire Coral Block|死んだミレポラサンゴブロック
 B|dead_horn_coral_block|minecraft:dead_horn_coral_block||1|Dead Horn Coral Block|死んだシカツノサンゴブロック
 B|tinted_glass|minecraft:tinted_glass||1|Tinted Glass|遮光ガラス
+B|acacia_wood|minecraft:acacia_wood||F|Acacia Wood|アカシアの木
+B|stripped_acacia_wood|minecraft:stripped_acacia_wood||F|Stripped Acacia Wood|樹皮を剥いだアカシアの木
 
 CS|21|Light Gray|薄灰色|153,153,153|seen=3,9,4|pad=153,153,153@1.26.51
 @DYE|light_gray
+B|pale_moss_block|minecraft:pale_moss_block|||Pale Moss Block|ペールモスブロック
 
 CS|22|Cyan|青緑色|76,127,153|pad=76,127,153@1.26.51
 @DYE|cyan
@@ -197,6 +246,7 @@ B|dark_oak_pressure_plate|minecraft:dark_oak_pressure_plate||S|Dark Oak Pressure
 CS|26|Green|緑色|102,127,51|pad=102,127,51@1.26.51
 @DYE|green
 B|dried_kelp_block|minecraft:dried_kelp_block||F|Dried Kelp Block|乾燥した昆布ブロック
+B|moss_block|minecraft:moss_block|||Moss Block|苔ブロック
 
 CS|27|Red|赤色|153,51,51|seen=32,64,120|pad=153,51,51@1.26.51
 @DYE|red
@@ -208,6 +258,10 @@ B|mangrove_log_y|minecraft:mangrove_log|pillar_axis=y|F|Mangrove Log (vertical)|
 B|mangrove_planks|minecraft:mangrove_planks||F|Mangrove Planks|マングローブの板材
 B|mangrove_slab|minecraft:mangrove_slab||SF|Mangrove Slab|マングローブのハーフブロック
 B|mangrove_pressure_plate|minecraft:mangrove_pressure_plate||S|Mangrove Pressure Plate|マングローブの感圧板
+B|mangrove_wood|minecraft:mangrove_wood||F|Mangrove Wood|マングローブの木
+B|stripped_mangrove_log|minecraft:stripped_mangrove_log||F|Stripped Mangrove Log|樹皮を剥いだマングローブの原木
+B|stripped_mangrove_wood|minecraft:stripped_mangrove_wood||F|Stripped Mangrove Wood|樹皮を剥いだマングローブの木
+B|red_mushroom_block|minecraft:red_mushroom_block|||Red Mushroom Block|赤いキノコブロック
 
 CS|28|Black|黒色|25,25,25|pad=25,25,25@1.26.51
 @DYE|black
@@ -219,6 +273,14 @@ B|blackstone_slab|minecraft:blackstone_slab||S|Blackstone Slab|ブラックス�
 B|basalt|minecraft:basalt|pillar_axis=y||Basalt|玄武岩
 B|netherite_block|minecraft:netherite_block||3|Block of Netherite|ネザライトブロック
 B|polished_blackstone_pressure_plate|minecraft:polished_blackstone_pressure_plate||S|Polished Blackstone Pressure Plate|磨かれたブラックストーンの感圧板
+B|polished_blackstone|minecraft:polished_blackstone|||Polished Blackstone|磨かれたブラックストーン
+B|polished_blackstone_bricks|minecraft:polished_blackstone_bricks|||Polished Blackstone Bricks|磨かれたブラックストーンレンガ
+B|chiseled_polished_blackstone|minecraft:chiseled_polished_blackstone|||Chiseled Polished Blackstone|模様入りの磨かれたブラックストーン
+B|cracked_polished_blackstone_bricks|minecraft:cracked_polished_blackstone_bricks|||Cracked Polished Blackstone Bricks|ひび割れた磨かれたブラックストーンレンガ
+B|gilded_blackstone|minecraft:gilded_blackstone||2|Gilded Blackstone|きらめくブラックストーン
+B|polished_basalt|minecraft:polished_basalt|||Polished Basalt|磨かれた玄武岩
+B|smooth_basalt|minecraft:smooth_basalt|||Smooth Basalt|滑らかな玄武岩
+B|ancient_debris|minecraft:ancient_debris||3|Ancient Debris|古代の残骸
 
 CS|29|Gold|金|250,238,77|pad=250,238,77@1.26.51
 B|gold_block|minecraft:gold_block||3|Block of Gold|金ブロック
@@ -249,6 +311,10 @@ B|podzol|minecraft:podzol||1|Podzol|ポドゾル
 B|spruce_pressure_plate|minecraft:spruce_pressure_plate||S|Spruce Pressure Plate|トウヒの感圧板
 B|mangrove_log_x|minecraft:mangrove_log|pillar_axis=x|F|Mangrove Log (horizontal)|マングローブの原木（横）
 B|mangrove_roots|minecraft:mangrove_roots||F|Mangrove Roots|マングローブの根
+B|spruce_wood|minecraft:spruce_wood||F|Spruce Wood|トウヒの木
+B|stripped_spruce_log|minecraft:stripped_spruce_log||F|Stripped Spruce Log|樹皮を剥いだトウヒの原木
+B|stripped_spruce_wood|minecraft:stripped_spruce_wood||F|Stripped Spruce Wood|樹皮を剥いだトウヒの木
+B|muddy_mangrove_roots|minecraft:muddy_mangrove_roots|||Muddy Mangrove Roots|泥だらけのマングローブの根
 
 CS|34|Nether|ネザー|112,2,0|gd=96,0,0|pad=112,2,0@1.26.51
 B|netherrack|minecraft:netherrack|||Netherrack|ネザーラック
@@ -259,6 +325,10 @@ B|red_nether_bricks|minecraft:red_nether_brick||1|Red Nether Bricks|赤いネザ
 B|red_nether_brick_slab|minecraft:red_nether_brick_slab||S1|Red Nether Brick Slab|赤いネザーレンガのハーフブロック
 B|crimson_slab|minecraft:crimson_slab||S1|Crimson Slab|真紅のハーフブロック
 B|crimson_pressure_plate|minecraft:crimson_pressure_plate||S1|Crimson Pressure Plate|真紅の感圧板
+B|chiseled_nether_bricks|minecraft:chiseled_nether_bricks|||Chiseled Nether Bricks|模様入りのネザーレンガ
+B|cracked_nether_bricks|minecraft:cracked_nether_bricks|||Cracked Nether Bricks|ひび割れたネザーレンガ
+B|nether_gold_ore|minecraft:nether_gold_ore||1|Nether Gold Ore|ネザー金鉱石
+B|quartz_ore|minecraft:quartz_ore||1|Nether Quartz Ore|ネザークォーツ鉱石
 
 CS|35|White Terracotta|白色のテラコッタ|209,177,161|pad=209,177,161@1.26.51
 @TERRACOTTA|white
@@ -271,6 +341,9 @@ B|cherry_pressure_plate|minecraft:cherry_pressure_plate||S|Cherry Pressure Plate
 
 CS|36|Orange Terracotta|橙色のテラコッタ|159,82,36|pad=159,82,36@1.26.51
 @TERRACOTTA|orange
+B|resin_block|minecraft:resin_block||1|Block of Resin|樹脂ブロック
+B|resin_bricks|minecraft:resin_bricks||1|Resin Bricks|樹脂レンガ
+B|chiseled_resin_bricks|minecraft:chiseled_resin_bricks||1|Chiseled Resin Bricks|模様入りの樹脂レンガ
 CS|37|Magenta Terracotta|赤紫色のテラコッタ|149,87,108|pad=149,87,108@1.26.51
 @TERRACOTTA|magenta
 CS|38|Light Blue Terracotta|空色のテラコッタ|112,108,138|pad=112,108,138@1.26.51
@@ -290,6 +363,10 @@ CS|42|Gray Terracotta|灰色のテラコッタ|57,41,35|pad=57,41,35@1.26.51
 B|tuff|minecraft:tuff|||Tuff|凝灰岩
 B|cherry_log_x|minecraft:cherry_log|pillar_axis=x|F|Cherry Log (horizontal)|サクラの原木（横）
 B|cherry_wood|minecraft:cherry_wood|pillar_axis=y|F|Cherry Wood|サクラの木
+B|polished_tuff|minecraft:polished_tuff|||Polished Tuff|磨かれた凝灰岩
+B|tuff_bricks|minecraft:tuff_bricks|||Tuff Bricks|凝灰岩レンガ
+B|chiseled_tuff|minecraft:chiseled_tuff|||Chiseled Tuff|模様入りの凝灰岩
+B|chiseled_tuff_bricks|minecraft:chiseled_tuff_bricks|||Chiseled Tuff Bricks|模様入りの凝灰岩レンガ
 
 CS|43|Light Gray Terracotta|薄灰色のテラコッタ|135,107,98|pad=135,107,98@1.26.51
 @TERRACOTTA|light_gray
@@ -297,6 +374,9 @@ B|waxed_exposed_copper|minecraft:waxed_exposed_copper||1|Waxed Exposed Copper|�
 B|waxed_exposed_cut_copper_slab|minecraft:waxed_exposed_cut_copper_slab||S1|Waxed Exposed Cut Copper Slab|錆止めされた風化した切り込み入りの銅のハーフブロック
 B|mud_bricks|minecraft:mud_bricks|||Mud Bricks|泥レンガ
 B|mud_brick_slab|minecraft:mud_brick_slab||S|Mud Brick Slab|泥レンガのハーフブロック
+B|waxed_exposed_cut_copper|minecraft:waxed_exposed_cut_copper||1|Waxed Exposed Cut Copper|錆止めされた風化した切り込み入りの銅
+B|waxed_exposed_chiseled_copper|minecraft:waxed_exposed_chiseled_copper||1|Waxed Exposed Chiseled Copper|錆止めされた風化した模様入りの銅
+B|waxed_exposed_copper_grate|minecraft:waxed_exposed_copper_grate||1|Waxed Exposed Copper Grate|錆止めされた風化した銅の格子
 
 CS|44|Cyan Terracotta|青緑色のテラコッタ|87,92,92|pad=87,92,92@1.26.51
 @TERRACOTTA|cyan
@@ -335,6 +415,9 @@ CS|54|Warped Nylium|歪んだナイリウム|22,126,134|seen=0,3,4|pad=22,126,13
 B|warped_nylium|minecraft:warped_nylium||1|Warped Nylium|歪んだナイリウム
 B|waxed_oxidized_copper|minecraft:waxed_oxidized_copper||2|Waxed Oxidized Copper|錆止めされた酸化した銅
 B|waxed_oxidized_cut_copper_slab|minecraft:waxed_oxidized_cut_copper_slab||S2|Waxed Oxidized Cut Copper Slab|錆止めされた酸化した切り込み入りの銅のハーフブロック
+B|waxed_oxidized_cut_copper|minecraft:waxed_oxidized_cut_copper||1|Waxed Oxidized Cut Copper|錆止めされた酸化した切り込み入りの銅
+B|waxed_oxidized_chiseled_copper|minecraft:waxed_oxidized_chiseled_copper||1|Waxed Oxidized Chiseled Copper|錆止めされた酸化した模様入りの銅
+B|waxed_oxidized_copper_grate|minecraft:waxed_oxidized_copper_grate||1|Waxed Oxidized Copper Grate|錆止めされた酸化した銅の格子
 
 CS|55|Warped Stem|歪んだ幹|58,142,140|pad=58,142,140@1.26.51
 B|warped_stem|minecraft:warped_stem|pillar_axis=y|1|Warped Stem|歪んだ幹
@@ -342,6 +425,9 @@ B|stripped_warped_stem|minecraft:stripped_warped_stem|pillar_axis=y|1|Stripped W
 B|warped_planks|minecraft:warped_planks||1|Warped Planks|歪んだ板材
 B|waxed_weathered_copper|minecraft:waxed_weathered_copper||2|Waxed Weathered Copper|錆止めされた錆びた銅
 B|waxed_weathered_cut_copper_slab|minecraft:waxed_weathered_cut_copper_slab||S2|Waxed Weathered Cut Copper Slab|錆止めされた錆びた切り込み入りの銅のハーフブロック
+B|waxed_weathered_cut_copper|minecraft:waxed_weathered_cut_copper||1|Waxed Weathered Cut Copper|錆止めされた錆びた切り込み入りの銅
+B|waxed_weathered_chiseled_copper|minecraft:waxed_weathered_chiseled_copper||1|Waxed Weathered Chiseled Copper|錆止めされた錆びた模様入りの銅
+B|waxed_weathered_copper_grate|minecraft:waxed_weathered_copper_grate||1|Waxed Weathered Copper Grate|錆止めされた錆びた銅の格子
 
 CS|56|Warped Hyphae|歪んだ菌糸|86,44,62|pad=86,44,62@1.26.51
 B|warped_hyphae|minecraft:warped_hyphae|pillar_axis=y|1|Warped Hyphae|歪んだ菌糸
@@ -354,6 +440,12 @@ CS|58|Deepslate|深層岩|100,100,100|pad=100,100,100@1.26.51
 B|deepslate|minecraft:deepslate|pillar_axis=y||Deepslate|深層岩
 B|cobbled_deepslate|minecraft:cobbled_deepslate|||Cobbled Deepslate|深層岩の丸石
 B|cobbled_deepslate_slab|minecraft:cobbled_deepslate_slab||S|Cobbled Deepslate Slab|深層岩の丸石のハーフブロック
+B|polished_deepslate|minecraft:polished_deepslate|||Polished Deepslate|磨かれた深層岩
+B|deepslate_bricks|minecraft:deepslate_bricks|||Deepslate Bricks|深層岩レンガ
+B|deepslate_tiles|minecraft:deepslate_tiles|||Deepslate Tiles|深層岩タイル
+B|chiseled_deepslate|minecraft:chiseled_deepslate|||Chiseled Deepslate|模様入りの深層岩
+B|cracked_deepslate_bricks|minecraft:cracked_deepslate_bricks|||Cracked Deepslate Bricks|ひび割れた深層岩レンガ
+B|cracked_deepslate_tiles|minecraft:cracked_deepslate_tiles|||Cracked Deepslate Tiles|ひび割れた深層岩タイル
 
 CS|59|Raw Iron|鉄の原石|216,175,147|pad=216,175,147@1.26.51
 B|raw_iron_block|minecraft:raw_iron_block||2|Block of Raw Iron|鉄の原石ブロック
