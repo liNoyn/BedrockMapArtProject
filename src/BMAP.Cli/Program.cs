@@ -443,7 +443,7 @@ try
             var profile = BMAP.Palette.ColorProfile.LoadBuiltIn();
             var parts = opts.TryGetValue("parts", out var ps) ? ps.Split(',') : null;
             var dir = BMAP.Shading.VerificationKit.Create(args[1], profile, int.Parse(opts.GetValueOrDefault("y", "-60")), opts.ContainsKey("en"),
-                parts, opts.GetValueOrDefault("name", "BMAP_verification_kit"));
+                parts, opts.GetValueOrDefault("name", "BMAP_verification_kit"), opts.GetValueOrDefault("blocks"));
             Console.WriteLine(dir);
             break;
         }
@@ -476,6 +476,12 @@ try
                 var r = BMAP.Shading.Calibrator.Analyze(pad, map, profile, world.Version ?? "?", en);
                 File.WriteAllText(Path.Combine(outDir, $"calibration_{item.Id}.txt"), BMAP.Shading.Calibrator.Report(r, en));
                 ImageCodec.SavePng(BMAP.Shading.Calibrator.ComparisonImage(r), Path.Combine(outDir, $"calibration_{item.Id}.png"));
+            }
+            if (manifest.Items.Any(i => i.Discovery != null))
+            {
+                string disc = BMAP.Shading.VerificationKit.DiscoveryReport(args[2], maps, profile);
+                File.WriteAllText(Path.Combine(outDir, "discovery.txt"), disc, new UTF8Encoding(true));
+                sb.AppendLine().Append(string.Join("\n", disc.Split('\n').Take(60)));
             }
             if (manifest.Items.Any(i => i.Pools != null))
             {
