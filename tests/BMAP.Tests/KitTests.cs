@@ -44,7 +44,7 @@ public class KitTests
         var byKey = Profile.Blocks.GroupBy(b => StructureExporter.ToPaletteBlock(b).Signature).ToDictionary(g => g.Key, g => g.First());
         string fn = Path.Combine(kit, "BMAP_kit_BP", "functions", "bmap", "kit");
         var model = Profile.Shades.ShadingModel;
-        foreach (var item in manifest.Items)
+        foreach (var item in manifest.Items.Where(i => i.Pools is null)) // water is measured, not predicted
         {
             // World blocks from the pack.
             var world = new Dictionary<(int X, int Y, int Z), BlockDefinition>();
@@ -124,7 +124,7 @@ public class KitTests
                 }
         }
         var (tiles, diffs) = VerificationKit.Verify(kit, maps);
-        Assert.Equal(1 + 1 + 1 + 4 + 16, tiles.Count);
+        Assert.Equal(1 + 1 + 1 + 4 + 16 + 1, tiles.Count);
         Assert.All(tiles.Where(t => t.Item != "flat"), t => Assert.Equal(t.Compared, t.Exact));
         var flat = tiles.Single(t => t.Item == "flat");
         Assert.Equal(5, flat.Unexplored);
@@ -132,5 +132,34 @@ public class KitTests
         Assert.Equal(manifest.Items.Count, diffs.Count);
         // Without maps every tile is reported missing.
         Assert.All(VerificationKit.Verify(kit, []).Tiles, t => Assert.Null(t.MapId));
+    }
+
+    [Fact]
+    public void WaterReport_ListsTheColoursOfEveryPoolByParity()
+    {
+        string kit = VerificationKit.Create(TestHelpers.TempDir(), Profile, parts: ["water"]);
+        var item = KitManifest.Load(Path.Combine(kit, "kit.json")).Items.Single();
+        Assert.Equal(16, item.Pools!.Count);
+        Assert.Equal(Enumerable.Range(1, 16), item.Pools.Select(p => p.Depth));
+        // A fake map: even pixels #4040FF, odd #3A3AE6.
+        var colours = new byte[128 * 128 * 4];
+        for (int i = 0; i < 128 * 128; i++)
+        {
+            bool even = ((i % 128 + i / 128) & 1) == 0;
+            colours[i * 4] = colours[i * 4 + 1] = (byte)(even ? 0x40 : 0x3A); colours[i * 4 + 2] = (byte)(even ? 0xFF : 0xE6); colours[i * 4 + 3] = 255;
+        }
+        var map = new MapRecord
+        {
+            Id = 1,
+            Nbt = new NbtCompound
+            {
+                { "width", new NbtShort(128) }, { "height", new NbtShort(128) }, { "scale", new NbtByte(0) }, { "dimension", new NbtByte(0) },
+                { "xCenter", new NbtInt(128 * item.MapX) }, { "zCenter", new NbtInt(128 * item.MapZ) }, { "colors", new NbtByteArray(colours) },
+            },
+        };
+        string report = VerificationKit.WaterReport(kit, [map]);
+        Assert.Contains("#4040FF x392", report);
+        Assert.Contains("#3A3AE6 x392", report);
+        Assert.Equal(16, report.Split('\n').Count(l => l.Contains("#4040FF")));
     }
 }
