@@ -269,14 +269,20 @@ public static partial class ColorQuantizer
 
         bool IsEmpty(int i) => image.Pixels[i * 4 + 3] < options.AlphaThreshold;
 
-        // Optimised: start from linear-light Floyd–Steinberg, then optimise. The strength slider trades mixing
-        // (closer colours from a distance) against calm, sharp pixels.
+        // Optimised: start from linear-light Floyd–Steinberg, then optimise with two-colour mixes (docs/benchmarks.md).
+        // The strength slider trades mixing (truer colours) against calm, sharp pixels.
         if (options.Dither == DitherMode.Optimized)
+        {
+            double calm = 1 - Math.Clamp(options.DitherStrength, 0, 1);
             options = options with
             {
                 Dither = DitherMode.FloydSteinberg, DitherStrength = 1,
-                Refine = options.Refine ?? new RefineSettings { PixelWeight = 0.05 + (1 - Math.Clamp(options.DitherStrength, 0, 1)) * 0.55 },
+                Refine = options.Refine ?? new RefineSettings
+                {
+                    PixelWeight = 0.1 + calm * 0.3, PerceptualWeight = 0.2, PairLambda = 0.1 + calm * 0.3, Neighbours = 24,
+                },
             };
+        }
         var ordered = OrderedMatrix(options.Dither);
         var knoll = KnollMatrix(options.Dither);
         if (options.HeightLimited && (options.Dither == DitherMode.None || ordered != null || knoll != null))

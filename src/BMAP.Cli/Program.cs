@@ -17,6 +17,7 @@ if (args.Length == 0)
           convert <image> <out.png> [--dither Optimized] [--staircase valley|flat] [--max n] [--maps 1x1]
                                          変換結果を元画像と並べて保存し、色差を表示
           nearest #RRGGBB... [--n 8]     一番近い地図色（陰影つき）を一覧
+          score <source> <map.png>...    地図画像（128 px / 枚）と元画像の色差（ピクセル・近く・遠く）
           render <image> <out.png> [--maps 1x1] [--mode texture|map|shade|height] [--yaw 35] [--pitch 40] [--zoom 0]
                 [--size 1200x800] [--textures dir] [--grid] [--nolight]
                                          3D ビューを PNG に描画（各段階の処理時間を表示）
@@ -247,6 +248,9 @@ try
                     Weight2 = double.Parse(opts.GetValueOrDefault("w2", "1"), System.Globalization.CultureInfo.InvariantCulture),
                     Neighbours = int.Parse(opts.GetValueOrDefault("nb", "16")),
                     DarkWeight = double.Parse(opts.GetValueOrDefault("dw", "0.5"), System.Globalization.CultureInfo.InvariantCulture),
+                    PerceptualWeight = double.Parse(opts.GetValueOrDefault("ow", "0"), System.Globalization.CultureInfo.InvariantCulture),
+                    Radius = double.Parse(opts.GetValueOrDefault("rad", "0"), System.Globalization.CultureInfo.InvariantCulture),
+                    PairLambda = double.Parse(opts.GetValueOrDefault("pair", "0"), System.Globalization.CultureInfo.InvariantCulture),
                 } : null,
             };
             var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -267,6 +271,24 @@ try
                 px += BMAP.ColorEngine.ColorMath.DeltaE2000(BMAP.ColorEngine.ColorMath.ToLab(img.Pixels[i * 4], img.Pixels[i * 4 + 1], img.Pixels[i * 4 + 2]),
                     BMAP.ColorEngine.ColorMath.ToLab(q.Preview.Pixels[i * 4], q.Preview.Pixels[i * 4 + 1], q.Preview.Pixels[i * 4 + 2]));
             Console.WriteLine($"pxΔE2000={px / (w * h):0.000} blurΔE76={BMAP.BlockEngine.HeightAdvisor.PerceivedDeltaE(img, q.Preview):0.000} linΔE2000={BMAP.BlockEngine.HeightAdvisor.DistanceDeltaE2000(img, q.Preview):0.000} colours={q.EntryIndex.Distinct().Count()} {ms} ms");
+            break;
+        }
+
+        case "score":
+        {
+            // score <source image> <map.png>... [--maps 1x1]: how close finished map images (128 px per map) are to the source.
+            var opts = ParseOptions(args.Skip(2));
+            var (mx, my) = ParseGrid(opts.GetValueOrDefault("maps", "1x1"));
+            var src = ImagePipeline.Process(ImageCodec.Load(args[1]), new ImageSettings { MapsX = mx, MapsY = my });
+            Console.WriteLine($"{"image",-28} {"px",7} {"near",7} {"far",7} {"colours",8}");
+            foreach (var path in args.Skip(2).Where(a => !a.StartsWith("--") && File.Exists(a)))
+            {
+                var map = ImageCodec.Load(path);
+                if (map.Width != src.Width || map.Height != src.Height) { Console.WriteLine($"{Path.GetFileName(path)}: size {map.Width}x{map.Height} differs"); continue; }
+                var s = BMAP.BlockEngine.QualityScore.Measure(src, map);
+                int colours = Enumerable.Range(0, map.Width * map.Height).Select(i => (map.Pixels[i * 4] << 16) | (map.Pixels[i * 4 + 1] << 8) | map.Pixels[i * 4 + 2]).Distinct().Count();
+                Console.WriteLine($"{Path.GetFileName(path),-28} {s.Pixel,7:0.000} {s.Near,7:0.000} {s.Far,7:0.000} {colours,8}");
+            }
             break;
         }
 

@@ -96,3 +96,25 @@ which the palette lacks — the nearest map colour is ΔE2000 ≈ 10 away — pl
 - Starting from Floyd–Steinberg or Knoll gives the same result (2.24 / 2.25); 32 candidates instead of 16 gains 1 %
   at twice the time. 4 × 4 maps take 1.4 s.
 - On the anime image the old default Knoll gave linΔE2000 3.88, Optimised 1.49: the hair stays pink instead of grey.
+## Two-colour mixing (v0.10.0)
+
+A user compared BMAP with MapartCraft on the same picture (`score <source> <map.png>...` measures finished 128 px
+map images: per pixel, near = blurred σ 0.8 px, far = blurred σ 2 px, CIEDE2000). BMAP's earlier optimiser scored best
+(near 2.27, far 0.98 vs MapartCraft 4.89 / 3.69) but looked worse: it built pale lavender from white, strong blue, pink
+and yellow dots — the right average, rough up close. Restricting each pixel to the best **pair** (closest blend in linear
+light + 0.1 × Oklab contrast of the pair × 2√(t(1−t))) plus its nearest colour fixed that:
+
+| image | setting | px | near | far |
+|---|---|---:|---:|---:|
+| user's illustration | MapartCraft | 9.47 | 4.89 | 3.69 |
+| | BMAP v0.9 optimiser | 9.21 | 2.27 | 0.98 |
+| | **BMAP pairs** | **8.01** | 2.91 | 1.83 |
+| anime (pale pink) | Floyd–Steinberg | 9.78 | 5.04 | 3.85 |
+| | **BMAP pairs** | 9.36 | **3.63** | **2.66** |
+| landscape | Floyd–Steinberg | 6.71 | 1.73 | 0.65 |
+| | **BMAP pairs** | 6.47 | 2.12 | 1.05 |
+
+- A plain Oklab distance limit on the candidates (tried first) made the result calm but lost hues the palette can only
+  mix from far colours (pale pink hair turned beige), so it was dropped in favour of pairs.
+- Contrast penalties 0.07–0.15 were close; 0.25 and above lost colour (far error ×2–3). The strength slider raises it.
+- Speed: one map 0.2 s, 4 × 4 maps 1.2 s.
