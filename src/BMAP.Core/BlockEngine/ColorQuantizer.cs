@@ -280,6 +280,7 @@ public static partial class ColorQuantizer
                 Refine = options.Refine ?? new RefineSettings
                 {
                     PixelWeight = 0.1 + calm * 0.3, PerceptualWeight = 0.2, PairLambda = 0.1 + calm * 0.3, Neighbours = 24,
+                    TriplePool = 16, PlanHue = 0.5 + calm, PlanPixel = calm * 0.5, PairQuad = 0.05 + calm * 0.2, Sigma1 = 1.5,
                 },
             };
         }

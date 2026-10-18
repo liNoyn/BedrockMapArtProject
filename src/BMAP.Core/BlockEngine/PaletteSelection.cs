@@ -103,6 +103,10 @@ public sealed class BlockPreset
 
         return
         [
+            // First (default): every colour set, with a block that needs no support where there is one — the same
+            // colours and quality as "one block per colour" on the test corpus, but fewer support blocks to place.
+            Make("おすすめ（支え不要・全色）", "Recommended (no support, all colours)",
+                s => First(s, b => !b.NeedsSupport && !b.Gravity).Concat(First(s, _ => true)).Take(1)),
             Make("各色 1 ブロック（先頭）", "One block per colour", s => First(s, _ => true)),
             Make("サバイバル向け（入手しやすい・落下しない）", "Survival friendly",
                 s => First(s, b => !b.NeedsSupport && !b.Gravity && b.Rarity <= 1 && !b.BiomeTinted)),

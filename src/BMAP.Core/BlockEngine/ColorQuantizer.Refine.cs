@@ -224,7 +224,13 @@ public static partial class ColorQuantizer
             lin[c * 3 + 2] = ColorMath.SrgbToLinear(candidates[c].Color.B);
         }
         static double D(Lab a, Lab b) => Math.Sqrt((a.L - b.L) * (a.L - b.L) + (a.A - b.A) * (a.A - b.A) + (a.B - b.B) * (a.B - b.B));
-        double lambda = settings.PairLambda;
+        // Contrast inside a mix: differences in hue and vividness (a, b) weighted by ChromaSpread against lightness.
+        double kc = settings.ChromaSpread;
+        double S(Lab a, Lab b) => Math.Sqrt((a.L - b.L) * (a.L - b.L) + kc * ((a.A - b.A) * (a.A - b.A) + (a.B - b.B) * (a.B - b.B)));
+        double lambda = settings.PairLambda, mu = settings.PairQuad;
+        // Penalty for the contrast inside a mix: linear, plus a quadratic part so that extreme mixes (white with
+        // emerald for a pale green) lose against calm ones even when their average is closer.
+        double Spread(double s) => lambda * s + mu * s * s;
         int pool = Math.Min(settings.PairPool, nc);
 
         // Plans per colour bucket (5 bits per channel) and shade group, from the bucket centre: deterministic.
@@ -237,25 +243,78 @@ public static partial class ColorQuantizer
                 byte cr = (byte)((r & ~7) + 4), cg = (byte)((g & ~7) + 4), cb = (byte)((b & ~7) + 4);
                 double tr = ColorMath.SrgbToLinear(cr), tg = ColorMath.SrgbToLinear(cg), tb = ColorMath.SrgbToLinear(cb);
                 var target = ColorMath.ToOklab(cr, cg, cb);
-                // Pool: the candidates closest in linear light (where mixing happens), allowed shades only.
-                var ids = Enumerable.Range(0, nc).Where(c => shadeFilter < 0 || (int)candidates[c].Shade == shadeFilter)
-                    .OrderBy(c => Sq(lin[c * 3] - tr) + Sq(lin[c * 3 + 1] - tg) + Sq(lin[c * 3 + 2] - tb)).ThenBy(c => c).Take(pool).ToArray();
-                int nearest = ids.OrderBy(c => D(ck[c], target)).ThenBy(c => c).First();
-                double best = D(ck[nearest], target);
+                // Pairs: one of the colours closest to the target with any allowed colour. The partner can be far away:
+                // a pale pink needs white and pink wool, which is nowhere near it.
+                var allowed = Enumerable.Range(0, nc).Where(c => shadeFilter < 0 || (int)candidates[c].Shade == shadeFilter).ToArray();
+                var close = allowed.OrderBy(c => D(ck[c], target)).ThenBy(c => c).Take(Math.Min(settings.PairNear, allowed.Length)).ToArray();
+                int nearest = close[0];
+                // Triples: among the closest in linear light (where mixing happens) and the closest perceptually.
+                var ids = close.Concat(allowed.OrderBy(c => Sq(lin[c * 3] - tr) + Sq(lin[c * 3 + 1] - tg) + Sq(lin[c * 3 + 2] - tb)).ThenBy(c => c).Take(pool))
+                    .Distinct().ToArray();
+                // Expected per-pixel distance of a mix (PlanPixel): mixing extreme colours to reach a colour the palette
+                // lacks (pure red and yellow for a salmon orange) gets the average right, but every pixel is far off.
+                double beta = settings.PlanPixel, gamma = settings.PlanHue;
+                // Off-hue part of a colour: its distance (in the a/b plane) from the line through the target's hue.
+                // White and pink for a pale pink, or white and ice for a pale lavender, lie on that line; red and yellow
+                // for a salmon orange lie on either side of it and show as loud dots.
+                double tA = target.A, tB = target.B, tC = Math.Sqrt(tA * tA + tB * tB);
+                double Off(int c) => tC > 0.02 ? Math.Abs(ck[c].A * tB - ck[c].B * tA) / tC : Math.Sqrt(ck[c].A * ck[c].A + ck[c].B * ck[c].B);
+                double best = D(ck[nearest], target) * (1 + beta) + gamma * Off(nearest);
                 int ba = nearest, bb = -1;
-                for (int i = 0; i < ids.Length; i++)
-                    for (int j = i + 1; j < ids.Length; j++)
+                var partners = new List<(double Cost, int Id)>();
+                double partnerCut = double.MaxValue;
+                for (int i = 0; i < close.Length; i++)
+                    foreach (int c in allowed)
                     {
-                        int a = ids[i], c = ids[j];
+                        int a = close[i];
+                        if (c == a) continue;
+                        int ci = Array.IndexOf(close, c);
+                        if (ci >= 0 && ci < i) continue; // pair already seen
                         double dx = lin[c * 3] - lin[a * 3], dy = lin[c * 3 + 1] - lin[a * 3 + 1], dz = lin[c * 3 + 2] - lin[a * 3 + 2];
                         double len = dx * dx + dy * dy + dz * dz;
                         if (len <= 0) continue;
                         double t = Math.Clamp(((tr - lin[a * 3]) * dx + (tg - lin[a * 3 + 1]) * dy + (tb - lin[a * 3 + 2]) * dz) / len, 0, 1);
                         if (t <= 0 || t >= 1) continue;
                         var mix = ColorMath.LinearToOklab(lin[a * 3] + t * dx, lin[a * 3 + 1] + t * dy, lin[a * 3 + 2] + t * dz);
-                        double cost = D(mix, target) + lambda * D(ck[a], ck[c]) * 2 * Math.Sqrt(t * (1 - t));
+                        double cost = D(mix, target) + Spread(S(ck[a], ck[c]) * 2 * Math.Sqrt(t * (1 - t)))
+                            + beta * ((1 - t) * D(ck[a], target) + t * D(ck[c], target)) + gamma * ((1 - t) * Off(a) + t * Off(c));
                         if (cost < best) { best = cost; ba = a; bb = c; }
+                        if (cost < partnerCut) { partners.Add((cost, c)); if (partners.Count > 24) { partners.Sort(); partners.RemoveRange(12, partners.Count - 12); partnerCut = partners[^1].Cost; } }
                     }
+                // Three-colour mixes reach colours inside a triangle of map colours, which no pair can. Weights by least
+                // squares in linear light (sum 1, all positive); the contrast term generalises the pair's:
+                // 2·sqrt(Σ wi·wj·dij²).
+                int t1 = -1, t2 = -1, t3 = -1;
+                // Triples also consider the best pair partners (pink wool for a pale pink lies far from it).
+                var good = partners.OrderBy(p => p.Cost).Select(p => p.Id).Distinct().Take(4).ToArray();
+                ids = [.. close.Take(Math.Max(0, settings.TriplePool - good.Length)), .. good];
+                ids = ids.Distinct().ToArray();
+                int tri = Math.Min(settings.TriplePool, ids.Length);
+                for (int i = 0; i < tri; i++)
+                    for (int j = i + 1; j < tri; j++)
+                        for (int k = j + 1; k < tri; k++)
+                        {
+                            int a = ids[i], b2 = ids[j], c = ids[k];
+                            // Solve target = A + u(B−A) + v(C−A) in the least-squares sense.
+                            double e1x = lin[b2 * 3] - lin[a * 3], e1y = lin[b2 * 3 + 1] - lin[a * 3 + 1], e1z = lin[b2 * 3 + 2] - lin[a * 3 + 2];
+                            double e2x = lin[c * 3] - lin[a * 3], e2y = lin[c * 3 + 1] - lin[a * 3 + 1], e2z = lin[c * 3 + 2] - lin[a * 3 + 2];
+                            double px = tr - lin[a * 3], py = tg - lin[a * 3 + 1], pz = tb - lin[a * 3 + 2];
+                            double m11 = e1x * e1x + e1y * e1y + e1z * e1z, m12 = e1x * e2x + e1y * e2y + e1z * e2z, m22 = e2x * e2x + e2y * e2y + e2z * e2z;
+                            double r1 = e1x * px + e1y * py + e1z * pz, r2 = e2x * px + e2y * py + e2z * pz;
+                            double det = m11 * m22 - m12 * m12;
+                            if (Math.Abs(det) < 1e-12) continue;
+                            double u = (r1 * m22 - r2 * m12) / det, v = (m11 * r2 - m12 * r1) / det, w0 = 1 - u - v;
+                            if (u <= 0.02 || v <= 0.02 || w0 <= 0.02) continue; // edges are covered by the pairs
+                            var mix = ColorMath.LinearToOklab(lin[a * 3] + u * e1x + v * e2x, lin[a * 3 + 1] + u * e1y + v * e2y, lin[a * 3 + 2] + u * e1z + v * e2z);
+                            double dab = S(ck[a], ck[b2]), dac = S(ck[a], ck[c]), dbc = S(ck[b2], ck[c]);
+                            double spread = 2 * Math.Sqrt(w0 * u * dab * dab + w0 * v * dac * dac + u * v * dbc * dbc);
+                            double cost = D(mix, target) + Spread(spread)
+                                + beta * (w0 * D(ck[a], target) + u * D(ck[b2], target) + v * D(ck[c], target))
+                                + gamma * (w0 * Off(a) + u * Off(b2) + v * Off(c));
+                            if (cost < best) { best = cost; t1 = a; t2 = b2; t3 = c; }
+                        }
+                if (t1 >= 0)
+                    return Array.IndexOf(new[] { t1, t2, t3 }, nearest) >= 0 ? [t1, t2, t3] : [t1, t2, t3, nearest];
                 return bb < 0 ? (ba == nearest ? [nearest] : [ba, nearest])
                     : nearest == ba || nearest == bb ? [ba, bb] : [ba, bb, nearest];
             });
@@ -317,4 +376,16 @@ public sealed record RefineSettings
     public double PairLambda { get; init; }
     /// <summary>Two-colour mixing: how many candidates (closest in linear light) are paired.</summary>
     public int PairPool { get; init; } = 40;
+    /// <summary>Pairs are formed from this many colours closest to the target (with any partner).</summary>
+    public int PairNear { get; init; } = 12;
+    /// <summary>Three-colour mixes among the closest this many candidates (0 = pairs only).</summary>
+    public int TriplePool { get; init; }
+    /// <summary>Weight of hue / vividness differences against lightness differences in the mix contrast.</summary>
+    public double ChromaSpread { get; init; } = 1;
+    /// <summary>Weight of the expected per-pixel distance of a mix when choosing it.</summary>
+    public double PlanPixel { get; init; }
+    /// <summary>Weight of the off-hue part of the colours in a mix when choosing it.</summary>
+    public double PlanHue { get; init; }
+    /// <summary>Quadratic part of the mix contrast penalty.</summary>
+    public double PairQuad { get; init; }
 }
