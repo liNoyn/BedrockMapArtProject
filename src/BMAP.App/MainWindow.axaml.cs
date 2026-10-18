@@ -39,11 +39,34 @@ public partial class MainWindow : Window, IDialogService
                 box.CaretIndex = box.Text?.Length ?? 0;
         };
         SetupCropDrag();
+        SetupPreviewSize();
         _vm.OpenViewerRequested += OpenViewer;
-        Closed += (_, _) => _viewer?.Close();
+        Closed += (_, _) => { _viewer?.Close(); _zoomWindow?.Close(); };
     }
 
     private ViewerWindow? _viewer;
+    private PreviewWindow? _zoomWindow;
+
+    /// <summary>The square preview follows the width of its column; "Enlarge" or a double-click opens it large.</summary>
+    private void SetupPreviewSize()
+    {
+        if (this.FindControl<ScrollViewer>("PreviewColumn") is not { } column || this.FindControl<Border>("PreviewBox") is not { } box) return;
+        column.SizeChanged += (_, _) =>
+        {
+            double side = Math.Max(256, Math.Floor(column.Bounds.Width - 20));
+            box.Width = box.Height = side;
+        };
+        if (this.FindControl<Button>("ZoomButton") is { } zoom) zoom.Click += (_, _) => OpenZoom();
+        box.DoubleTapped += (_, _) => { if (_vm.HasPreview) OpenZoom(); };
+    }
+
+    private void OpenZoom()
+    {
+        if (_zoomWindow is { } w) { w.Activate(); return; }
+        _zoomWindow = new PreviewWindow(_vm);
+        _zoomWindow.Closed += (_, _) => _zoomWindow = null;
+        _zoomWindow.Show(this);
+    }
 
     /// <summary>"View in 3D": one viewer window, brought to the front when it is already open.</summary>
     private void OpenViewer()
