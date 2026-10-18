@@ -12,7 +12,7 @@ public class KitTests
 {
     private static readonly ColorProfile Profile = ColorProfile.LoadBuiltIn();
 
-    private static string MakeKit() => VerificationKit.Create(TestHelpers.TempDir(), Profile, parts: VerificationKit.AllParts);
+    private static string MakeKit() => VerificationKit.Create(TestHelpers.TempDir(), Profile, parts: VerificationKit.AllParts.Where(p => p != "discovery").ToList());
 
     [Fact]
     public void LargePart_IsSplitIntoPieces_AndEveryPieceIsLoadedByExactlyOneMapFunction()

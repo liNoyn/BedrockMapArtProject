@@ -23,7 +23,12 @@ public sealed record KitItem
     public string? Pad { get; init; }
     /// <summary>Water pools (water part only): measured, not predicted.</summary>
     public List<WaterPool>? Pools { get; init; }
+    /// <summary>Discovery samples: one 3 x 3 patch per block, to find map colours the palette lacks.</summary>
+    public List<DiscoverySample>? Discovery { get; init; }
 }
+
+/// <summary>A 3 x 3 patch of one block (default states) with its north-west map pixel at (X, Z).</summary>
+public sealed record DiscoverySample(string Block, string States, int X, int Z);
 
 /// <summary>A pool of still water: Size x Size water surface at map pixel (X, Z), Depth blocks deep, on a stone floor.</summary>
 /// <param name="NorthDy">Height of the water surface minus the height the map sees just north of the pool (0 = same).</param>
@@ -63,10 +68,29 @@ public static class VerificationKit
     public const string Namespace = "bmap_kit";
 
     /// <summary>All parts; <c>parts</c> picks some of them (a second session only needs what is still open).</summary>
-    public static readonly string[] AllParts = ["colour_pad", "flat", "classic", "valley_2x2", "large_4x4", "water", "water_steps"];
+    public static readonly string[] AllParts = ["colour_pad", "flat", "classic", "valley_2x2", "large_4x4", "water", "water_steps", "discovery"];
+
+    /// <summary>
+    /// Blocks left out of the discovery pad: technical or education blocks, liquids, fire, portals, explosives, blocks
+    /// made of two parts (doors, beds, tall plants) and blocks with signs or banners. Everything else is placed in its
+    /// default state on a cobblestone floor; blocks that pop off or are not drawn show the floor.
+    /// </summary>
+    private static readonly string[] DiscoverySkip =
+    [
+        "air", "allow", "deny", "border_block", "barrier", "structure_", "jigsaw", "command_block", "light_block", "moving_block",
+        "piston_arm_collision", "info_update", "reserved6", "unknown", "client_request_placeholder", "camera", "element_", "hard_",
+        "colored_torch", "chemistry", "compound_creator", "lab_table", "material_reducer", "element_constructor", "chemical_heat",
+        "underwater_torch", "underwater_tnt", "tnt", "fire", "lava", "water", "portal", "end_gateway", "respawn_anchor",
+        "bubble_column", "frosted_ice", "_door", "bed", "double_plant", "tall_", "large_fern", "sunflower", "lilac", "rose_bush",
+        "peony", "pitcher", "big_dripleaf", "_sign", "banner", "skull", "_head", "candle_cake", "_cake", "glow_frame", "frame",
+        "piston_head", "sweet_berry", "cave_vines", "kelp", "seagrass", "sea_pickle", "end_portal_frame", "lit_", "unlit_",
+        "powered_", "_wall_banner", "trial_spawner", "vault", "creaking_heart", "mob_spawner",
+        // Power sources and blocks that move or act when powered: next to each other they could push samples away.
+        "piston", "redstone_torch", "daylight_detector", "observer", "sculk_sensor", "dispenser", "dropper", "crafter",
+    ];
 
     public static string Create(string folder, ColorProfile profile, int baseY = -60, bool english = false,
-        IReadOnlyCollection<string>? parts = null, string name = "BMAP_verification_kit")
+        IReadOnlyCollection<string>? parts = null, string name = "BMAP_verification_kit", string? blocksJson = null)
     {
         parts ??= ["colour_pad", "flat", "classic", "valley_2x2"];
         foreach (var p in parts) if (!AllParts.Contains(p)) throw new ArgumentException($"unknown kit part {p}");
@@ -217,6 +241,60 @@ public static class VerificationKit
             pieces.Add((item, [new StructureTile { Id = "cells", Structure = s, OffsetX = 0, OffsetY = 0, OffsetZ = 0, MapNumbers = [1], Order = 0 }], origin));
         }
 
+        // Discovery: every other block of Mojang's block list in its default state, 3 x 3 each, on a cobblestone floor.
+        if (parts.Contains("discovery"))
+        {
+            if (blocksJson is null) throw new ArgumentException("discovery needs Mojang's block list (mojang-blocks.json)");
+            var doc = JsonDocument.Parse(File.ReadAllText(blocksJson)).RootElement;
+            var firstValue = new Dictionary<string, (string Type, JsonElement Value)>();
+            foreach (var p in doc.GetProperty("block_properties").EnumerateArray())
+                firstValue[p.GetProperty("name").GetString()!] = (p.GetProperty("type").GetString()!, p.GetProperty("values")[0].GetProperty("value"));
+            var known = profile.Blocks.Select(b => b.Name).ToHashSet();
+            var floor = new PaletteBlock("minecraft:cobblestone", new Nbt.NbtCompound(), 18168865);
+            var s = new McStructure(128, 2, 128);
+            for (int z = 0; z < 128; z++) for (int x = 0; x < 128; x++) s.SetBlock(x, 0, z, floor);
+            var samples = new List<DiscoverySample>();
+            int slot = 0;
+            foreach (var b in doc.GetProperty("data_items").EnumerateArray())
+            {
+                string id = b.GetProperty("name").GetString()!;
+                string shortName = id["minecraft:".Length..];
+                if (known.Contains(id) || DiscoverySkip.Any(k => shortName.Contains(k))) continue;
+                var states = new Nbt.NbtCompound();
+                var text = new List<string>();
+                foreach (var prop in b.GetProperty("properties").EnumerateArray())
+                {
+                    string pn = prop.GetProperty("name").GetString()!;
+                    var (type, v) = firstValue[pn];
+                    states.Add(pn, type switch
+                    {
+                        "bool" => new Nbt.NbtByte((byte)(v.GetBoolean() ? 1 : 0)),
+                        "int" => new Nbt.NbtInt(v.GetInt32()),
+                        _ => new Nbt.NbtString(v.GetString()!),
+                    });
+                    text.Add($"{pn}={v}");
+                }
+                int sx = slot % 42 * 3 + 1, sz = slot / 42 * 3 + 1;
+                if (sz + 3 > 127) break;
+                var block = new PaletteBlock(id, states, 18168865);
+                for (int dz = 0; dz < 3; dz++) for (int dx = 0; dx < 3; dx++) s.SetBlock(sx + dx, 1, sz + dz, block);
+                samples.Add(new DiscoverySample(id, string.Join(";", text), sx, sz));
+                slot++;
+            }
+            int mapX = -1, mapZ = 2;
+            var origin = new WorldOrigin(128 * mapX - 64, baseY, 128 * mapZ - 64);
+            string sub = Path.Combine(dir, "discovery");
+            Directory.CreateDirectory(sub);
+            ImageCodec.SavePng(new RgbaImage(128, 128), Path.Combine(sub, "predicted_map.png"));
+            var item = new KitItem
+            {
+                Id = "discovery", Title = english ? $"Discovery: {samples.Count} other blocks" : $"未知の色さがし: ほかの {samples.Count} ブロック", MapX = mapX, MapZ = mapZ,
+                Predicted = Path.GetRelativePath(dir, Path.Combine(sub, "predicted_map.png")), Discovery = samples,
+            };
+            items.Add(item);
+            pieces.Add((item, [new StructureTile { Id = "blocks", Structure = s, OffsetX = 0, OffsetY = 0, OffsetZ = 0, MapNumbers = [1], Order = 0 }], origin));
+        }
+
         var manifest = new KitManifest { BaseY = baseY, ProfileId = profile.Id, Created = DateTime.Now.ToString("yyyy-MM-dd HH:mm"), Items = items };
         File.WriteAllText(Path.Combine(dir, "kit.json"), manifest.ToJson(), new UTF8Encoding(false));
         WritePack(dir, pieces, packName: name);
@@ -362,6 +440,55 @@ public static class VerificationKit
                 sb.AppendLine($"{p.Depth,5}  {Top(even),-36} {Top(odd)}");
             }
         }
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// What the game drew for each discovery sample (the lower two rows of its 3 x 3 patch, whose north neighbour is the
+    /// same block, so the normal shade), classified as a known colour set, the cobblestone floor (block not drawn or
+    /// popped off) or a NEW colour. New colours come first.
+    /// </summary>
+    public static string DiscoveryReport(string kitDir, IReadOnlyList<Bedrock.MapRecord> maps, ColorProfile profile)
+    {
+        var m = KitManifest.Load(Path.Combine(kitDir, "kit.json"));
+        var normals = new Dictionary<string, string>();
+        foreach (var set in profile.ColourSets)
+            foreach (var b in set.Blocks)
+                normals.TryAdd(profile.ColorOf(b, Shade.Normal).ToHex(), $"{set.Id} {set.NameEn}");
+        var floorShades = new[] { Shade.Dark, Shade.Normal, Shade.Bright }.Select(s => profile.ColorOf(profile.Find("cobblestone")!, s).ToHex()).ToHashSet();
+        var rows = new List<(int Order, string Line)>();
+        foreach (var item in m.Items.Where(i => i.Discovery != null))
+        {
+            var map = maps.Where(r => r.Scale == 0 && r.Dimension == 0 && r.XCenter == 128 * item.MapX && r.ZCenter == 128 * item.MapZ)
+                .Select(r => r.ToImage()).FirstOrDefault(i => i != null);
+            if (map is null) return $"{item.Id}: no map";
+            foreach (var smp in item.Discovery!)
+            {
+                var counts = new Dictionary<string, int>();
+                for (int dz = 1; dz < 3; dz++)
+                    for (int dx = 0; dx < 3; dx++)
+                    {
+                        int i = ((smp.Z + dz) * 128 + smp.X + dx) * 4;
+                        string c = map.Pixels[i + 3] == 0 ? "(unexplored)" : $"#{map.Pixels[i]:X2}{map.Pixels[i + 1]:X2}{map.Pixels[i + 2]:X2}";
+                        counts[c] = counts.GetValueOrDefault(c) + 1;
+                    }
+                var top = counts.OrderByDescending(kv => kv.Value).First();
+                string kind = top.Key == "(unexplored)" ? "unexplored"
+                    : floorShades.Contains(top.Key) ? "floor (not drawn / popped off)"
+                    : normals.TryGetValue(top.Key, out var set) ? $"set {set}" : "NEW";
+                if (kind == "NEW")
+                {
+                    // Base colour estimate from the normal shade (x220 / 255, rounded down): the smallest base giving it.
+                    var c = Rgba.FromHex(top.Key);
+                    int B(int v) => (int)Math.Ceiling(v * 255 / 220.0);
+                    kind = $"NEW  (base about #{B(c.R):X2}{B(c.G):X2}{B(c.B):X2})";
+                }
+                rows.Add((kind.StartsWith("NEW") ? 0 : kind.StartsWith("floor") ? 2 : 1,
+                    $"{smp.Block,-44} {top.Key} ({top.Value}/6)  {kind}{(counts.Count > 1 ? $"  [{string.Join(" ", counts.Select(kv => $"{kv.Key} x{kv.Value}"))}]" : "")}"));
+            }
+        }
+        var sb = new StringBuilder($"{rows.Count(r => r.Order == 0)} new colours, {rows.Count(r => r.Order == 1)} known, {rows.Count(r => r.Order == 2)} not drawn\n");
+        foreach (var r in rows.OrderBy(r => r.Order)) sb.AppendLine(r.Line);
         return sb.ToString();
     }
 

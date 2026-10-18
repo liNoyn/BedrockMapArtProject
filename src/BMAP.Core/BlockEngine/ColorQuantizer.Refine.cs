@@ -115,10 +115,29 @@ public static partial class ColorQuantizer
         for (int i = 0; i < n; i++) ok[i] = ColorMath.ToOklab(image.Pixels[i * 4], image.Pixels[i * 4 + 1], image.Pixels[i * 4 + 2]);
         float pw = (float)settings.PerceptualWeight;
         double ph = settings.PixelHue;
+        // Edges (line art, contours) get a higher per-pixel weight: dithering them frays the line, while flat areas
+        // can mix. Edge strength = Sobel gradient of Oklab (L, a, b) at the pixel, 0..1 (0.15 per pixel = full edge).
+        var edgeBoost = new float[n];
+        if (settings.EdgeWeight > 0)
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    double gx = 0, gy = 0;
+                    foreach (var (dx, dy, kx, ky) in Sobel)
+                    {
+                        int xx = Math.Clamp(x + dx, 0, w - 1), yy = Math.Clamp(y + dy, 0, h - 1);
+                        var o2 = ok[yy * w + xx];
+                        double v = o2.L + 0.5 * Math.Sqrt(o2.A * o2.A + o2.B * o2.B);
+                        gx += kx * v; gy += ky * v;
+                    }
+                    double g = Math.Sqrt(gx * gx + gy * gy) / 4;
+                    edgeBoost[y * w + x] = (float)(1 + settings.EdgeWeight * Math.Min(1, g / 0.15));
+                }
+        else Array.Fill(edgeBoost, 1f);
         float PixelCost(int i, int c)
         {
             double dl = ck[c].L - ok[i].L, da = ck[c].A - ok[i].A, db = ck[c].B - ok[i].B;
-            double cost = pw * (dl * dl + da * da + db * db);
+            double cost = pw * edgeBoost[i] * (dl * dl + da * da + db * db);
             if (ph > 0)
             {
                 // Off-hue part of the colour relative to this pixel's hue (the same idea as the plan's PlanHue), so
@@ -179,38 +198,86 @@ public static partial class ColorQuantizer
                 Spread(x, y, s * (cv[c * 3] - ov[i * 3]), s * (cv[c * 3 + 1] - ov[i * 3 + 1]), s * (cv[c * 3 + 2] - ov[i * 3 + 2]));
             }
 
-        for (int pass = 0; pass < settings.MaxPasses; pass++)
+        // Swaps (as in direct binary search halftoning): two neighbouring pixels exchange their colours when that lowers
+        // the error. The local mix stays the same, only the arrangement of the dots improves, which single-pixel
+        // changes cannot do once each pixel on its own is at its best.
+        bool InList(int i, int c)
         {
-            ct.ThrowIfCancellationRequested();
-            int changes = 0;
-            for (int y = 0; y < h; y++)
+            int start = i * take;
+            for (int t = 0; t < counts[i]; t++) if (near[start + t] == c) return true;
+            return false;
+        }
+        (int Dx, int Dy)[] offsets = [(1, 0), (0, 1), (1, 1), (-1, 1)];
+        // Rounds of single-pixel passes and swap passes (a swap can open new single-pixel improvements).
+        for (int round = 0; round < Math.Max(1, settings.Rounds); round++)
+        {
+            for (int pass = 0; pass < settings.MaxPasses; pass++)
             {
-                bool reverse = (y & 1) == 1;
-                for (int s = 0; s < w; s++)
+                ct.ThrowIfCancellationRequested();
+                int changes = 0;
+                for (int y = 0; y < h; y++)
                 {
-                    int x = reverse ? w - 1 - s : s, i = y * w + x, cur = chosen[i];
-                    if (cur < 0) continue;
-                    int count = counts[i], start = i * take;
-                    float qr = cv[cur * 3], qg = cv[cur * 3 + 1], qb = cv[cur * 3 + 2], sp = sw[i], cs = c0 * sp * sp;
-                    float er = ce[i * 3], eg = ce[i * 3 + 1], eb = ce[i * 3 + 2];
-                    float curCost = PixelCost(i, cur);
-                    int best = cur;
-                    float bestDelta = -1e-9f;
-                    for (int t = 0; t < count; t++)
+                    bool reverse = (y & 1) == 1;
+                    for (int s = 0; s < w; s++)
                     {
-                        int c = near[start + t];
-                        if (c == cur) continue;
-                        float ar = cv[c * 3] - qr, ag = cv[c * 3 + 1] - qg, ab = cv[c * 3 + 2] - qb;
-                        float delta = 2 * sp * (ar * er + ag * eg + ab * eb) + cs * (ar * ar + ag * ag + ab * ab) + nearCost[start + t] - curCost;
-                        if (delta < bestDelta) { bestDelta = delta; best = c; }
+                        int x = reverse ? w - 1 - s : s, i = y * w + x, cur = chosen[i];
+                        if (cur < 0) continue;
+                        int count = counts[i], start = i * take;
+                        float qr = cv[cur * 3], qg = cv[cur * 3 + 1], qb = cv[cur * 3 + 2], sp = sw[i], cs = c0 * sp * sp;
+                        float er = ce[i * 3], eg = ce[i * 3 + 1], eb = ce[i * 3 + 2];
+                        float curCost = PixelCost(i, cur);
+                        int best = cur;
+                        float bestDelta = -1e-9f;
+                        for (int t = 0; t < count; t++)
+                        {
+                            int c = near[start + t];
+                            if (c == cur) continue;
+                            float ar = cv[c * 3] - qr, ag = cv[c * 3 + 1] - qg, ab = cv[c * 3 + 2] - qb;
+                            float delta = 2 * sp * (ar * er + ag * eg + ab * eb) + cs * (ar * ar + ag * ag + ab * ab) + nearCost[start + t] - curCost;
+                            if (delta < bestDelta) { bestDelta = delta; best = c; }
+                        }
+                        if (best == cur) continue;
+                        Spread(x, y, sp * (cv[best * 3] - qr), sp * (cv[best * 3 + 1] - qg), sp * (cv[best * 3 + 2] - qb));
+                        chosen[i] = best;
+                        changes++;
                     }
-                    if (best == cur) continue;
-                    Spread(x, y, sp * (cv[best * 3] - qr), sp * (cv[best * 3 + 1] - qg), sp * (cv[best * 3 + 2] - qb));
-                    chosen[i] = best;
-                    changes++;
                 }
+                if (changes <= n / 1000) break;
             }
-            if (changes <= n / 1000) break;
+
+            for (int pass = 0; pass < settings.SwapPasses; pass++)
+            {
+                ct.ThrowIfCancellationRequested();
+                int swaps = 0;
+                for (int y = 0; y < h; y++)
+                    for (int x = 0; x < w; x++)
+                    {
+                        int i = y * w + x, ci = chosen[i];
+                        if (ci < 0) continue;
+                        foreach (var (dx, dy) in offsets)
+                        {
+                            int x2 = x + dx, y2 = y + dy;
+                            if (x2 < 0 || x2 >= w || y2 >= h) continue;
+                            int j = y2 * w + x2, cj = chosen[j];
+                            if (cj < 0 || cj == ci || !InList(i, cj) || !InList(j, ci)) continue;
+                            float si = sw[i], sj = sw[j];
+                            float ar = si * (cv[cj * 3] - cv[ci * 3]), ag = si * (cv[cj * 3 + 1] - cv[ci * 3 + 1]), ab = si * (cv[cj * 3 + 2] - cv[ci * 3 + 2]);
+                            float br = sj * (cv[ci * 3] - cv[cj * 3]), bg = sj * (cv[ci * 3 + 1] - cv[cj * 3 + 1]), bb = sj * (cv[ci * 3 + 2] - cv[cj * 3 + 2]);
+                            float kij = kernel[(dy + R) * K + dx + R];
+                            float delta = 2 * (ar * ce[i * 3] + ag * ce[i * 3 + 1] + ab * ce[i * 3 + 2]) + c0 * (ar * ar + ag * ag + ab * ab)
+                                + 2 * (br * ce[j * 3] + bg * ce[j * 3 + 1] + bb * ce[j * 3 + 2]) + c0 * (br * br + bg * bg + bb * bb)
+                                + 2 * kij * (ar * br + ag * bg + ab * bb)
+                                + PixelCost(i, cj) - PixelCost(i, ci) + PixelCost(j, ci) - PixelCost(j, cj);
+                            if (delta >= -1e-9f) continue;
+                            Spread(x, y, ar, ag, ab);
+                            Spread(x2, y2, br, bg, bb);
+                            chosen[i] = cj; chosen[j] = ci;
+                            ci = cj;
+                            swaps++;
+                        }
+                    }
+                if (swaps <= n / 2000) break;
+            }
         }
     }
 
@@ -406,6 +473,9 @@ public static partial class ColorQuantizer
 
     private static double Sq(double v) => v * v;
 
+    private static readonly (int Dx, int Dy, int Kx, int Ky)[] Sobel =
+        [(-1, -1, -1, -1), (0, -1, 0, -2), (1, -1, 1, -1), (-1, 0, -2, 0), (1, 0, 2, 0), (-1, 1, -1, 1), (0, 1, 0, 2), (1, 1, 1, 1)];
+
     /// <summary>
     /// Bilateral filter (13x13, spatial σ 3, range σ <paramref name="range"/> in sRGB steps): removes the small block
     /// noise of compressed pictures in flat areas, which made the optimiser decide block by block (square patches of
@@ -514,6 +584,12 @@ public sealed record RefineSettings
     /// <summary>Candidates tried per pixel (the closest to the source colour).</summary>
     public int Neighbours { get; init; } = 16;
     public int MaxPasses { get; init; } = 12;
+    /// <summary>Passes of neighbour swaps after the single-pixel passes (0 = none).</summary>
+    public int SwapPasses { get; init; }
+    /// <summary>Rounds of single-pixel and swap passes.</summary>
+    public int Rounds { get; init; } = 1;
+    /// <summary>Extra per-pixel weight on edges (0 = off): keeps line art and contours crisp.</summary>
+    public double EdgeWeight { get; init; }
     /// <summary>Linear space: exponent of the dark-tone weighting (0 = none, 2/3 = lightness slope).</summary>
     public double DarkWeight { get; init; } = 0.5;
     /// <summary>Weight of the per-pixel Oklab error (calm, true-hue pixels up close).</summary>
