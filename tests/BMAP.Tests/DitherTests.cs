@@ -83,6 +83,24 @@ public class DitherTests
         Assert.True(QualityScore.Measure(RgbaImage.Filled(64, 64, pale), q.Preview).Far < 4);
     }
 
+    [Theory]
+    [InlineData("#EED0D4")]
+    [InlineData("#ECD4D4")]
+    [InlineData("#EDD1D6")]
+    public void Optimized_DoesNotTurnPalePinkHairGrey(string hex)
+    {
+        // Pale pinks with the lightness of the grey #DCD9D3 (the top of the hair in a user's anime image): grey alone was
+        // closer by distance than white + pink, which pay for their contrast, so whole areas turned grey. The plan now
+        // pays for the colour it loses (PlanChroma). Flat builds are left out: without the bright shades white + pink
+        // can only reach these pinks much darker, and a stronger penalty there only adds red dots.
+        foreach (var mode in new[] { StaircaseMode.Classic, StaircaseMode.Valley })
+        {
+            var q = Q(RgbaImage.Filled(64, 64, Rgba.FromHex(hex)), new QuantizeOptions { Dither = DitherMode.Optimized, Mode = mode });
+            int pink = q.EntryIndex.Count(e => q.Entries[e].Block.Key.StartsWith("pink"));
+            Assert.True(pink > 64 * 64 / 10, $"{hex} {mode}: only {pink} pink pixels");
+        }
+    }
+
     [Fact]
     public void Optimized_HasNoPatchesInAPaleGradientWithBlockNoise()
     {
@@ -90,9 +108,9 @@ public class DitherTests
         // compressed anime frames). One hard plan per colour bucket made the blocks flip between grey and
         // white + pink: square patches. Inside each flat area the pink share must be even.
         const int S = 64, T = 16;
-        // #F2D4D7 / #F1D1D5 are left out: they sit where "grey alone" and "white + pink" tie, and under block noise
-        // still turn grey with stripes (known limitation, docs/TODO.md).
-        string[] colours = ["#F4DADB", "#F3D7D9", "#F0CED3", "#EFCBD1"];
+        // #F2D4D7 / #F1D1D5 sat where "grey alone" and "white + pink" tied and turned grey with stripes until the plan
+        // paid for lost chroma (PlanChroma).
+        string[] colours = ["#F4DADB", "#F3D7D9", "#F2D4D7", "#F1D1D5", "#F0CED3", "#EFCBD1"];
         double worst = 0;
         foreach (var hex in colours)
         {
