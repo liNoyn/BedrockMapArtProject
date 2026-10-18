@@ -60,9 +60,10 @@ public sealed class BmapProject
         SelectedBlocks is { } list ? [.. list] : Selection is { } old ? [.. old.Values] : null;
     public int MaxBlockTypes { get; set; }
     public string SupportBlockKey { get; set; } = "cobblestone";
-    public int? OriginX { get; set; }
-    public int? OriginY { get; set; }
-    public int? OriginZ { get; set; }
+    /// <summary>Map grid position of the build (null = not aligned). Aligned by default: the coordinate parity is then known.</summary>
+    public int? OriginX { get; set; } = 0;
+    public int? OriginY { get; set; } = 64;
+    public int? OriginZ { get; set; } = 0;
 
     /// <summary>Build progress per map number (1-based).</summary>
     public Dictionary<int, ProgressState> MapProgress { get; set; } = [];

@@ -192,7 +192,7 @@ var profile = new JsonObject
         ["statusNote"] = "Multipliers seen exactly (base x180 / x220 / x255, rounded down) on maps drawn by Bedrock 1.21.132-1.26.51. " +
             "Step rule measured with the BMAP shading pad on Bedrock 1.26.51 (2026-10-18, 8032 samples, 100 % exact): " +
             "a step of +1 is light only where x + z is odd, -1 is dark only where x + z is even; steps of 2 or more always; carpets and slabs alike; east/west steps have no effect.",
-        ["minStep"] = 2, ["brightStep"] = 2, ["darkStep"] = 2, ["model"] = "checker", ["rounding"] = "fromBase", ["modelId"] = "checker",
+        ["minStep"] = 2, ["brightStep"] = 2, ["darkStep"] = 2, ["model"] = "checker", ["rounding"] = "fromBase", ["modelId"] = "parity",
         ["stepStatus"] = "verified",
     },
     ["colourSets"] = sets,

@@ -62,12 +62,18 @@ public sealed partial class MainViewModel : ViewModelBase
         Interpolations = [new(Interpolation.Lanczos3, "InterpLanczos", L), new(Interpolation.Bilinear, "InterpBilinear", L), new(Interpolation.Nearest, "InterpNearest", L)];
         CropModes = [new(CropMode.Off, "CropOff", L), new(CropMode.Center, "CropCenter", L), new(CropMode.Manual, "CropManual", L)];
         TransparencyModes = [new(TransparencyMode.Smooth, "TransSmooth", L), new(TransparencyMode.Dithered, "TransDithered", L), new(TransparencyMode.Keep, "TransKeep", L)];
+        // Main window: pictures of the map. The build views live in the "View in 3D" window (MapartCraft's "View online").
         PreviewModes =
         [
-            new(PreviewMode.BlockMap, "PvBlockMap", L), new(PreviewMode.Original, "PvOriginal", L), new(PreviewMode.Difference, "PvDifference", L),
-            new(PreviewMode.ShadeMap, "PvShadeMap", L), new(PreviewMode.Build2D, "PvBuild2D", L), new(PreviewMode.Build3D, "PvBuild3D", L),
-            new(PreviewMode.HeightMap, "PvHeightMap", L), new(PreviewMode.Calibration, "PvCalibration", L),
+            new(PreviewMode.BlockMap, "PvBlockMapShort", L), new(PreviewMode.Original, "PvOriginal", L),
+            new(PreviewMode.ShadeMap, "PvShadeMapShort", L), new(PreviewMode.Difference, "PvDifference", L),
+            new(PreviewMode.Calibration, "PvCalibrationShort", L),
         ];
+        ViewerModes =
+        [
+            new(PreviewMode.Build3D, "PvBuild3D", L), new(PreviewMode.Build2D, "PvBuild2D", L), new(PreviewMode.HeightMap, "PvHeightMap", L),
+        ];
+        _viewerMode = ViewerModes[0];
         _fit = FitModes[0];
         _interp = Interpolations[0];
         _cropMode = CropModes[0];
@@ -257,18 +263,37 @@ public sealed partial class MainViewModel : ViewModelBase
         set
         {
             if (value == null || !Set(ref _previewMode, value)) return;
-            Raise(nameof(IsBuildView));
-            Raise(nameof(IsBuild3D));
-            Raise(nameof(IsImageView));
-            Raise(nameof(IsBuildScroll));
-            RefreshPreview();
+            RefreshMainPreview();
         }
     }
-    public bool IsBuildView => SelectedPreviewMode.Value is PreviewMode.Build2D or PreviewMode.Build3D or PreviewMode.HeightMap;
-    public bool IsBuild3D => SelectedPreviewMode.Value == PreviewMode.Build3D;
-    public bool IsImageView => !IsBuildView;
+
+    // ---- "View in 3D" window ----
+    public IReadOnlyList<LocOption<PreviewMode>> ViewerModes { get; }
+    private LocOption<PreviewMode> _viewerMode;
+    public LocOption<PreviewMode> SelectedViewerMode
+    {
+        get => _viewerMode;
+        set
+        {
+            if (value == null || !Set(ref _viewerMode, value)) return;
+            Raise(nameof(IsBuild3D));
+            Raise(nameof(IsBuildScroll));
+            RefreshViewer();
+        }
+    }
+    public bool IsBuild3D => SelectedViewerMode.Value == PreviewMode.Build3D;
     /// <summary>2D build view and height map: a scrollable picture. The 3D view has its own interactive panel.</summary>
-    public bool IsBuildScroll => SelectedPreviewMode.Value is PreviewMode.Build2D or PreviewMode.HeightMap;
+    public bool IsBuildScroll => SelectedViewerMode.Value is PreviewMode.Build2D or PreviewMode.HeightMap;
+    private bool _viewerOpen;
+    /// <summary>Set by the viewer window: build views are only rendered while it is open.</summary>
+    public bool ViewerOpen { get => _viewerOpen; set { if (Set(ref _viewerOpen, value) && value) RefreshViewer(); } }
+    private Bitmap? _viewerImage;
+    public Bitmap? ViewerImage { get => _viewerImage; set => Set(ref _viewerImage, value); }
+    private string _viewerInfo = "";
+    public string ViewerInfo { get => _viewerInfo; set => Set(ref _viewerInfo, value); }
+    /// <summary>Raised when the "View in 3D" button is pressed; the window opens (or activates) the viewer.</summary>
+    public event Action? OpenViewerRequested;
+    public void RequestViewer() => OpenViewerRequested?.Invoke();
 
     private bool _showGrid = true;
     public bool ShowGrid { get => _showGrid; set { if (Set(ref _showGrid, value)) RefreshPreview(); } }
@@ -383,6 +408,9 @@ public sealed partial class MainViewModel : ViewModelBase
         var profile = Profile;
         var selection = CurrentSelection();
         var qopt = CurrentQuantizeOptions();
+        var support = SelectedSupportBlock ?? profile.Find("cobblestone") ?? profile.Blocks.First();
+        var supports = SupportModeOption.Value;
+        bool grid = UseOrigin;
         Status = L["Converting"];
         try
         {
@@ -391,7 +419,7 @@ public sealed partial class MainViewModel : ViewModelBase
                 var p = ImagePipeline.Process(source, settings, cts.Token);
                 QuantizeResult? qr = null;
                 string? err = null;
-                try { qr = ColorQuantizer.Quantize(p, profile, selection, qopt, cts.Token); }
+                try { qr = HeightPlanner.Quantize(p, profile, selection, qopt, support, supports, grid, cts.Token); }
                 catch (InvalidOperationException ex) { err = ex.Message; }
                 return (p, qr, err);
             }, cts.Token);
@@ -425,7 +453,11 @@ public sealed partial class MainViewModel : ViewModelBase
         try { _layout = BlockLayout.Generate(q, support, 0, SupportModeOption.Value, onMapGrid: UseOrigin); }
         catch (InvalidOperationException ex) { _layout = null; Log(ex.Message); }
         AnalyzeShading();
+        Raise(nameof(HasLayout));
     }
+
+    /// <summary>A build layout exists (an image is converted).</summary>
+    public bool HasLayout => _layout != null;
 
     private int _analysisVersion;
 
@@ -441,8 +473,8 @@ public sealed partial class MainViewModel : ViewModelBase
             if (version != _analysisVersion) return;
             _report = report;
             UpdateShadingText();
-            if (SelectedPreviewMode.Value == PreviewMode.ShadeMap) RefreshPreview();
-            if (SelectedPreviewMode.Value == PreviewMode.Build3D) Request3D(); // problem marks in the shade view
+            if (SelectedPreviewMode.Value == PreviewMode.ShadeMap) RefreshMainPreview();
+            if (ViewerOpen && IsBuild3D) Request3D(); // problem marks in the shade view
         }
         catch (Exception ex) { Log(ex.Message); }
     }
@@ -482,21 +514,31 @@ public sealed partial class MainViewModel : ViewModelBase
         return LayoutRegion.Map(n % MapsX, n / MapsX);
     }
 
-    private async void RefreshPreview()
+    /// <summary>Refreshes the main picture and, when it is open, the viewer window.</summary>
+    private void RefreshPreview()
     {
-        int version = ++_previewVersion;
-        var mode = SelectedPreviewMode.Value;
+        RefreshMainPreview();
+        RefreshViewer();
+    }
+
+    private int _viewerVersion;
+
+    /// <summary>Build views of the viewer window (3D, 2D layout, height map); nothing is rendered while it is closed.</summary>
+    private async void RefreshViewer()
+    {
+        if (!ViewerOpen) return;
+        int version = ++_viewerVersion;
+        var mode = SelectedViewerMode.Value;
         if (mode == PreviewMode.Build3D)
         {
             Request3D();
             return;
         }
-        if (mode is PreviewMode.Build2D or PreviewMode.HeightMap)
         {
             if (_layout is not { } layout || Profile is not { } profile)
             {
-                Preview = null;
-                PreviewInfo = _source is null ? L["DropHere"] : "";
+                ViewerImage = null;
+                ViewerInfo = "";
                 return;
             }
             var region = RegionFor(layout);
@@ -521,16 +563,21 @@ public sealed partial class MainViewModel : ViewModelBase
                 Log(ex.Message);
                 return;
             }
-            if (version != _previewVersion) return;
+            if (version != _viewerVersion) return;
             _renderedRegion = region;
             _renderedCell = mode == PreviewMode.HeightMap ? Math.Max(1, cell) : cell;
-            Preview = _renderedBitmap = BitmapHelper.ToBitmap(img);
-            PreviewInfo = mode == PreviewMode.HeightMap
+            ViewerImage = _renderedBitmap = BitmapHelper.ToBitmap(img);
+            ViewerInfo = mode == PreviewMode.HeightMap
                 ? L.Format("HeightLegend", layout.MaxHeight)
                 : L["InfoBuild"] + $"  ({img.Width} x {img.Height})";
-            return;
         }
+    }
 
+    /// <summary>The picture in the main window: predicted map, original, shading, difference or calibration.</summary>
+    private void RefreshMainPreview()
+    {
+        ++_previewVersion;
+        var mode = SelectedPreviewMode.Value;
         RgbaImage? image = mode switch
         {
             PreviewMode.Original => _sourceThumb,
@@ -589,9 +636,8 @@ public sealed partial class MainViewModel : ViewModelBase
     /// <summary>Pointer over the build view at fractions (0..1) of the rendered image.</summary>
     public void OnPreviewPointer(double fx, double fy, bool click, bool pressed = false, bool released = false)
     {
-        if (SelectedPreviewMode.Value is not (PreviewMode.Build2D or PreviewMode.HeightMap) || _layout is not { } layout
-            || Preview is null || !ReferenceEquals(Preview, _renderedBitmap)) return;
-        var hit = LayoutRenderer.HitTestTopDown(_renderedRegion, _renderedCell, fx * Preview.PixelSize.Width, fy * Preview.PixelSize.Height);
+        if (!IsBuildScroll || _layout is not { } layout || ViewerImage is not { } shown || !ReferenceEquals(shown, _renderedBitmap)) return;
+        var hit = LayoutRenderer.HitTestTopDown(_renderedRegion, _renderedCell, fx * shown.PixelSize.Width, fy * shown.PixelSize.Height);
         if (hit is not var (x, z) || !layout.InBounds(x, z)) { HoverInfo = ""; return; }
         var b = layout.BlockAt(x, z);
         string world = Origin is { } o ? $"  {(L.English ? "world" : "ワールド")} X {o.X + x}, Y {o.Y + layout.HeightAt(x, z)}, Z {o.Z + z}" : "";
@@ -763,7 +809,6 @@ public sealed partial class MainViewModel : ViewModelBase
         p.Dither = Dither.Value;
         p.DitherStrength = DitherStrength;
         p.MaxHeight = MaxHeight;
-        p.ShadingModelId = ShadingModelOption?.Value?.Id ?? "";
         p.ShadePenalty = ShadePenalty;
         p.Serpentine = Serpentine;
         p.LinearDiffusion = LinearDiffusion;
@@ -804,8 +849,6 @@ public sealed partial class MainViewModel : ViewModelBase
             Dither = Dithers.First(d => d.Value == p.Dither);
             DitherStrength = p.DitherStrength;
             MaxHeight = p.MaxHeight;
-            _shadingModel = ShadingModels.FirstOrDefault(m => (m.Value?.Id ?? "") == p.ShadingModelId) ?? ShadingModels[0];
-            Raise(nameof(ShadingModelOption));
             ShadePenalty = p.ShadePenalty;
             Serpentine = p.Serpentine;
             LinearDiffusion = p.LinearDiffusion;

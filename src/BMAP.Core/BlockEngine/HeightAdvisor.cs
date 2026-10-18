@@ -35,7 +35,7 @@ public static class HeightAdvisor
         (int MaxHeight, int BuildHeight, double Error, int Blocks) Run(StaircaseMode m, int limit)
         {
             ct.ThrowIfCancellationRequested();
-            var q = ColorQuantizer.Quantize(image, profile, selection, options with { Mode = m, MaxHeight = limit }, ct);
+            var q = HeightPlanner.Quantize(image, profile, selection, options with { Mode = m, MaxHeight = limit }, supportBlock, supports, onMapGrid, ct);
             var layout = BlockLayout.Generate(q, supportBlock, 0, supports, onMapGrid: onMapGrid);
             int top = 0, bottom = int.MaxValue;
             for (int i = 0; i < layout.Cells.Length; i++)

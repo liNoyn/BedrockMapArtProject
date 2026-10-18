@@ -11,9 +11,10 @@ Java Edition) for Bedrock: the image is reduced to block map colours and exporte
 pieces for structure blocks, one per map, or one file) with a build guide (textured placement plans, row-by-row steps,
 material CSV and world coordinates).
 
-The window has MapartCraft's three columns: **block selection** on the left, the **map preview** in the middle (map
-colours, original, difference, shading analysis, 2D / 3D build views, height map) and **map settings**, export buttons,
-the **shading & build check** and the **materials** on the right. The UI is in English and Japanese (switch at the top right).
+The window has MapartCraft's three columns: **block selection** on the left, the **map preview** (map, original, shading,
+difference, calibration) and the **materials** in the middle, and **map settings** with the green export buttons on the
+right, one "label: control" per line with foldable sections. 3D, the placement plan and the height map open in a
+separate window with "View in 3D" (MapartCraft's "View online"). The UI is in English and Japanese (switch at the top right).
 
 Built with C# / .NET 8 / Avalonia 11 and SkiaSharp. Little-endian NBT, `.mcstructure`, all dithering and the 3D software
 renderer are implemented in the project without further libraries.
@@ -56,8 +57,9 @@ renderer are implemented in the project without further libraries.
 **3D map art (staircasing) and the shading rule**
 - 3D: off (flat), Classic, Valley, full dark, full light.
 - **Shading model**: by default the rule measured on Bedrock 1.26.51 (±1 alternates by coordinate parity, ±2 or more
-  always). With the build aligned to the map grid, single steps are used where the parity allows, 23–27 % lower than
-  always stepping by 2. Step 1 (Java), step 2 (gd-codes, Nukkit) and others can be chosen.
+  always). With the build aligned to the map grid (default), single steps are used where the parity allows and normal
+  pixels may drift by one, 27–37 % lower than always stepping by 2. With a height limit, the real layout height is
+  measured so the limit is used fully.
 - **Shading rule analysis** (details in [docs/shading-rules.md](docs/shading-rules.md), Japanese)
   - Map simulator: redraws the map from the block positions alone and compares it pixel by pixel with the planned
     colours (tested to match in every staircase, support and dithering mode).

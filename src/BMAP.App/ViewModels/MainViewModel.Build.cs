@@ -127,19 +127,6 @@ public sealed partial class MainViewModel
         ApplyRecommendedYCommand.RaiseCanExecuteChanged();
     }
 
-    // ---- shading model (the profile's own rule, or a candidate chosen before it is measured) ----
-    public IReadOnlyList<LocOption<BMAP.Shading.ShadingModel?>> ShadingModels { get; private set; } = [];
-    private LocOption<BMAP.Shading.ShadingModel?>? _shadingModel;
-    public LocOption<BMAP.Shading.ShadingModel?>? ShadingModelOption
-    {
-        get => _shadingModel;
-        set
-        {
-            if (value is null || !Set(ref _shadingModel, value) || BaseProfile is null) return;
-            SelectProfile(BaseProfile, CurrentSelection().Keys);
-        }
-    }
-
     private double _ditherStrength = 1.0;
     public double DitherStrength { get => _ditherStrength; set { if (Set(ref _ditherStrength, Math.Clamp(value, 0, 1))) ScheduleUpdate(); } }
     private bool _serpentine = true;
@@ -259,18 +246,11 @@ public sealed partial class MainViewModel
         ClearEditsCommand = new RelayCommand(ClearEditsAsync, () => _edits.Count > 0);
         SavePreviewPngCommand = new RelayCommand(SavePreviewPngAsync, () => _quantized != null);
         ExportTestPadCommand = new RelayCommand(() => ExportPadAsync(PadKind.Shading));
-        View3DCommand = new RelayCommand(() => SelectedPreviewMode = PreviewModes.First(p => p.Value == PreviewMode.Build3D), () => _layout != null);
+        View3DCommand = new RelayCommand(RequestViewer, () => _layout != null);
         ShowShadeMapCommand = new RelayCommand(() => SelectedPreviewMode = PreviewModes.First(p => p.Value == PreviewMode.ShadeMap));
         AnalyzeHeightCommand = new RelayCommand(AnalyzeHeightAsync, () => _processed != null && !IsAnalyzing);
         FlatBackgroundCommand = new RelayCommand(UseFlatBackground);
         ApplyRecommendedYCommand = new RelayCommand(() => { if (_advice is { Fits: true } a) { UseOrigin = true; OriginY = a.RecommendedBaseY; } }, () => _advice is { Fits: true });
-        ShadingModels =
-        [
-            new(null, "ModelProfile", L),
-            .. BMAP.Shading.ShadingModel.Candidates.Where(m => m.Kind != BMAP.Shading.ShadingModelKind.Graded)
-                .Select(m => new LocOption<BMAP.Shading.ShadingModel?>(m, "Model_" + m.Id, L)),
-        ];
-        _shadingModel = ShadingModels[0];
         Dithers =
         [
             new(DitherMode.None, "SuNone", L), new(DitherMode.FloydSteinberg, "Floyd–Steinberg", L),
