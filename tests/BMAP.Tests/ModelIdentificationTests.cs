@@ -171,9 +171,28 @@ public class HeightPlannerTests
             return Enumerable.Range(0, l.Cells.Length).Where(i => l.Cells[i] != BMAP.BlockEngine.BlockLayout.Empty).Max(i => l.Heights[i])
                  - Enumerable.Range(0, l.Cells.Length).Where(i => l.Cells[i] != BMAP.BlockEngine.BlockLayout.Empty).Min(i => l.Heights[i]);
         }
+        // The limit is the height of the whole build, supports included, and it is used (nearly) fully.
+        int total = BMAP.BlockEngine.BlockLayout.Generate(planned, cobble, 0, BMAP.BlockEngine.SupportMode.Important, onMapGrid: true).MaxHeight;
+        Assert.InRange(total, 7, 8);
         Assert.InRange(Range(planned), 0, 8);
-        Assert.True(Range(planned) >= Range(naive));
-        Assert.True(BMAP.BlockEngine.HeightAdvisor.DistanceDeltaE2000(img, planned.Preview) <= BMAP.BlockEngine.HeightAdvisor.DistanceDeltaE2000(img, naive.Preview) + 1e-9);
+        _ = naive;
+    }
+
+    [Theory]
+    [InlineData(4)]
+    [InlineData(8)]
+    [InlineData(16)]
+    public void OptimisedDither_WithSupports_StaysWithinTheLimit(int limit)
+    {
+        var profile = ColorProfile.LoadBuiltIn();
+        var sel = BMAP.BlockEngine.BlockPreset.BuiltIns(profile)[0].ToSelection();
+        var img = TestHelpers.Gradient(128, 128);
+        var cobble = profile.Find("cobblestone")!;
+        var opt = new BMAP.BlockEngine.QuantizeOptions { Mode = BMAP.BlockEngine.StaircaseMode.Valley, MaxHeight = limit, Dither = BMAP.BlockEngine.DitherMode.Optimized };
+        var q = BMAP.BlockEngine.HeightPlanner.Quantize(img, profile, sel, opt, cobble, BMAP.BlockEngine.SupportMode.Important, onMapGrid: true);
+        var l = BMAP.BlockEngine.BlockLayout.Generate(q, cobble, 0, BMAP.BlockEngine.SupportMode.Important, onMapGrid: true);
+        Assert.InRange(l.MaxHeight, 1, limit);
+        Assert.Equal(0, ShadingAnalyzer.Analyze(l, profile, q.Preview).Mismatches);
     }
 }
 

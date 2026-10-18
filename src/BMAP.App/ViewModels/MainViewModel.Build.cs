@@ -36,9 +36,34 @@ public sealed partial class MainViewModel
 
     // ---- 3D map art: height ----
     private int _maxHeight;
-    public int MaxHeight { get => _maxHeight; set { if (Set(ref _maxHeight, Math.Max(0, value))) ScheduleUpdate(); } }
+    public int MaxHeight
+    {
+        get => _maxHeight;
+        set
+        {
+            if (!Set(ref _maxHeight, Math.Clamp(value, 0, 383))) return;
+            if (_maxHeight > 0) _lastLimit = _maxHeight;
+            Raise(nameof(HeightUnlimited)); Raise(nameof(HeightLimited)); Raise(nameof(HeightSlider)); Raise(nameof(MaxHeightText));
+            ScheduleUpdate();
+        }
+    }
+    // The height setting as the user sees it: "no limit" or a limit picked with a slider / presets.
+    private int _lastLimit = 16;
+    public const int HeightSliderMax = 96;
+    public bool HeightUnlimited { get => _maxHeight == 0; set { if (value != HeightUnlimited) MaxHeight = value ? 0 : _lastLimit; } }
+    public bool HeightLimited => _maxHeight > 0;
+    public double HeightSlider { get => _maxHeight == 0 ? _lastLimit : Math.Min(_maxHeight, HeightSliderMax); set => MaxHeight = Math.Max(1, (int)Math.Round(value)); }
+    public string MaxHeightText => _maxHeight == 0 ? L["HeightNoLimit"] : L.Format("BlocksTall", _maxHeight);
+    public RelayCommand HeightLowCommand { get; private set; } = null!;
+    public RelayCommand HeightMediumCommand { get; private set; } = null!;
+    public RelayCommand HeightHighCommand { get; private set; } = null!;
+    public RelayCommand HeightNoLimitCommand { get; private set; } = null!;
+    /// <summary>The height the current layout really needs, shown under the setting.</summary>
+    private string _buildHeightText = "";
+    public string BuildHeightText { get => _buildHeightText; set => Set(ref _buildHeightText, value); }
     private double _shadePenalty;
-    public double ShadePenalty { get => _shadePenalty; set { if (Set(ref _shadePenalty, Math.Clamp(value, 0, 1))) ScheduleUpdate(); } }
+    public double ShadePenalty { get => _shadePenalty; set { if (Set(ref _shadePenalty, Math.Clamp(value, 0, 1))) { Raise(nameof(ShadePenaltyText)); ScheduleUpdate(); } } }
+    public string ShadePenaltyText => _shadePenalty <= 0 ? L["Off"] : $"{_shadePenalty:P0}";
     /// <summary>The height limit works with Valley only (a Classic staircase never drops back).</summary>
     public bool CanLimitHeight => StaircaseOption?.Value is StaircaseMode.Valley;
     public ObservableCollection<HeightRowViewModel> HeightRows { get; } = [];
@@ -117,9 +142,13 @@ public sealed partial class MainViewModel
 
     private void UpdatePlacement()
     {
-        if (_layout is null || ApplyRecommendedYCommand is null) { PlacementText = ""; _advice = null; return; }
+        if (_layout is null || ApplyRecommendedYCommand is null) { PlacementText = ""; BuildHeightText = ""; _advice = null; return; }
         _advice = PlacementAdvisor.Advise(_layout, UseOrigin ? OriginY : null, L.English);
         var a = _advice;
+        BuildHeightText = _layout.Mode == StaircaseMode.Flat && IsStaircase
+            ? L["BuildHeightFlat"]
+            // The limit counts the difference between the lowest and highest block, the layout counts rows of blocks.
+            : UseOrigin ? L.Format("BuildHeightNowAt", a.BuildHeight - 1, OriginY, OriginY + a.BuildHeight - 1) : L.Format("BuildHeightNow", a.BuildHeight - 1);
         var sb = new StringBuilder(L.Format("PlacementSummary", a.BuildHeight, a.MinBaseY, a.MaxBaseY, a.RecommendedBaseY));
         if (UseOrigin) sb.Append("\n").Append(L.Format("PlacementCurrent", OriginY, OriginY + a.BuildHeight - 1));
         foreach (var n in a.Notes) sb.Append("\n• ").Append(n);
@@ -247,6 +276,10 @@ public sealed partial class MainViewModel
         SavePreviewPngCommand = new RelayCommand(SavePreviewPngAsync, () => _quantized != null);
         ExportTestPadCommand = new RelayCommand(() => ExportPadAsync(PadKind.Shading));
         View3DCommand = new RelayCommand(RequestViewer, () => _layout != null);
+        HeightLowCommand = new RelayCommand(() => MaxHeight = 8);
+        HeightMediumCommand = new RelayCommand(() => MaxHeight = 16);
+        HeightHighCommand = new RelayCommand(() => MaxHeight = 32);
+        HeightNoLimitCommand = new RelayCommand(() => MaxHeight = 0);
         ShowShadeMapCommand = new RelayCommand(() => SelectedPreviewMode = PreviewModes.First(p => p.Value == PreviewMode.ShadeMap));
         AnalyzeHeightCommand = new RelayCommand(AnalyzeHeightAsync, () => _processed != null && !IsAnalyzing);
         FlatBackgroundCommand = new RelayCommand(UseFlatBackground);
