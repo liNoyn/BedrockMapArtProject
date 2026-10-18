@@ -1,3 +1,6 @@
+using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using BMAP.ColorEngine;
 using BMAP.Imaging;
 
@@ -90,20 +93,35 @@ public static partial class ColorQuantizer
         AddGaussian(settings.Sigma2, settings.Weight2);
         float c0 = kernel[R * K + R];
 
-        // ce = C * e, with e = chosen − original.
+        // ce = C * e, with e = chosen − original. Spread is the hot loop: the kernel is stored with each value three times
+        // (one per channel, as ce is interleaved) so each kernel row is one contiguous run that is added with SIMD.
+        // Each element still gets ce + k·e, the same float operations as a plain loop, so results do not change.
         var ce = new float[n * 3];
+        int K3 = K * 3;
+        var kernel3 = new float[K * K3];
+        for (int k = 0; k < K * K; k++) kernel3[k * 3] = kernel3[k * 3 + 1] = kernel3[k * 3 + 2] = kernel[k];
+        var pattern = new float[K3];
         void Spread(int x, int y, float er, float eg, float eb)
         {
+            for (int j = 0; j < K3; j += 3) { pattern[j] = er; pattern[j + 1] = eg; pattern[j + 2] = eb; }
             int y0 = Math.Max(0, y - R), y1 = Math.Min(h - 1, y + R), x0 = Math.Max(0, x - R), x1 = Math.Min(w - 1, x + R);
+            int len = (x1 - x0 + 1) * 3, kx = (x0 - x + R) * 3;
+            // Bounds are checked once above (the rows stay inside ce, kernel3 and pattern); the loop uses raw references.
+            ref float pr = ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(pattern), kx);
+            ref float k0 = ref MemoryMarshal.GetArrayDataReference(kernel3);
+            ref float c0r = ref MemoryMarshal.GetArrayDataReference(ce);
+            int vn = Vector.IsHardwareAccelerated ? Vector<float>.Count : int.MaxValue;
             for (int yy = y0; yy <= y1; yy++)
             {
-                int krow = (yy - y + R) * K - x + R;
-                for (int xx = x0; xx <= x1; xx++)
+                ref float kr = ref Unsafe.Add(ref k0, (yy - y + R) * K3 + kx);
+                ref float cr = ref Unsafe.Add(ref c0r, (yy * w + x0) * 3);
+                int j = 0;
+                for (; j <= len - vn; j += vn)
                 {
-                    float k = kernel[krow + xx];
-                    int j = (yy * w + xx) * 3;
-                    ce[j] += k * er; ce[j + 1] += k * eg; ce[j + 2] += k * eb;
+                    var c = Vector.LoadUnsafe(ref cr, (nuint)j) + Vector.LoadUnsafe(ref kr, (nuint)j) * Vector.LoadUnsafe(ref pr, (nuint)j);
+                    c.StoreUnsafe(ref cr, (nuint)j);
                 }
+                for (; j < len; j++) Unsafe.Add(ref cr, j) += Unsafe.Add(ref kr, j) * Unsafe.Add(ref pr, j);
             }
         }
 
@@ -156,7 +174,9 @@ public static partial class ColorQuantizer
         var near = new int[n * take];
         var nearCost = new float[n * take];
         var counts = new int[n];
-        Parallel.For(0, h, new ParallelOptions { CancellationToken = ct }, () => (new int[nc], new float[nc], new int[take]), (y, _, buf) =>
+        // With mix plans (PairLambda) the plans replace every list, so the nearest-colour lists are not built at all.
+        if (!(settings.PairLambda > 0))
+        Parallel.For(0, h,new ParallelOptions { CancellationToken = ct }, () => (new int[nc], new float[nc], new int[take]), (y, _, buf) =>
         {
             var (order, dist, tried) = buf;
             for (int x = 0; x < w; x++)
@@ -497,6 +517,17 @@ public static partial class ColorQuantizer
         var spatial = new double[K * K];
         for (int dy = -R; dy <= R; dy++) for (int dx = -R; dx <= R; dx++) spatial[(dy + R) * K + dx + R] = Math.Exp(-(dx * dx + dy * dy) / (2 * Sigma * Sigma));
         double inv = 1 / (2 * range * range);
+        // Range weights for every possible squared distance (integers), computed once instead of per neighbour; beyond
+        // the table Math.Exp is exactly 0.
+        int maxD2 = 3 * 255 * 255;
+        var rangeTable = new List<double>();
+        for (int d2 = 0; d2 <= maxD2; d2++)
+        {
+            double v = Math.Exp(-d2 * inv);
+            if (v == 0) break;
+            rangeTable.Add(v);
+        }
+        var rangeW = rangeTable.ToArray();
         var p = img.Pixels;
         Parallel.For(0, h, y =>
         {
@@ -515,8 +546,10 @@ public static partial class ColorQuantizer
                         if (xx < 0 || xx >= w) continue;
                         int j = (yy * w + xx) * 4;
                         if (p[j + 3] == 0) continue;
-                        double d2 = Sq(p[j] - p[i]) + Sq(p[j + 1] - p[i + 1]) + Sq(p[j + 2] - p[i + 2]);
-                        double wt = spatial[(dy + R) * K + dx + R] * Math.Exp(-d2 * inv);
+                        int dr = p[j] - p[i], dg = p[j + 1] - p[i + 1], db = p[j + 2] - p[i + 2];
+                        int d2 = dr * dr + dg * dg + db * db;
+                        if (d2 >= rangeW.Length) continue; // weight exactly 0
+                        double wt = spatial[(dy + R) * K + dx + R] * rangeW[d2];
                         sr += p[j] * wt; sg += p[j + 1] * wt; sb += p[j + 2] * wt; ws += wt;
                     }
                 }

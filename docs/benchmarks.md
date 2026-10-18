@@ -219,3 +219,10 @@ target's chroma. Pale pinks #EED0D4 / #ECD4D4 / #EDD1D6 now mix white + pink + g
 passes the patch test too. Corpus: illustrations near 2.58 → 2.54, far 1.26 → 1.19; photos and flat colours unchanged;
 the 2 x 2 frame far 1.26 → 0.84. Flat builds keep grey: without the bright shades the mix would be much darker, and a
 stronger penalty only adds red dots.
+
+## Speed (v0.13.2)
+
+Same output bit for bit (hashes of 21 conversions: 1, 2 and 4 maps square; Valley, Flat, height limit 8, FS), faster:
+the optimiser's error spreading runs on SIMD rows, the nearest-colour lists that the mix plans replace are no longer
+built, the bilateral filter uses a weight table, and the nearest-colour search has a fast path for Oklab. Optimized,
+4 x 4 maps (512 x 512): 1.28–1.67 s → 0.47–0.59 s.

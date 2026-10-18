@@ -280,7 +280,7 @@ public static partial class ColorQuantizer
                 Refine = options.Refine ?? new RefineSettings
                 {
                     PixelWeight = 0.03 + calm * 0.37, PerceptualWeight = 0.05 + calm * 0.15, PairLambda = 0.08 + calm * 0.32, Neighbours = 24,
-                    TriplePool = 16, PlanHue = 0.4 + calm, PlanChroma = 1,PlanPixel = calm * 0.5, PairQuad = 0.5 + calm * 2.5, HueTolerance = 0.03,
+                    TriplePool = 16, PlanHue = 0.4 + calm, PlanChroma = 1, PlanPixel = calm * 0.5, PairQuad = 0.5 + calm * 2.5, HueTolerance = 0.03,
                     Sigma1 = 1.25, Sigma2 = 3, Weight2 = 2, Denoise = 4, SwapPasses = 2,
                 },
             };
@@ -602,7 +602,10 @@ public static partial class ColorQuantizer
             _labs = candidates.Select(c => metric == ColorMetric.Oklab
                 ? ColorMath.ToOklab(c.Color.R, c.Color.G, c.Color.B)
                 : ColorMath.ToLab(c.Color.R, c.Color.G, c.Color.B)).ToArray();
+            _shadeBits = candidates.Select(c => 1 << (int)c.Shade).ToArray();
         }
+
+        private readonly int[] _shadeBits;
 
         public int Find(double r, double g, double b) => Find(r, g, b, AllShades, 0);
 
@@ -611,18 +614,33 @@ public static partial class ColorQuantizer
         {
             int ri = Q(r), gi = Q(g), bi = Q(b);
             int key = (shadeMask << 24) | (ri << 16) | (gi << 8) | bi;
-            bool cacheable = penalty == 0 || _penaltyForCache == penalty;
+            // The cache holds results for one penalty only (the first one used).
+            bool cacheable = _penaltyForCache == penalty;
             if (cacheable && _cache.TryGetValue(key, out int hit)) return hit;
 
             int best = -1;
             double bestD = double.MaxValue;
             var lab = LabOf(ri, gi, bi);
-            for (int i = 0; i < _candidates.Count; i++)
+            if (penalty == 0 && _metric is ColorMetric.Lab or ColorMetric.Oklab)
             {
-                if ((shadeMask & (1 << (int)_candidates[i].Shade)) == 0) continue;
-                double d = Distance(ri, gi, bi, lab, i, penalty);
-                if (d < bestD) { bestD = d; best = i; } // strict '<' keeps the first (preferred) candidate on ties
+                // Fast path of the loop below for the default metric (same arithmetic as ColorMath.DeltaE76).
+                var labs = _labs;
+                var bits = _shadeBits;
+                for (int i = 0; i < labs.Length; i++)
+                {
+                    if ((shadeMask & bits[i]) == 0) continue;
+                    double dl = lab.L - labs[i].L, da = lab.A - labs[i].A, db = lab.B - labs[i].B;
+                    double d = dl * dl + da * da + db * db;
+                    if (d < bestD) { bestD = d; best = i; }
+                }
             }
+            else
+                for (int i = 0; i < _candidates.Count; i++)
+                {
+                    if ((shadeMask & _shadeBits[i]) == 0) continue;
+                    double d = Distance(ri, gi, bi, lab, i, penalty);
+                    if (d < bestD) { bestD = d; best = i; } // strict '<' keeps the first (preferred) candidate on ties
+                }
             if (_cache.Count == 0) _penaltyForCache = penalty;
             if (_penaltyForCache == penalty && _cache.Count < 1 << 20) _cache[key] = best;
             return best;
