@@ -21,7 +21,12 @@ public sealed record KitItem
     public required string Predicted { get; init; }
     /// <summary>pad.json of a calibration pad, relative to the kit folder (colour pad only).</summary>
     public string? Pad { get; init; }
+    /// <summary>Water pools (water part only): measured, not predicted.</summary>
+    public List<WaterPool>? Pools { get; init; }
 }
+
+/// <summary>A pool of still water: Size x Size water surface at map pixel (X, Z), Depth blocks deep, on a stone floor.</summary>
+public sealed record WaterPool(int X, int Z, int Size, int Depth);
 
 /// <summary>kit.json: what was placed where, so <see cref="VerificationKit.Verify"/> can compare the game's maps.</summary>
 public sealed record KitManifest
@@ -56,7 +61,7 @@ public static class VerificationKit
     public const string Namespace = "bmap_kit";
 
     /// <summary>All parts; <c>parts</c> picks some of them (a second session only needs what is still open).</summary>
-    public static readonly string[] AllParts = ["colour_pad", "flat", "classic", "valley_2x2", "large_4x4"];
+    public static readonly string[] AllParts = ["colour_pad", "flat", "classic", "valley_2x2", "large_4x4", "water"];
 
     public static string Create(string folder, ColorProfile profile, int baseY = -60, bool english = false,
         IReadOnlyCollection<string>? parts = null, string name = "BMAP_verification_kit")
@@ -118,6 +123,42 @@ public static class VerificationKit
             };
             items.Add(item);
             pieces.Add((item, StructureExporter.Split(layout, b.Maps, new StructureExportOptions { Split = b.Split }), origin));
+        }
+
+        // Water: how the game draws water on maps (colour by depth, with or without a checker pattern). Not predicted:
+        // BMAP has no water model yet, the kit measures one. 16 pools, depth 1..16, each 30 x 30 inside a stone wall.
+        if (parts.Contains("water"))
+        {
+            const int Cell = 32, MaxDepth = 16;
+            var stone = new PaletteBlock("minecraft:stone", new Nbt.NbtCompound(), 18168865);
+            var water = new PaletteBlock("minecraft:water", new Nbt.NbtCompound { { "liquid_depth", new Nbt.NbtInt(0) } }, 18168865);
+            var s = new McStructure(128, MaxDepth + 1, 128);
+            var pools = new List<WaterPool>();
+            for (int j = 0; j < 4; j++)
+                for (int i = 0; i < 4; i++)
+                {
+                    int depth = j * 4 + i + 1, x0 = i * Cell, z0 = j * Cell;
+                    for (int z = z0; z < z0 + Cell; z++)
+                        for (int x = x0; x < x0 + Cell; x++)
+                        {
+                            s.SetBlock(x, 0, z, stone);
+                            bool wall = x == x0 || z == z0 || x == x0 + Cell - 1 || z == z0 + Cell - 1;
+                            for (int y = 1; y <= depth; y++) s.SetBlock(x, y, z, wall ? stone : water);
+                        }
+                    pools.Add(new WaterPool(x0 + 1, z0 + 1, Cell - 2, depth));
+                }
+            int mapX = -1, mapZ = 0;
+            var origin = new WorldOrigin(128 * mapX - 64, baseY, 128 * mapZ - 64);
+            string sub = Path.Combine(dir, "water");
+            Directory.CreateDirectory(sub);
+            ImageCodec.SavePng(new RgbaImage(128, 128), Path.Combine(sub, "predicted_map.png")); // nothing predicted
+            var item = new KitItem
+            {
+                Id = "water", Title = english ? "Water depth 1-16" : "水深 1〜16 のプール", MapX = mapX, MapZ = mapZ,
+                Predicted = Path.GetRelativePath(dir, Path.Combine(sub, "predicted_map.png")), Pools = pools,
+            };
+            items.Add(item);
+            pieces.Add((item, [new StructureTile { Id = "pools", Structure = s, OffsetX = 0, OffsetY = 0, OffsetZ = 0, MapNumbers = [1], Order = 0 }], origin));
         }
 
         var manifest = new KitManifest { BaseY = baseY, ProfileId = profile.Id, Created = DateTime.Now.ToString("yyyy-MM-dd HH:mm"), Items = items };
@@ -211,6 +252,38 @@ public static class VerificationKit
             else
                 for (int n = 1; n <= i.MapsX * i.MapsY; n++)
                     sb.AppendLine($"    {n,2}: /function bmap/kit/goto_{i.Id}_m{n}   →   /function bmap/kit/{i.Id}_m{n}");
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// What the game drew over each water pool: the colours inside it (one pixel in from the wall), split by the
+    /// parity of map x + z, most frequent first. Shows whether water is shaded by depth and whether in a checker pattern.
+    /// </summary>
+    public static string WaterReport(string kitDir, IReadOnlyList<Bedrock.MapRecord> maps)
+    {
+        var m = KitManifest.Load(Path.Combine(kitDir, "kit.json"));
+        var sb = new StringBuilder();
+        foreach (var item in m.Items.Where(i => i.Pools != null))
+        {
+            var map = maps.Where(r => r.Scale == 0 && r.Dimension == 0 && r.XCenter == 128 * item.MapX && r.ZCenter == 128 * item.MapZ)
+                .Select(r => r.ToImage()).FirstOrDefault(i => i != null);
+            if (map is null) { sb.AppendLine($"{item.Id}: no map"); continue; }
+            sb.AppendLine("depth  even (x+z)                          odd (x+z)");
+            foreach (var p in item.Pools!)
+            {
+                var even = new Dictionary<string, int>(); var odd = new Dictionary<string, int>();
+                for (int z = p.Z + 1; z < p.Z + p.Size - 1; z++)
+                    for (int x = p.X + 1; x < p.X + p.Size - 1; x++)
+                    {
+                        int i = (z * 128 + x) * 4;
+                        string c = map.Pixels[i + 3] == 0 ? "(unexplored)" : $"#{map.Pixels[i]:X2}{map.Pixels[i + 1]:X2}{map.Pixels[i + 2]:X2}";
+                        var d = ((x + z) & 1) == 0 ? even : odd;
+                        d[c] = d.GetValueOrDefault(c) + 1;
+                    }
+                static string Top(Dictionary<string, int> d) => string.Join(" ", d.OrderByDescending(kv => kv.Value).Take(3).Select(kv => $"{kv.Key} x{kv.Value}"));
+                sb.AppendLine($"{p.Depth,5}  {Top(even),-36} {Top(odd)}");
+            }
         }
         return sb.ToString();
     }

@@ -477,6 +477,12 @@ try
                 File.WriteAllText(Path.Combine(outDir, $"calibration_{item.Id}.txt"), BMAP.Shading.Calibrator.Report(r, en));
                 ImageCodec.SavePng(BMAP.Shading.Calibrator.ComparisonImage(r), Path.Combine(outDir, $"calibration_{item.Id}.png"));
             }
+            if (manifest.Items.Any(i => i.Pools != null))
+            {
+                string water = BMAP.Shading.VerificationKit.WaterReport(args[2], maps);
+                File.WriteAllText(Path.Combine(outDir, "water.txt"), water, new UTF8Encoding(true));
+                sb.AppendLine().Append(water);
+            }
             File.WriteAllText(Path.Combine(outDir, "verify.txt"), sb.ToString(), new UTF8Encoding(true));
             Console.Write(sb);
             Console.WriteLine(outDir);
