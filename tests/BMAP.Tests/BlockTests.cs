@@ -21,19 +21,23 @@ public class BlockTests
         new() { Keys = [.. keys] };
 
     [Fact]
-    public void BuiltInProfile_HasAllMapartCraftColourSets_AndIsUnverified()
+    public void BuiltInProfile_HasAllColourSets_MeasuredInGame()
     {
-        // 61 map colours minus water, plus Bedrock-only sets from gd-codes (birch / spruce leaves, sculk, 16 wool slabs).
+        // 61 map colours minus water, plus Bedrock-only sets (birch / spruce leaves, sculk, 16 wool slabs), all measured
+        // with the colour pad on Bedrock 1.26.51 (palettes/measured).
         Assert.Equal(79, Profile.ColourSets.Count);
-        Assert.True(Profile.Blocks.Count() > 350);
-        Assert.Equal(ColorStatus.ThirdParty, Profile.ColourSets.Single(s => s.NameEn == "Purple").Status);
-        Assert.Equal("#995ACC", Profile.ColourSets.Single(s => s.NameEn == "Purple").MapColor); // normal = gd-codes #844DB0
-        Assert.Equal("#844DB0", Profile.Shaded(Rgba.FromHex(Profile.ColourSets.Single(s => s.NameEn == "Purple").MapColor), Shade.Normal).ToHex());
-        Assert.Equal(ColorStatus.Verified, Profile.ColourSets.Single(s => s.NameEn == "Quartz").Status);
-        Assert.Equal(ColorStatus.Estimated, Profile.ColourSets.Single(s => s.NameEn == "Gray").Status);
-        Assert.All(Profile.ColourSets.Where(s => s.NameEn.EndsWith("Wool Slab")), s => Assert.Equal(ColorStatus.ThirdParty, s.Status));
-        Assert.All(Profile.ColourSets.Where(s => s.NameEn.EndsWith("Wool Slab")).SelectMany(s => s.Blocks), b => Assert.False(b.DefaultEnabled));
-        Assert.All(Profile.Blocks, b => Assert.False(b.Verified));
+        Assert.Equal(351, Profile.Blocks.Count());
+        Assert.All(Profile.ColourSets, s => Assert.Equal(ColorStatus.Verified, s.Status));
+        Assert.Equal("#995ACD", Profile.ColourSets.Single(s => s.NameEn == "Purple").MapColor);
+        Assert.Equal("#700200", Profile.ColourSets.Single(s => s.NameEn == "Nether").MapColor);
+        // Measured blocks of other colour sets than in Java.
+        Assert.Equal("Yellow", Profile.ColourSets.Single(s => s.Blocks.Any(b => b.Key == "bamboo_block_x")).NameEn);
+        Assert.Equal("Nether", Profile.ColourSets.Single(s => s.Blocks.Any(b => b.Key == "crimson_slab")).NameEn);
+        Assert.Equal("Cyan", Profile.ColourSets.Single(s => s.Blocks.Any(b => b.Key == "warped_slab")).NameEn);
+        // Spruce leaves keep a tinted colour unrounded: bright is not base x 255 / 255 of an integer base.
+        Assert.Equal("#345234", Profile.ColorOf(Profile.Find("spruce_leaves")!, Shade.Bright).ToHex());
+        Assert.Equal("#2D472D", Profile.ColorOf(Profile.Find("spruce_leaves")!, Shade.Normal).ToHex());
+        Assert.All(Profile.ColourSets.Where(s => s.NameEn.EndsWith("Wool Slab")).SelectMany(s => s.Blocks), b => Assert.True(b.DefaultEnabled));
         Assert.Equal(Profile.Blocks.Count(), Profile.Blocks.Select(b => b.Key).Distinct().Count());
         Assert.All(Profile.Blocks, b => Assert.StartsWith("minecraft:", b.Name));
         Assert.Equal("minecraft:silver_glazed_terracotta", Profile.Find("light_gray_glazed_terracotta")!.Name);
@@ -44,7 +48,7 @@ public class BlockTests
     [Fact]
     public void Presets_PickOneBlockPerColourSet()
     {
-        Assert.Equal(63, Presets[0].Keys.Count); // wool slab colours are not selected by default (third-party, unverified)
+        Assert.Equal(79, Presets[0].Keys.Count); // every colour set, the 16 wool slab colours included (measured in game)
         // The recommended default covers the same colour sets as "one block per colour", without support blocks where possible.
         var one = Presets.Single(p => p.NameEn == "One block per colour");
         Assert.Equal(one.Keys.Count, Presets[0].Keys.Count);

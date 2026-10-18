@@ -245,7 +245,8 @@ public static partial class ColorQuantizer
         double Spread(double s, double cross) => lambda * s + mu * cross * cross;
         int pool = Math.Min(settings.PairPool, nc);
 
-        // Plans per colour bucket (5 bits per channel) and shade group, from the bucket centre: deterministic.
+        // Plans per colour bucket (5 bits per channel) and shade group, from the bucket centre: deterministic. (Finer
+        // buckets were tried: more plan boundaries inside smooth areas, more grey islands in pale pinks.)
         var plans = new System.Collections.Concurrent.ConcurrentDictionary<long, int[]>();
         int[] Plan(byte r, byte g, byte b, int shadeFilter)
         {
@@ -343,7 +344,8 @@ public static partial class ColorQuantizer
                             if (cost < best) { best = cost; t1 = a; t2 = b2; t3 = c; }
                             Keep(cost, a, b2, c);
                         }
-                // Colours of the best plan first, then of the near-best ones, then the nearest colour.
+                // Colours of the best plan first, then of the near-best ones, then the nearest colour (a fallback that keeps
+                // transitions between plans soft: without it pale pinks broke into grey islands).
                 var list = new List<int>();
                 void Add(int id) { if (id >= 0 && !list.Contains(id)) list.Add(id); }
                 if (t1 >= 0) { Add(t1); Add(t2); Add(t3); } else { Add(ba); Add(bb); }
@@ -405,17 +407,20 @@ public static partial class ColorQuantizer
     private static double Sq(double v) => v * v;
 
     /// <summary>
-    /// Bilateral filter (5x5, spatial σ 1.2, range σ <paramref name="range"/> in sRGB steps): removes the small block
+    /// Bilateral filter (13x13, spatial σ 3, range σ <paramref name="range"/> in sRGB steps): removes the small block
     /// noise of compressed pictures in flat areas, which made the optimiser decide block by block (square patches of
     /// pink and grey in a pale pink), while keeping lines and edges, which differ by far more. Transparent pixels are
     /// left alone and do not contribute.
     /// </summary>
     internal static RgbaImage Denoise(RgbaImage img, double range)
     {
+        // Wider than an 8x8 compression block, or the inside of each block would keep its offset.
+        const int R = 6, K = 2 * R + 1;
+        const double Sigma = 3;
         int w = img.Width, h = img.Height;
         var dst = img.Clone();
-        var spatial = new double[25];
-        for (int dy = -2; dy <= 2; dy++) for (int dx = -2; dx <= 2; dx++) spatial[(dy + 2) * 5 + dx + 2] = Math.Exp(-(dx * dx + dy * dy) / (2 * 1.2 * 1.2));
+        var spatial = new double[K * K];
+        for (int dy = -R; dy <= R; dy++) for (int dx = -R; dx <= R; dx++) spatial[(dy + R) * K + dx + R] = Math.Exp(-(dx * dx + dy * dy) / (2 * Sigma * Sigma));
         double inv = 1 / (2 * range * range);
         var p = img.Pixels;
         Parallel.For(0, h, y =>
@@ -425,18 +430,18 @@ public static partial class ColorQuantizer
                 int i = (y * w + x) * 4;
                 if (p[i + 3] == 0) continue;
                 double sr = 0, sg = 0, sb = 0, ws = 0;
-                for (int dy = -2; dy <= 2; dy++)
+                for (int dy = -R; dy <= R; dy++)
                 {
                     int yy = y + dy;
                     if (yy < 0 || yy >= h) continue;
-                    for (int dx = -2; dx <= 2; dx++)
+                    for (int dx = -R; dx <= R; dx++)
                     {
                         int xx = x + dx;
                         if (xx < 0 || xx >= w) continue;
                         int j = (yy * w + xx) * 4;
                         if (p[j + 3] == 0) continue;
                         double d2 = Sq(p[j] - p[i]) + Sq(p[j + 1] - p[i + 1]) + Sq(p[j + 2] - p[i + 2]);
-                        double wt = spatial[(dy + 2) * 5 + dx + 2] * Math.Exp(-d2 * inv);
+                        double wt = spatial[(dy + R) * K + dx + R] * Math.Exp(-d2 * inv);
                         sr += p[j] * wt; sg += p[j + 1] * wt; sb += p[j + 2] * wt; ws += wt;
                     }
                 }

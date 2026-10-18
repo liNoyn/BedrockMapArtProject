@@ -169,3 +169,22 @@ Fix:
 Test `Optimized_HasNoPatchesInAPaleGradientWithBlockNoise` (flat pale pinks with block noise) fails with v0.11's
 settings (pink share varies by 0.23 between tiles) and passes now. Corpus, one map: illustrations far 2.44 → 2.29,
 speckle 3.60 → 3.80 (more of the pale hues kept); photos far 1.40 → 1.34.
+## Palette measured in game (v0.12.0)
+
+After the colour pad measurement (docs/calibration.md) the palette has all 79 colour sets verified, 351 blocks, and the
+16 wool slab colours on by default; the optimiser's per-pixel weights were lowered (0.05 / 0.1) because the mix plans
+already keep colours calm. Corpus, one map each, Valley:
+
+| setting | group | px | near | far | speckle |
+|---|---|---:|---:|---:|---:|
+| Floyd–Steinberg | illustrations | 8.07 | 3.44 | 2.39 | 3.43 |
+| v0.11.1 | illustrations | 7.50 | 3.35 | 2.28 | 3.80 |
+| **v0.12.0** | illustrations | 7.82 | **2.95** | **1.70** | 4.19 |
+| Floyd–Steinberg | photos | 7.69 | 1.98 | 0.87 | 3.27 |
+| v0.11.1 | photos | 7.44 | 2.69 | 1.34 | 2.58 |
+| **v0.12.0** | photos | 7.30 | 2.35 | 0.98 | 2.82 |
+| v0.11.1 | flat pale colours | 13.38 | 6.38 | 5.62 | 8.70 |
+| **v0.12.0** | flat pale colours | 14.75 | **3.32** | **1.80** | 11.97 |
+
+The 2 x 2 hair that broke into patches in v0.11 stays even. Known limitation: very pale pinks right at the tie between
+"grey alone" and "white + pink" (#F2D4D7–#F1D1D5) still turn grey with stripes under block noise (docs/TODO.md).

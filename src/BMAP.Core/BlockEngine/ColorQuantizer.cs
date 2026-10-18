@@ -279,12 +279,17 @@ public static partial class ColorQuantizer
                 Dither = DitherMode.FloydSteinberg, DitherStrength = 1,
                 Refine = options.Refine ?? new RefineSettings
                 {
-                    PixelWeight = 0.1 + calm * 0.3, PerceptualWeight = 0.2, PairLambda = 0.1 + calm * 0.3, Neighbours = 24,
+                    PixelWeight = 0.05 + calm * 0.35, PerceptualWeight = 0.1 + calm * 0.1, PairLambda = 0.1 + calm * 0.3, Neighbours = 24,
                     TriplePool = 16, PlanHue = 0.5 + calm, PlanPixel = calm * 0.5, PairQuad = 1 + calm * 2, HueTolerance = 0.05,
                     Sigma1 = 1.5, Denoise = 4,
                 },
             };
         }
+        // Without a height limit the diffusion start may use the denoised image as well (with a limit its shades must
+        // stay those of the plain diffusion the height planner measured).
+        RgbaImage? denoised = null;
+        if (options.Refine is { Denoise: > 0 } dn0 && !options.HeightLimited && !(options.ShadePenalty > 0))
+            image = denoised = Denoise(image, dn0.Denoise);
         var ordered = OrderedMatrix(options.Dither);
         var knoll = KnollMatrix(options.Dither);
         if (options.HeightLimited && (options.Dither == DitherMode.None || ordered != null || knoll != null))
@@ -338,7 +343,7 @@ public static partial class ColorQuantizer
             // With a height limit or a shade penalty only same-shade swaps are allowed, so the staircase stays as planned.
             // The optimiser works towards a denoised copy; the start (and so, under a height limit, every shade) stays
             // that of the diffusion on the image itself, which the height planner relies on.
-            var target = refine.Denoise > 0 ? Denoise(image, refine.Denoise) : image;
+            var target = denoised ?? (refine.Denoise > 0 ? Denoise(image, refine.Denoise) : image);
             Refine(target, w, h, candidates, chosen, options.HeightLimited || options.ShadePenalty > 0, refine, ct);
             for (int i = 0; i < n; i++) if (chosen[i] >= 0) Assign(i, chosen[i]);
         }

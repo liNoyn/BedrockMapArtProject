@@ -4,6 +4,14 @@ namespace BMAP.Tests;
 
 internal static class TestHelpers
 {
+    /// <summary>The repository root (the folder with BMAP.sln), found from the test binaries.</summary>
+    public static string RepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "BMAP.sln"))) dir = dir.Parent;
+        return dir?.FullName ?? throw new DirectoryNotFoundException("BMAP.sln not found");
+    }
+
     public static string TempDir()
     {
         var dir = Path.Combine(Path.GetTempPath(), "bmap-tests", Guid.NewGuid().ToString("N"));

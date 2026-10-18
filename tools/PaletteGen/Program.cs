@@ -39,6 +39,7 @@ string En(string dye) => string.Join(' ', dye.Split('_').Select(w => char.ToUppe
 
 var sets = new JsonArray();
 JsonObject? current = null;
+string[]? currentShades = null;
 var errors = new List<string>();
 var keys = new HashSet<string>();
 
@@ -88,6 +89,8 @@ void AddBlock(string key, string name, string stateText, string flags, string en
     if (flags.Contains('X')) block["defaultEnabled"] = false;
     var rarity = flags.FirstOrDefault(char.IsDigit);
     if (rarity != default) block["rarity"] = rarity - '0';
+    if (currentShades is { Length: 3 })
+        block["measured"] = new JsonObject { ["Dark"] = currentShades[0], ["Normal"] = currentShades[1], ["Bright"] = currentShades[2] };
     current["blocks"]!.AsArray().Add(block);
 }
 
@@ -111,10 +114,17 @@ foreach (var rawLine in File.ReadAllLines(Path.Combine(root, "tools", "PaletteGe
             // Optional fields:
             //   seen=d,n,b  pixels of base x180 / x220 / x255 found on maps drawn by Bedrock (BMAP mapcheck)
             //   gd=r,g,b    normal colour in gd-codes/mc-pixelart-maker (Bedrock, experimental, third-party)
-            // Priority of evidence: seen on Bedrock maps in 2+ shades > gd-codes (Bedrock) > Java value (estimate).
+            //   pad=r,g,b@version  base colour measured with the BMAP colour pad in game: every block of the set,
+            //                      bright / normal / dark, matched (base x 255 / 220 / 180, rounded down)
+            // Priority of evidence: colour pad > seen on Bedrock maps in 2+ shades > gd-codes (Bedrock) > Java value.
             var notes = new List<string>();
             string status = "estimated";
-            foreach (var extra in f.Skip(5))
+            string? pad = f.Skip(5).FirstOrDefault(e => e.StartsWith("pad="));
+            // shades=#dark,#normal,#bright: colours measured per shade that do not follow base x multiplier with an
+            // integer base (spruce leaves: a tinted colour the game keeps unrounded). Written to every block of the set.
+            currentShades = f.Skip(5).FirstOrDefault(e => e.StartsWith("shades="))?[7..].Split(',');
+            if (currentShades is not null) notes.Add($"Shades measured separately: {string.Join(" / ", currentShades)} (dark / normal / bright)");
+            foreach (var extra in f.Skip(5).Where(e => !e.StartsWith("pad=") && !e.StartsWith("shades=")))
             {
                 if (extra.StartsWith("gd="))
                 {
@@ -137,6 +147,18 @@ foreach (var rawLine in File.ReadAllLines(Path.Combine(root, "tools", "PaletteGe
                     notes.Add($"Seen on maps drawn by Bedrock 1.21.132-1.26.51: x180 {n[0]}, x220 {n[1]}, x255 {n[2]} pixels" +
                         (verified ? "" : " (one shade only: not enough to verify)"));
                 }
+            }
+            if (pad is not null)
+            {
+                var parts = pad[4..].Split('@');
+                var m = parts[0].Split(',').Select(byte.Parse).ToArray();
+                string version = parts.Length > 1 ? parts[1] : "?";
+                if (m[0] != rgb[0] || m[1] != rgb[1] || m[2] != rgb[2])
+                    notes.Add($"#{rgb[0]:X2}{rgb[1]:X2}{rgb[2]:X2} replaced by the measured colour");
+                rgb = m;
+                current["mapColor"] = $"#{m[0]:X2}{m[1]:X2}{m[2]:X2}";
+                notes.Insert(0, $"Measured with the BMAP colour pad on Bedrock {version}: all blocks of the set, three shades");
+                status = "verified";
             }
             if (notes.Count > 0)
             {
@@ -182,10 +204,10 @@ var profile = new JsonObject
 {
     ["formatVersion"] = 2,
     ["id"] = "bedrock-full-v2",
-    ["name"] = "Bedrock 全ブロック / All blocks（推定色・未検証 / estimated colours）",
+    ["name"] = "Bedrock 全ブロック / All blocks（1.26.51 で実測 / measured on 1.26.51）",
     ["gameVersion"] = "1.26",
     ["updated"] = DateTime.Now.ToString("yyyy-MM-dd"),
-    ["notes"] = "色セットと地図の基本色は Minecraft の地図色（Java 版の値）を初期値にし、gd-codes の Bedrock 用データで補っています（status）。陰影の倍率 180/220/255・丸め方・段差の規則は Bedrock 1.26.51 の実機で確認済み（段差 ±1 は座標の偶奇で交互、±2 以上は常に）。ブロックとの対応は未検証。ブロック識別子と状態は Bedrock 1.26 の公式メタデータで検証済み。",
+    ["notes"] = "全 79 色セットの基本色と、各ブロックがどの色セットに描かれるかを Bedrock 1.26.51 の色テストパッド（全ブロック・明 / 通常 / 暗）で実測しました。陰影の倍率 180/220/255・丸め方・段差の規則も同じ版の実機で確認済み（段差 ±1 は座標の偶奇で交互、±2 以上は常に）。地図に描かれないブロック（鉄格子・鍾乳石・ろうそく）と TNT は除いています。草ブロックと一部の葉はバイオームで色が変わるため既定では使いません。ブロック識別子と状態は Bedrock の公式メタデータで検証済み。",
     ["shades"] = new JsonObject
     {
         ["dark"] = 180, ["normal"] = 220, ["bright"] = 255, ["verified"] = true, ["status"] = "verified",
