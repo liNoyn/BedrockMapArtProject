@@ -116,9 +116,13 @@ public static class StructureExporter
                 maps.Add(Math.Max(0, z - 1) / 128 * mapsX + x / 128 + 1);
 
         int part = 0;
+        bool sliced = maxY - minY >= options.MaxTileHeight;
         for (int y0 = minY; y0 <= maxY; y0 += options.MaxTileHeight, part++)
         {
-            int h = Math.Min(options.MaxTileHeight, maxY - y0 + 1);
+            // Each slice starts at its lowest block; slices without blocks are skipped.
+            int top = Math.Min(y0 + options.MaxTileHeight - 1, maxY);
+            if (!blocks.Any(b => b.Y >= y0 && b.Y <= top)) continue;
+            int h = top - y0 + 1;
             var s = new McStructure(w, h, d);
             foreach (var b in blocks)
             {
@@ -128,7 +132,7 @@ public static class StructureExporter
             }
             result.Add(new StructureTile
             {
-                Id = maxY - minY < options.MaxTileHeight ? id : $"{id}_y{part}",
+                Id = sliced ? $"{id}_y{part}" : id,
                 Structure = s, OffsetX = x0, OffsetY = y0, OffsetZ = z0, MapNumbers = maps.ToArray(), Order = order++,
             });
         }
@@ -183,9 +187,10 @@ public static class StructureExporter
         var problems = ValidateCoverage(layout, tiles);
         if (problems.Count > 0) throw new InvalidOperationException("構造物の分割検証に失敗しました / structure split failed:\n" + string.Join("\n", problems.Take(10)));
 
+        // Only this project's earlier pieces are removed: the folder may hold the user's own files.
         string structDir = Path.Combine(outDir, "mcstructure");
-        if (Directory.Exists(structDir)) Directory.Delete(structDir, true);
         Directory.CreateDirectory(structDir);
+        foreach (var old in Directory.GetFiles(structDir, $"{slug}_*.mcstructure")) File.Delete(old);
         var files = new List<string>();
         foreach (var t in tiles)
         {
@@ -205,7 +210,7 @@ public static class StructureExporter
 
         string zip = Path.Combine(outDir, $"{slug}_mcstructure.zip");
         if (File.Exists(zip)) File.Delete(zip);
-        ZipDirectory(structDir, zip);
+        ZipFiles(files, zip);
 
         string? mcpack = null;
         if (options.WriteBehaviorPack)
@@ -332,6 +337,13 @@ public static class StructureExporter
             sb.AppendLine($"       /structure load \"mystructure:{FileName(slug, t)}\" {pos}");
         }
         return sb.ToString();
+    }
+
+    /// <summary>Zips the given files flat (only this export's pieces, not other files in the folder).</summary>
+    public static void ZipFiles(IEnumerable<string> files, string zipPath)
+    {
+        using var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create);
+        foreach (var file in files) zip.CreateEntryFromFile(file, Path.GetFileName(file), CompressionLevel.Optimal);
     }
 
     public static void ZipDirectory(string dir, string zipPath)

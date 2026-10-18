@@ -9,8 +9,8 @@ if (args.Length == 0)
         BMAP CLI
           build <image> <outDir> [--maps 2x2] [--dither none|fs|jjn|burkes|sierra|stucki|atkinson|bayer2|bayer4|ordered3]
                 [--staircase flat|classic|valley|dark|bright] [--support none|important|all|double] [--preset 0-7]
-                [--origin mapX,mapZ,y] [--name n]
-                                         ブロック建築データ（.mcstructure とガイド）を出力
+                [--origin mapX,mapZ,y] [--name n] [--max n] [--split tiles|map|whole] [--bp]
+                                         ブロック建築データ（.mcstructure とガイド、--bp でビヘイビアパック）を出力
           analyze <image> [--maps 1x1] [--dither none|fs|bayer4] [--preset n] [--bg #RRGGBB]
                                          3D マップアートの高さと画質の関係を解析
           bench <image>... [--maps 1x1]  ディザリング・色差の方式を比較（画質と速度）
@@ -67,6 +67,7 @@ try
                     "bright" => BMAP.BlockEngine.StaircaseMode.FullBright,
                     _ => BMAP.BlockEngine.StaircaseMode.Flat,
                 },
+                MaxHeight = int.Parse(opts.GetValueOrDefault("max", "0")),
             };
             var support = opts.GetValueOrDefault("support", "important") switch
             {
@@ -77,19 +78,30 @@ try
             };
             var presets = BMAP.BlockEngine.BlockPreset.BuiltIns(profile);
             var preset = presets[int.Parse(opts.GetValueOrDefault("preset", "0"))];
-            var q = BMAP.BlockEngine.ColorQuantizer.Quantize(img, profile, preset.ToSelection(), qopt);
             BMAP.BlockEngine.WorldOrigin? origin = null;
             if (opts.TryGetValue("origin", out var o))
             {
                 var p = o.Split(',').Select(int.Parse).ToArray();
                 origin = BMAP.BlockEngine.WorldOrigin.AlignedToMap(p[0], p[1], p[2]);
             }
+            // The height limit counts the whole build (supports included), as in the app.
+            var q = BMAP.BlockEngine.HeightPlanner.Quantize(img, profile, preset.ToSelection(), qopt, profile.Find("cobblestone")!, support, origin != null);
             // Single parity steps only when the build is placed on the map grid (--origin).
             var layout = BMAP.BlockEngine.BlockLayout.Generate(q, profile.Find("cobblestone")!, 380, support, onMapGrid: origin != null);
             var materials = BMAP.BlockEngine.MaterialCalculator.Calculate(layout, mx);
             string name = opts.GetValueOrDefault("name", Path.GetFileNameWithoutExtension(args[1]));
             BMAP.BlockEngine.BuildGuideGenerator.WriteAll(Path.Combine(args[2], "guide"), layout, q, profile, materials, mx, my, origin, name);
-            var result = BMAP.Export.StructureExporter.Export(args[2], name, layout, mx, new BMAP.Export.StructureExportOptions(), origin);
+            var exportOptions = new BMAP.Export.StructureExportOptions
+            {
+                WriteBehaviorPack = opts.ContainsKey("bp"),
+                Split = opts.GetValueOrDefault("split", "tiles") switch
+                {
+                    "map" => BMAP.Export.StructureSplit.PerMap,
+                    "whole" => BMAP.Export.StructureSplit.Whole,
+                    _ => BMAP.Export.StructureSplit.Tiles64,
+                },
+            };
+            var result = BMAP.Export.StructureExporter.Export(args[2], name, layout, mx, exportOptions, origin);
             Console.WriteLine($"blocks={materials.Sum(m => m.Count)} types={q.EntryIndex.Distinct().Count()} maxHeight={layout.MaxHeight} structures={result.Tiles.Count} pack={result.McpackPath}");
             break;
         }
