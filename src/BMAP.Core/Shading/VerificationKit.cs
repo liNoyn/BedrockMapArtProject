@@ -122,13 +122,13 @@ public static class VerificationKit
 
         var manifest = new KitManifest { BaseY = baseY, ProfileId = profile.Id, Created = DateTime.Now.ToString("yyyy-MM-dd HH:mm"), Items = items };
         File.WriteAllText(Path.Combine(dir, "kit.json"), manifest.ToJson(), new UTF8Encoding(false));
-        WritePack(dir, pieces, name);
+        WritePack(dir, pieces, packName: name);
         File.WriteAllText(Path.Combine(dir, english ? "HOW-TO.txt" : "手順.txt"), Instructions(manifest, english), new UTF8Encoding(true));
         return dir;
     }
 
     /// <summary>One behavior pack with every piece and a function per part (absolute coordinates).</summary>
-    private static void WritePack(string dir, List<(KitItem Item, List<StructureTile> Tiles, WorldOrigin Origin)> pieces, string name)
+    private static void WritePack(string dir, List<(KitItem Item, List<StructureTile> Tiles, WorldOrigin Origin)> pieces, string packName)
     {
         string pack = Path.Combine(dir, "BMAP_kit_BP");
         string structures = Path.Combine(pack, "structures", Namespace);
@@ -138,7 +138,7 @@ public static class VerificationKit
         var manifest = new
         {
             format_version = 2,
-            header = new { name = name.Replace('_', ' '), description = "Bedrock Map Art Project", uuid = Guid.NewGuid().ToString(), version = new[] { 1, 0, 0 }, min_engine_version = new[] { 1, 20, 0 } },
+            header = new { name = packName.Replace('_', ' '), description = "Bedrock Map Art Project", uuid = Guid.NewGuid().ToString(), version = new[] { 1, 0, 0 }, min_engine_version = new[] { 1, 20, 0 } },
             modules = new[] { new { type = "data", uuid = Guid.NewGuid().ToString(), version = new[] { 1, 0, 0 } } },
         };
         File.WriteAllText(Path.Combine(pack, "manifest.json"), JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false));
@@ -170,7 +170,7 @@ public static class VerificationKit
                             $"tp @s {128 * (item.MapX + col)} 200 {128 * (item.MapZ + row)}\ngamemode creative @s\n", new UTF8Encoding(false));
                     }
         }
-        string mcpack = Path.Combine(dir, name + ".mcpack");
+        string mcpack = Path.Combine(dir, packName + ".mcpack");
         StructureExporter.ZipDirectory(pack, mcpack);
     }
 
