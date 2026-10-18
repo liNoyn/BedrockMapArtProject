@@ -79,7 +79,8 @@ public sealed class McStructure
             { "structure", new NbtCompound
                 {
                     { "block_indices", new NbtList(NbtType.List, [primary, secondary]) },
-                    { "entities", new NbtList(NbtType.Compound, Entities) },
+                    // The game writes an empty list with element type End (seen in 1.26 worlds).
+                    { "entities", new NbtList(Entities.Count == 0 ? NbtType.End : NbtType.Compound, Entities) },
                     { "palette", new NbtCompound
                         {
                             { "default", new NbtCompound

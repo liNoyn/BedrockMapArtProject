@@ -182,7 +182,7 @@ public sealed class BlockLayout
             ParitySteps = parity, ParityShading = q.ParityShading,
         };
         if (maxHeight > 0 && layout.MaxHeight > maxHeight)
-            throw new InvalidOperationException($"高さ {layout.MaxHeight} が上限 {maxHeight} を超えています。Flat 方式・Valley 方式にするか、ディザリングを変更してください。");
+            throw new InvalidOperationException($"高さ {layout.MaxHeight} が上限 {maxHeight} を超えています。Valley 階段で「高さの上限」を決めるか、平面にしてください。 / The build is {layout.MaxHeight} blocks tall (limit {maxHeight}): set a height limit with the Valley staircase, or use flat.");
         return layout;
     }
 

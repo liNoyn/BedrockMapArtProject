@@ -344,6 +344,54 @@ public class BlockTests
     }
 
     [Fact]
+    public void TallPieces_AreSlicedVertically_AndCoverEverything()
+    {
+        var q = Quantize(TestHelpers.Gradient(128, 128), opt: new QuantizeOptions { Mode = StaircaseMode.Classic, Dither = DitherMode.FloydSteinberg });
+        var layout = BlockLayout.Generate(q, Cobble, supports: SupportMode.Important);
+        Assert.True(layout.MaxHeight > 20);
+        var tiles = StructureExporter.Split(layout, 1, new StructureExportOptions { MaxTileHeight = 8 });
+        Assert.Empty(StructureExporter.ValidateCoverage(layout, tiles));
+        Assert.Contains(tiles, t => t.Id.Contains("_y"));
+        Assert.All(tiles, t => Assert.InRange(t.Structure.SizeY, 1, 8));
+        Assert.All(tiles, t => Assert.True(t.BlockCount > 0));
+        Assert.Equal(tiles.Count, tiles.Select(t => t.Id).Distinct().Count());
+    }
+
+    [Fact]
+    public void Export_KeepsOtherFilesInTheStructureFolder()
+    {
+        var dir = TestHelpers.TempDir();
+        var own = Path.Combine(dir, "mcstructure");
+        Directory.CreateDirectory(own);
+        File.WriteAllText(Path.Combine(own, "my_house.mcstructure"), "user file");
+        File.WriteAllText(Path.Combine(own, "test_art_old_piece.mcstructure"), "stale piece of this project");
+        var q = Quantize(TestHelpers.Gradient(128, 128));
+        var layout = BlockLayout.Generate(q, Cobble, supports: SupportMode.Important);
+        var result = StructureExporter.Export(dir, "Test Art", layout, 1, new StructureExportOptions(), null);
+        Assert.True(File.Exists(Path.Combine(own, "my_house.mcstructure")));
+        Assert.False(File.Exists(Path.Combine(own, "test_art_old_piece.mcstructure")));
+        using var zip = System.IO.Compression.ZipFile.OpenRead(result.ZipPath);
+        Assert.Equal(result.Files.Count, zip.Entries.Count);
+        Assert.DoesNotContain(zip.Entries, e => e.Name == "my_house.mcstructure");
+    }
+
+    [Fact]
+    public void Structure_MatchesTheGamesLayout()
+    {
+        // As saved by Bedrock 1.26: empty entity list of type End, two index layers, version per palette entry.
+        var s = new BMAP.Export.McStructure(2, 1, 1);
+        s.SetBlock(1, 0, 0, StructureExporter.ToPaletteBlock(Cobble));
+        var root = s.ToNbt();
+        var structure = root.Get<BMAP.Nbt.NbtCompound>("structure")!;
+        Assert.Equal(BMAP.Nbt.NbtType.End, structure.Get<BMAP.Nbt.NbtList>("entities")!.ElementType);
+        Assert.Equal(2, structure.Get<BMAP.Nbt.NbtList>("block_indices")!.Count);
+        Assert.Equal(1, root.GetInt("format_version"));
+        var back = BMAP.Export.McStructure.FromBytes(s.ToBytes());
+        Assert.Equal(new[] { -1, 0 }, back.Indices);
+        Assert.Equal(18168865, back.Palette[0].Version);
+    }
+
+    [Fact]
     public void PixelEdits_ApplyAndUndo()
     {
         var q = Quantize(RgbaImage.Filled(128, 128, Profile.ColorOf(Profile.Find("white_wool")!, Shade.Normal)), Only("white_wool"));
