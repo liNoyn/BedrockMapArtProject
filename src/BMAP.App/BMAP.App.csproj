@@ -10,7 +10,7 @@
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.9.0</Version>
+    <Version>0.10.0</Version>
     <ApplicationIcon>Assets\bmap.ico</ApplicationIcon>
     <Product>Bedrock Map Art Project</Product>
     <Copyright>Copyright (c) 2026 Noyn (MIT)</Copyright>

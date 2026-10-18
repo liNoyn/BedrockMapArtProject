@@ -57,6 +57,36 @@ public class DitherTests
     }
 
     [Fact]
+    public void Optimized_MixesAPaleColourFromFewColours()
+    {
+        // Pale lavender has no map colour: it must be mixed, but from a pair (white and ice), not from many hues.
+        var q = Q(RgbaImage.Filled(64, 64, new Rgba(228, 227, 245)), new QuantizeOptions { Dither = DitherMode.Optimized, Mode = StaircaseMode.Valley });
+        var colours = Enumerable.Range(0, 64 * 64).Select(i => (q.Preview.Pixels[i * 4], q.Preview.Pixels[i * 4 + 1], q.Preview.Pixels[i * 4 + 2])).Distinct().Count();
+        Assert.InRange(colours, 2, 3);
+        var fs = Q(RgbaImage.Filled(64, 64, new Rgba(228, 227, 245)), new QuantizeOptions { Dither = DitherMode.FloydSteinberg, Mode = StaircaseMode.Valley });
+        Assert.True(QualityScore.Measure(RgbaImage.Filled(64, 64, new Rgba(228, 227, 245)), q.Preview).Near
+            <= QualityScore.Measure(RgbaImage.Filled(64, 64, new Rgba(228, 227, 245)), fs.Preview).Near + 0.5);
+    }
+
+    [Fact]
+    public void QualityScore_IsZeroForAnIdenticalImage_AndSeesNoise()
+    {
+        var img = TestHelpers.Gradient(64, 64);
+        var same = QualityScore.Measure(img, img);
+        Assert.Equal(0, same.Pixel, 6);
+        Assert.Equal(0, same.Far, 6);
+        // Zero-mean checkerboard noise: clearly visible per pixel, fading when blurred.
+        var grey = RgbaImage.Filled(64, 64, new Rgba(128, 128, 128));
+        img = grey;
+        var noisy = grey.Clone();
+        for (int y = 0; y < 64; y++)
+            for (int x = 0; x < 64; x++)
+                for (int c = 0; c < 3; c++) noisy.Pixels[(y * 64 + x) * 4 + c] = (byte)(((x + y) & 1) == 0 ? 158 : 94);
+        var s = QualityScore.Measure(img, noisy);
+        Assert.True(s.Pixel > s.Near && s.Near > s.Far && s.Far > 0);
+    }
+
+    [Fact]
     public void Optimized_KeepsAnExactColourFlat()
     {
         // A colour the palette has exactly needs no mixing: no noise may be added.
