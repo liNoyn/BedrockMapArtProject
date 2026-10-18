@@ -188,6 +188,60 @@
           },
           "version": 18168865,
           "rarity": 2
+        },
+        {
+          "key": "stripped_birch_log",
+          "displayName": "樹皮を剥いだシラカバの原木",
+          "displayNameEn": "Stripped Birch Log",
+          "name": "minecraft:stripped_birch_log",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865
+        },
+        {
+          "key": "birch_wood",
+          "displayName": "シラカバの木",
+          "displayNameEn": "Birch Wood",
+          "name": "minecraft:birch_wood",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865
+        },
+        {
+          "key": "stripped_birch_wood",
+          "displayName": "樹皮を剥いだシラカバの木",
+          "displayNameEn": "Stripped Birch Wood",
+          "name": "minecraft:stripped_birch_wood",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865
+        },
+        {
+          "key": "cut_sandstone",
+          "displayName": "研がれた砂岩",
+          "displayNameEn": "Cut Sandstone",
+          "name": "minecraft:cut_sandstone",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "chiseled_sandstone",
+          "displayName": "模様入りの砂岩",
+          "displayNameEn": "Chiseled Sandstone",
+          "name": "minecraft:chiseled_sandstone",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "smooth_sandstone",
+          "displayName": "滑らかな砂岩",
+          "displayNameEn": "Smooth Sandstone",
+          "name": "minecraft:smooth_sandstone",
+          "states": {},
+          "version": 18168865
         }
       ],
       "status": "verified",
@@ -331,6 +385,18 @@
           "version": 18168865,
           "needsSupport": true,
           "rarity": 1
+        },
+        {
+          "key": "pale_oak_leaves",
+          "displayName": "ペールオークの葉",
+          "displayNameEn": "Pale Oak Leaves",
+          "name": "minecraft:pale_oak_leaves",
+          "states": {
+            "persistent_bit": true,
+            "update_bit": false
+          },
+          "version": 18168865,
+          "flammable": true
         }
       ],
       "status": "verified",
@@ -403,6 +469,18 @@
           "displayName": "ツツジの葉",
           "displayNameEn": "Azalea Leaves",
           "name": "minecraft:azalea_leaves",
+          "states": {
+            "persistent_bit": true,
+            "update_bit": false
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "azalea_leaves_flowered",
+          "displayName": "開花したツツジの葉",
+          "displayNameEn": "Flowering Azalea Leaves",
+          "name": "minecraft:azalea_leaves_flowered",
           "states": {
             "persistent_bit": true,
             "update_bit": false
@@ -539,6 +617,54 @@
           "displayNameEn": "Packed Mud",
           "name": "minecraft:packed_mud",
           "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "polished_granite",
+          "displayName": "磨かれた花崗岩",
+          "displayNameEn": "Polished Granite",
+          "name": "minecraft:polished_granite",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "jungle_wood",
+          "displayName": "ジャングルの木",
+          "displayNameEn": "Jungle Wood",
+          "name": "minecraft:jungle_wood",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865
+        },
+        {
+          "key": "stripped_jungle_log",
+          "displayName": "樹皮を剥いだジャングルの原木",
+          "displayNameEn": "Stripped Jungle Log",
+          "name": "minecraft:stripped_jungle_log",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865
+        },
+        {
+          "key": "stripped_jungle_wood",
+          "displayName": "樹皮を剥いだジャングルの木",
+          "displayNameEn": "Stripped Jungle Wood",
+          "name": "minecraft:stripped_jungle_wood",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865
+        },
+        {
+          "key": "brown_mushroom_block",
+          "displayName": "茶色いキノコブロック",
+          "displayNameEn": "Brown Mushroom Block",
+          "name": "minecraft:brown_mushroom_block",
+          "states": {
+            "huge_mushroom_bits": 0
+          },
           "version": 18168865
         }
       ],
@@ -762,6 +888,115 @@
           },
           "version": 18168865,
           "needsSupport": true
+        },
+        {
+          "key": "oak_wood",
+          "displayName": "オークの木",
+          "displayNameEn": "Oak Wood",
+          "name": "minecraft:oak_wood",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865
+        },
+        {
+          "key": "stripped_oak_log",
+          "displayName": "樹皮を剥いだオークの原木",
+          "displayNameEn": "Stripped Oak Log",
+          "name": "minecraft:stripped_oak_log",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865
+        },
+        {
+          "key": "stripped_oak_wood",
+          "displayName": "樹皮を剥いだオークの木",
+          "displayNameEn": "Stripped Oak Wood",
+          "name": "minecraft:stripped_oak_wood",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865
+        },
+        {
+          "key": "bookshelf",
+          "displayName": "本棚",
+          "displayNameEn": "Bookshelf",
+          "name": "minecraft:bookshelf",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "barrel",
+          "displayName": "樽",
+          "displayNameEn": "Barrel",
+          "name": "minecraft:barrel",
+          "states": {
+            "facing_direction": 0,
+            "open_bit": false
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "noteblock",
+          "displayName": "音符ブロック",
+          "displayNameEn": "Note Block",
+          "name": "minecraft:noteblock",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "cartography_table",
+          "displayName": "製図台",
+          "displayNameEn": "Cartography Table",
+          "name": "minecraft:cartography_table",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "fletching_table",
+          "displayName": "矢細工台",
+          "displayNameEn": "Fletching Table",
+          "name": "minecraft:fletching_table",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "smithing_table",
+          "displayName": "鍛冶台",
+          "displayNameEn": "Smithing Table",
+          "name": "minecraft:smithing_table",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "loom",
+          "displayName": "機織り機",
+          "displayNameEn": "Loom",
+          "name": "minecraft:loom",
+          "states": {
+            "direction": 0
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "beehive",
+          "displayName": "養蜂箱",
+          "displayNameEn": "Beehive",
+          "name": "minecraft:beehive",
+          "states": {
+            "direction": 0,
+            "honey_level": 0
+          },
+          "version": 18168865,
+          "flammable": true
         }
       ],
       "status": "verified",
@@ -834,6 +1069,83 @@
           "states": {},
           "version": 18168865,
           "rarity": 2
+        },
+        {
+          "key": "quartz_pillar",
+          "displayName": "クォーツの柱",
+          "displayNameEn": "Quartz Pillar",
+          "name": "minecraft:quartz_pillar",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865
+        },
+        {
+          "key": "chiseled_quartz_block",
+          "displayName": "模様入りのクォーツブロック",
+          "displayNameEn": "Chiseled Quartz Block",
+          "name": "minecraft:chiseled_quartz_block",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865
+        },
+        {
+          "key": "smooth_quartz",
+          "displayName": "滑らかなクォーツブロック",
+          "displayNameEn": "Smooth Quartz Block",
+          "name": "minecraft:smooth_quartz",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865
+        },
+        {
+          "key": "quartz_bricks",
+          "displayName": "クォーツレンガ",
+          "displayNameEn": "Quartz Bricks",
+          "name": "minecraft:quartz_bricks",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "polished_diorite",
+          "displayName": "磨かれた閃緑岩",
+          "displayNameEn": "Polished Diorite",
+          "name": "minecraft:polished_diorite",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "pale_oak_planks",
+          "displayName": "ペールオークの板材",
+          "displayNameEn": "Pale Oak Planks",
+          "name": "minecraft:pale_oak_planks",
+          "states": {},
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "pale_oak_log",
+          "displayName": "ペールオークの原木",
+          "displayNameEn": "Pale Oak Log",
+          "name": "minecraft:pale_oak_log",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "stripped_pale_oak_log",
+          "displayName": "樹皮を剥いだペールオークの原木",
+          "displayNameEn": "Stripped Pale Oak Log",
+          "name": "minecraft:stripped_pale_oak_log",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
         }
       ],
       "status": "verified",
@@ -920,6 +1232,23 @@
           },
           "version": 18168865,
           "needsSupport": true
+        },
+        {
+          "key": "lodestone",
+          "displayName": "ロードストーン",
+          "displayNameEn": "Lodestone",
+          "name": "minecraft:lodestone",
+          "states": {},
+          "version": 18168865,
+          "rarity": 2
+        },
+        {
+          "key": "target",
+          "displayName": "的",
+          "displayNameEn": "Target",
+          "name": "minecraft:target",
+          "states": {},
+          "version": 18168865
         }
       ],
       "status": "verified",
@@ -1125,6 +1454,78 @@
           },
           "version": 18168865,
           "needsSupport": true
+        },
+        {
+          "key": "smooth_red_sandstone",
+          "displayName": "滑らかな赤い砂岩",
+          "displayNameEn": "Smooth Red Sandstone",
+          "name": "minecraft:smooth_red_sandstone",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "cut_red_sandstone",
+          "displayName": "研がれた赤い砂岩",
+          "displayNameEn": "Cut Red Sandstone",
+          "name": "minecraft:cut_red_sandstone",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "chiseled_red_sandstone",
+          "displayName": "模様入りの赤い砂岩",
+          "displayNameEn": "Chiseled Red Sandstone",
+          "name": "minecraft:chiseled_red_sandstone",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "carved_pumpkin",
+          "displayName": "くり抜かれたカボチャ",
+          "displayNameEn": "Carved Pumpkin",
+          "name": "minecraft:carved_pumpkin",
+          "states": {
+            "minecraft:cardinal_direction": "south"
+          },
+          "version": 18168865
+        },
+        {
+          "key": "stripped_acacia_log",
+          "displayName": "樹皮を剥いだアカシアの原木",
+          "displayNameEn": "Stripped Acacia Log",
+          "name": "minecraft:stripped_acacia_log",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "waxed_cut_copper",
+          "displayName": "錆止めされた切り込み入りの銅",
+          "displayNameEn": "Waxed Cut Copper",
+          "name": "minecraft:waxed_cut_copper",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "waxed_chiseled_copper",
+          "displayName": "錆止めされた模様入りの銅",
+          "displayNameEn": "Waxed Chiseled Copper",
+          "name": "minecraft:waxed_chiseled_copper",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "waxed_copper_grate",
+          "displayName": "錆止めされた銅の格子",
+          "displayNameEn": "Waxed Copper Grate",
+          "name": "minecraft:waxed_copper_grate",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
         }
       ],
       "status": "verified",
@@ -1214,6 +1615,16 @@
           "version": 18168865,
           "needsSupport": true,
           "rarity": 2
+        },
+        {
+          "key": "purpur_pillar",
+          "displayName": "プルプァの柱",
+          "displayNameEn": "Purpur Pillar",
+          "name": "minecraft:purpur_pillar",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865
         }
       ],
       "status": "verified",
@@ -1442,6 +1853,38 @@
           },
           "version": 18168865,
           "flammable": true
+        },
+        {
+          "key": "stripped_bamboo_block",
+          "displayName": "皮を剥いだ竹ブロック",
+          "displayNameEn": "Block of Stripped Bamboo",
+          "name": "minecraft:stripped_bamboo_block",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "bee_nest",
+          "displayName": "ミツバチの巣",
+          "displayNameEn": "Bee Nest",
+          "name": "minecraft:bee_nest",
+          "states": {
+            "direction": 0,
+            "honey_level": 0
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "wet_sponge",
+          "displayName": "濡れたスポンジ",
+          "displayNameEn": "Wet Sponge",
+          "name": "minecraft:wet_sponge",
+          "states": {},
+          "version": 18168865,
+          "rarity": 2
         }
       ],
       "status": "verified",
@@ -1725,6 +2168,28 @@
           "states": {},
           "version": 18168865,
           "rarity": 1
+        },
+        {
+          "key": "acacia_wood",
+          "displayName": "アカシアの木",
+          "displayNameEn": "Acacia Wood",
+          "name": "minecraft:acacia_wood",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "stripped_acacia_wood",
+          "displayName": "樹皮を剥いだアカシアの木",
+          "displayNameEn": "Stripped Acacia Wood",
+          "name": "minecraft:stripped_acacia_wood",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
         }
       ],
       "status": "verified",
@@ -1790,6 +2255,14 @@
           "states": {
             "facing_direction": 2
           },
+          "version": 18168865
+        },
+        {
+          "key": "pale_moss_block",
+          "displayName": "ペールモスブロック",
+          "displayNameEn": "Pale Moss Block",
+          "name": "minecraft:pale_moss_block",
+          "states": {},
           "version": 18168865
         }
       ],
@@ -2265,6 +2738,14 @@
           "states": {},
           "version": 18168865,
           "flammable": true
+        },
+        {
+          "key": "moss_block",
+          "displayName": "苔ブロック",
+          "displayNameEn": "Moss Block",
+          "name": "minecraft:moss_block",
+          "states": {},
+          "version": 18168865
         }
       ],
       "status": "verified",
@@ -2411,6 +2892,49 @@
           },
           "version": 18168865,
           "needsSupport": true
+        },
+        {
+          "key": "mangrove_wood",
+          "displayName": "マングローブの木",
+          "displayNameEn": "Mangrove Wood",
+          "name": "minecraft:mangrove_wood",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "stripped_mangrove_log",
+          "displayName": "樹皮を剥いだマングローブの原木",
+          "displayNameEn": "Stripped Mangrove Log",
+          "name": "minecraft:stripped_mangrove_log",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "stripped_mangrove_wood",
+          "displayName": "樹皮を剥いだマングローブの木",
+          "displayNameEn": "Stripped Mangrove Wood",
+          "name": "minecraft:stripped_mangrove_wood",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "red_mushroom_block",
+          "displayName": "赤いキノコブロック",
+          "displayNameEn": "Red Mushroom Block",
+          "name": "minecraft:red_mushroom_block",
+          "states": {
+            "huge_mushroom_bits": 0
+          },
+          "version": 18168865
         }
       ],
       "status": "verified",
@@ -2553,6 +3077,74 @@
           },
           "version": 18168865,
           "needsSupport": true
+        },
+        {
+          "key": "polished_blackstone",
+          "displayName": "磨かれたブラックストーン",
+          "displayNameEn": "Polished Blackstone",
+          "name": "minecraft:polished_blackstone",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "polished_blackstone_bricks",
+          "displayName": "磨かれたブラックストーンレンガ",
+          "displayNameEn": "Polished Blackstone Bricks",
+          "name": "minecraft:polished_blackstone_bricks",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "chiseled_polished_blackstone",
+          "displayName": "模様入りの磨かれたブラックストーン",
+          "displayNameEn": "Chiseled Polished Blackstone",
+          "name": "minecraft:chiseled_polished_blackstone",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "cracked_polished_blackstone_bricks",
+          "displayName": "ひび割れた磨かれたブラックストーンレンガ",
+          "displayNameEn": "Cracked Polished Blackstone Bricks",
+          "name": "minecraft:cracked_polished_blackstone_bricks",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "gilded_blackstone",
+          "displayName": "きらめくブラックストーン",
+          "displayNameEn": "Gilded Blackstone",
+          "name": "minecraft:gilded_blackstone",
+          "states": {},
+          "version": 18168865,
+          "rarity": 2
+        },
+        {
+          "key": "polished_basalt",
+          "displayName": "磨かれた玄武岩",
+          "displayNameEn": "Polished Basalt",
+          "name": "minecraft:polished_basalt",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865
+        },
+        {
+          "key": "smooth_basalt",
+          "displayName": "滑らかな玄武岩",
+          "displayNameEn": "Smooth Basalt",
+          "name": "minecraft:smooth_basalt",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "ancient_debris",
+          "displayName": "古代の残骸",
+          "displayNameEn": "Ancient Debris",
+          "name": "minecraft:ancient_debris",
+          "states": {},
+          "version": 18168865,
+          "rarity": 3
         }
       ],
       "status": "verified",
@@ -2806,6 +3398,49 @@
           "states": {},
           "version": 18168865,
           "flammable": true
+        },
+        {
+          "key": "spruce_wood",
+          "displayName": "トウヒの木",
+          "displayNameEn": "Spruce Wood",
+          "name": "minecraft:spruce_wood",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "stripped_spruce_log",
+          "displayName": "樹皮を剥いだトウヒの原木",
+          "displayNameEn": "Stripped Spruce Log",
+          "name": "minecraft:stripped_spruce_log",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "stripped_spruce_wood",
+          "displayName": "樹皮を剥いだトウヒの木",
+          "displayNameEn": "Stripped Spruce Wood",
+          "name": "minecraft:stripped_spruce_wood",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865,
+          "flammable": true
+        },
+        {
+          "key": "muddy_mangrove_roots",
+          "displayName": "泥だらけのマングローブの根",
+          "displayNameEn": "Muddy Mangrove Roots",
+          "name": "minecraft:muddy_mangrove_roots",
+          "states": {
+            "pillar_axis": "y"
+          },
+          "version": 18168865
         }
       ],
       "status": "verified",
@@ -2896,6 +3531,40 @@
           },
           "version": 18168865,
           "needsSupport": true,
+          "rarity": 1
+        },
+        {
+          "key": "chiseled_nether_bricks",
+          "displayName": "模様入りのネザーレンガ",
+          "displayNameEn": "Chiseled Nether Bricks",
+          "name": "minecraft:chiseled_nether_bricks",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "cracked_nether_bricks",
+          "displayName": "ひび割れたネザーレンガ",
+          "displayNameEn": "Cracked Nether Bricks",
+          "name": "minecraft:cracked_nether_bricks",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "nether_gold_ore",
+          "displayName": "ネザー金鉱石",
+          "displayNameEn": "Nether Gold Ore",
+          "name": "minecraft:nether_gold_ore",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "quartz_ore",
+          "displayName": "ネザークォーツ鉱石",
+          "displayNameEn": "Nether Quartz Ore",
+          "name": "minecraft:quartz_ore",
+          "states": {},
+          "version": 18168865,
           "rarity": 1
         }
       ],
@@ -2995,6 +3664,33 @@
           "name": "minecraft:orange_terracotta",
           "states": {},
           "version": 18168865
+        },
+        {
+          "key": "resin_block",
+          "displayName": "樹脂ブロック",
+          "displayNameEn": "Block of Resin",
+          "name": "minecraft:resin_block",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "resin_bricks",
+          "displayName": "樹脂レンガ",
+          "displayNameEn": "Resin Bricks",
+          "name": "minecraft:resin_bricks",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "chiseled_resin_bricks",
+          "displayName": "模様入りの樹脂レンガ",
+          "displayNameEn": "Chiseled Resin Bricks",
+          "name": "minecraft:chiseled_resin_bricks",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
         }
       ],
       "status": "verified",
@@ -3155,6 +3851,38 @@
           },
           "version": 18168865,
           "flammable": true
+        },
+        {
+          "key": "polished_tuff",
+          "displayName": "磨かれた凝灰岩",
+          "displayNameEn": "Polished Tuff",
+          "name": "minecraft:polished_tuff",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "tuff_bricks",
+          "displayName": "凝灰岩レンガ",
+          "displayNameEn": "Tuff Bricks",
+          "name": "minecraft:tuff_bricks",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "chiseled_tuff",
+          "displayName": "模様入りの凝灰岩",
+          "displayNameEn": "Chiseled Tuff",
+          "name": "minecraft:chiseled_tuff",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "chiseled_tuff_bricks",
+          "displayName": "模様入りの凝灰岩レンガ",
+          "displayNameEn": "Chiseled Tuff Bricks",
+          "name": "minecraft:chiseled_tuff_bricks",
+          "states": {},
+          "version": 18168865
         }
       ],
       "status": "verified",
@@ -3213,6 +3941,33 @@
           },
           "version": 18168865,
           "needsSupport": true
+        },
+        {
+          "key": "waxed_exposed_cut_copper",
+          "displayName": "錆止めされた風化した切り込み入りの銅",
+          "displayNameEn": "Waxed Exposed Cut Copper",
+          "name": "minecraft:waxed_exposed_cut_copper",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "waxed_exposed_chiseled_copper",
+          "displayName": "錆止めされた風化した模様入りの銅",
+          "displayNameEn": "Waxed Exposed Chiseled Copper",
+          "name": "minecraft:waxed_exposed_chiseled_copper",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "waxed_exposed_copper_grate",
+          "displayName": "錆止めされた風化した銅の格子",
+          "displayNameEn": "Waxed Exposed Copper Grate",
+          "name": "minecraft:waxed_exposed_copper_grate",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
         }
       ],
       "status": "verified",
@@ -3487,6 +4242,33 @@
           "version": 18168865,
           "needsSupport": true,
           "rarity": 2
+        },
+        {
+          "key": "waxed_oxidized_cut_copper",
+          "displayName": "錆止めされた酸化した切り込み入りの銅",
+          "displayNameEn": "Waxed Oxidized Cut Copper",
+          "name": "minecraft:waxed_oxidized_cut_copper",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "waxed_oxidized_chiseled_copper",
+          "displayName": "錆止めされた酸化した模様入りの銅",
+          "displayNameEn": "Waxed Oxidized Chiseled Copper",
+          "name": "minecraft:waxed_oxidized_chiseled_copper",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "waxed_oxidized_copper_grate",
+          "displayName": "錆止めされた酸化した銅の格子",
+          "displayNameEn": "Waxed Oxidized Copper Grate",
+          "name": "minecraft:waxed_oxidized_copper_grate",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
         }
       ],
       "status": "verified",
@@ -3549,6 +4331,33 @@
           "version": 18168865,
           "needsSupport": true,
           "rarity": 2
+        },
+        {
+          "key": "waxed_weathered_cut_copper",
+          "displayName": "錆止めされた錆びた切り込み入りの銅",
+          "displayNameEn": "Waxed Weathered Cut Copper",
+          "name": "minecraft:waxed_weathered_cut_copper",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "waxed_weathered_chiseled_copper",
+          "displayName": "錆止めされた錆びた模様入りの銅",
+          "displayNameEn": "Waxed Weathered Chiseled Copper",
+          "name": "minecraft:waxed_weathered_chiseled_copper",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
+        },
+        {
+          "key": "waxed_weathered_copper_grate",
+          "displayName": "錆止めされた錆びた銅の格子",
+          "displayNameEn": "Waxed Weathered Copper Grate",
+          "name": "minecraft:waxed_weathered_copper_grate",
+          "states": {},
+          "version": 18168865,
+          "rarity": 1
         }
       ],
       "status": "verified",
@@ -3639,6 +4448,54 @@
           },
           "version": 18168865,
           "needsSupport": true
+        },
+        {
+          "key": "polished_deepslate",
+          "displayName": "磨かれた深層岩",
+          "displayNameEn": "Polished Deepslate",
+          "name": "minecraft:polished_deepslate",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "deepslate_bricks",
+          "displayName": "深層岩レンガ",
+          "displayNameEn": "Deepslate Bricks",
+          "name": "minecraft:deepslate_bricks",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "deepslate_tiles",
+          "displayName": "深層岩タイル",
+          "displayNameEn": "Deepslate Tiles",
+          "name": "minecraft:deepslate_tiles",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "chiseled_deepslate",
+          "displayName": "模様入りの深層岩",
+          "displayNameEn": "Chiseled Deepslate",
+          "name": "minecraft:chiseled_deepslate",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "cracked_deepslate_bricks",
+          "displayName": "ひび割れた深層岩レンガ",
+          "displayNameEn": "Cracked Deepslate Bricks",
+          "name": "minecraft:cracked_deepslate_bricks",
+          "states": {},
+          "version": 18168865
+        },
+        {
+          "key": "cracked_deepslate_tiles",
+          "displayName": "ひび割れた深層岩タイル",
+          "displayNameEn": "Cracked Deepslate Tiles",
+          "name": "minecraft:cracked_deepslate_tiles",
+          "states": {},
+          "version": 18168865
         }
       ],
       "status": "verified",

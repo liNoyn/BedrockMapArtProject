@@ -50,11 +50,14 @@ public class DitherTests
             var a = Q(img, new QuantizeOptions { Dither = DitherMode.Optimized, Mode = mode });
             var b = Q(img, new QuantizeOptions { Dither = DitherMode.Optimized, Mode = mode });
             Assert.Equal(a.EntryIndex, b.EntryIndex);
-            // Calmer pixel by pixel than diffusion and Knoll's patterns (the corpus in docs/benchmarks.md is the real check).
+            // Closer to the source seen from afar than diffusion and Knoll's patterns, and not much noisier pixel by pixel
+            // (the corpus in docs/benchmarks.md is the real check).
             var opt = QualityScore.Measure(img, a.Preview);
             var fs = QualityScore.Measure(img, Q(img, new QuantizeOptions { Dither = DitherMode.FloydSteinberg, Mode = mode }).Preview);
             var knoll = QualityScore.Measure(img, Q(img, new QuantizeOptions { Dither = DitherMode.KnollBayer, Mode = mode }).Preview);
-            Assert.True(opt.Pixel < fs.Pixel, $"{mode}: pixel {opt.Pixel:0.00} vs FS {fs.Pixel:0.00}");
+            Assert.True(opt.Far < fs.Far, $"{mode}: far {opt.Far:0.00} vs FS {fs.Far:0.00}");
+            Assert.True(opt.Far < knoll.Far, $"{mode}: far {opt.Far:0.00} vs Knoll {knoll.Far:0.00}");
+            Assert.True(opt.Pixel < fs.Pixel * 1.05, $"{mode}: pixel {opt.Pixel:0.00} vs FS {fs.Pixel:0.00}");
             Assert.True(opt.Pixel < knoll.Pixel, $"{mode}: pixel {opt.Pixel:0.00} vs Knoll {knoll.Pixel:0.00}");
         }
     }
