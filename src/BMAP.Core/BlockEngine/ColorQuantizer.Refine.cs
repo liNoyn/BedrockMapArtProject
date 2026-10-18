@@ -342,7 +342,12 @@ public static partial class ColorQuantizer
                 // small tolerance (a pink wool slightly off a pale pink's hue is fine).
                 double OffS(int c) => tC > 0.02 ? (ck[c].A * tB - ck[c].B * tA) / tC : Math.Sqrt(ck[c].A * ck[c].A + ck[c].B * ck[c].B);
                 double Off(int c) => Math.Max(0, Math.Abs(OffS(c)) - tol);
-                double best = D(ck[nearest], target) * (1 + beta) + gamma * Off(nearest);
+                // Chroma lost along the target's hue by the mixed colour, beyond half of the target's chroma. Distance alone
+                // let plain grey win over white + pink for pale pinks (#EED0D4): same lightness, ΔE small, colour gone,
+                // because the mix pays for its contrast and the grey pays nothing for turning the hair grey.
+                double kappa = settings.PlanChroma;
+                double Fade(Lab mix) => kappa > 0 && tC > 0.02 ? kappa * Math.Max(0, tC - (mix.A * tA + mix.B * tB) / tC - 0.5 * tC) : 0;
+                double best = D(ck[nearest], target) * (1 + beta) + gamma * Off(nearest) + Fade(ck[nearest]);
                 int ba = nearest, bb = -1;
                 // Near-best plans are kept too (within PlanMargin): one hard choice per colour made neighbouring colours
                 // flip between plans (grey vs white + pink in a pale gradient), which showed as square patches.
@@ -371,7 +376,7 @@ public static partial class ColorQuantizer
                         if (t <= 0 || t >= 1) continue;
                         var mix = ColorMath.LinearToOklab(lin[a * 3] + t * dx, lin[a * 3 + 1] + t * dy, lin[a * 3 + 2] + t * dz);
                         double cost = D(mix, target) + Spread(S(ck[a], ck[c]) * 2 * Math.Sqrt(t * (1 - t)), Math.Abs(OffS(a) - OffS(c)) * 2 * Math.Sqrt(t * (1 - t)))
-                            + beta * ((1 - t) * D(ck[a], target) + t * D(ck[c], target)) + gamma * ((1 - t) * Off(a) + t * Off(c));
+                            + beta * ((1 - t) * D(ck[a], target) + t * D(ck[c], target)) + gamma * ((1 - t) * Off(a) + t * Off(c)) + Fade(mix);
                         if (cost < best) { best = cost; ba = a; bb = c; }
                         Keep(cost, a, c, -1);
                         if (cost < partnerCut) { partners.Add((cost, c)); if (partners.Count > 24) { partners.Sort(); partners.RemoveRange(12, partners.Count - 12); partnerCut = partners[^1].Cost; } }
@@ -407,7 +412,7 @@ public static partial class ColorQuantizer
                             double cross = 2 * Math.Sqrt(w0 * u * (oa - ob) * (oa - ob) + w0 * v * (oa - oc) * (oa - oc) + u * v * (ob - oc) * (ob - oc));
                             double cost = D(mix, target) + Spread(spread, cross)
                                 + beta * (w0 * D(ck[a], target) + u * D(ck[b2], target) + v * D(ck[c], target))
-                                + gamma * (w0 * Off(a) + u * Off(b2) + v * Off(c));
+                                + gamma * (w0 * Off(a) + u * Off(b2) + v * Off(c)) + Fade(mix);
                             if (cost < best) { best = cost; t1 = a; t2 = b2; t3 = c; }
                             Keep(cost, a, b2, c);
                         }
@@ -610,6 +615,11 @@ public sealed record RefineSettings
     public double PlanPixel { get; init; }
     /// <summary>Weight of the off-hue part of the colours in a mix when choosing it.</summary>
     public double PlanHue { get; init; }
+    /// <summary>
+    /// Weight of the chroma a plan loses along the target's hue (beyond half of it) when choosing it: a pale pink drawn
+    /// as plain grey is close by distance but has lost its colour.
+    /// </summary>
+    public double PlanChroma { get; init; }
     /// <summary>Quadratic part of the mix contrast penalty.</summary>
     public double PairQuad { get; init; }
     /// <summary>Plans within this cost of the best one also lend their colours (smooth transitions between plans).</summary>

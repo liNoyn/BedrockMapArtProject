@@ -208,3 +208,14 @@ accurate point found (pw 0.02) was a little closer still but visibly grainier. C
 
 2 x 2 (illustration 1): near 3.44 → 2.51, far 1.88 → 0.98, and fewer grey patches in the pale pink hair. The trade is
 a little more fine grain up close (speckle +0.7). Salmon (#F47B4D) stays orange + pink without red dots.
+
+## Pale pinks no longer turn grey (v0.13.1)
+
+A user's 2 x 2 anime frame drew the top of pale pink hair (#EED0D4) as plain grey #DCD9D3. Cause: the plan cost was
+distance + contrast + off-hue; grey has the same lightness, so its distance (0.025, all of it lost chroma) beat
+white + pink (0.011 + 0.018 for their contrast), and nothing charged grey for losing the colour (it sits on the hue
+line, so the off-hue term was zero). New term PlanChroma (1): chroma lost along the target's hue beyond half of the
+target's chroma. Pale pinks #EED0D4 / #ECD4D4 / #EDD1D6 now mix white + pink + grey; the old tie band #F2D4D7–#F1D1D5
+passes the patch test too. Corpus: illustrations near 2.58 → 2.54, far 1.26 → 1.19; photos and flat colours unchanged;
+the 2 x 2 frame far 1.26 → 0.84. Flat builds keep grey: without the bright shades the mix would be much darker, and a
+stronger penalty only adds red dots.
