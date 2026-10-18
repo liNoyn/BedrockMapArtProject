@@ -152,3 +152,20 @@ Block selection: "Recommended (no support, all colours)" — the first block per
 does not fall — gives the same results as "one block per colour" on the whole corpus (illustrations identical, photos
 within 0.04) with fewer support blocks; only the grass colour (slime) still needs support. It is now the first preset.
 The survival preset lacks colours and is worse (illustrations far 2.84 vs 2.50).
+## Patches in pale areas at 2 × 2 maps (v0.11.1)
+
+A user saw the pink hair break into square patches of grey and pink at 2 × 2 maps. Cause: v0.11's off-hue penalty and
+quadratic contrast penalty put "grey alone" and "white + pink" at a near-tie in pale pinks, so small shading
+differences and the 8 × 8 block noise of compressed frames flipped whole areas between the two plans. (Adding the
+colours of near-best plans or plans of a blurred copy did not help: it brought red dots back into salmon orange.)
+
+Fix:
+- The off-hue penalty starts beyond a tolerance of 0.05 (Oklab): pink wool slightly off a pale pink's hue is fine.
+- The quadratic contrast penalty only counts contrast ACROSS the target's hue (spread of signed off-hue distances):
+  red + yellow for salmon loses as before, white + pink for pale pink is no longer touched.
+- The optimiser works towards a bilateral-filtered copy (5 × 5, range σ 4): block noise no longer decides pixel by
+  pixel. The diffusion start uses the image itself, so shades under a height limit are unchanged.
+
+Test `Optimized_HasNoPatchesInAPaleGradientWithBlockNoise` (flat pale pinks with block noise) fails with v0.11's
+settings (pink share varies by 0.23 between tiles) and passes now. Corpus, one map: illustrations far 2.44 → 2.29,
+speckle 3.60 → 3.80 (more of the pale hues kept); photos far 1.40 → 1.34.
