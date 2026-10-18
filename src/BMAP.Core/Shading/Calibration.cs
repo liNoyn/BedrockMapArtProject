@@ -279,7 +279,7 @@ public static class Calibrator
                 $"Controls (east/west steps, flat) deviate from the normal colour by {control:P1}; east/west heights may matter too."));
         else notes.Add(T("東西だけの段差は陰影に影響しませんでした。", "East/west-only steps did not change the shade."));
         if (normalFactor > 0)
-            notes.Add(T($"通常色 / 基本色 = {normalFactor:0.000}（Java 版は 220/255 = 0.863）", $"Normal / base colour = {normalFactor:0.000} (Java: 220/255 = 0.863)"));
+            notes.Add(T($"通常色 / 基本色 = {normalFactor:0.000}（220/255 = 0.863）", $"Normal / base colour = {normalFactor:0.000} (220/255 = 0.863)"));
         foreach (var c in new[] { "carpet", "slab" })
         {
             var cs = steps.Where(s => s.Case == c).ToList();

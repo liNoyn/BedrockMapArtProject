@@ -17,7 +17,7 @@
     "darkStep": 2,
     "model": "checker",
     "rounding": "fromBase",
-    "modelId": "checker",
+    "modelId": "parity",
     "stepStatus": "verified"
   },
   "colourSets": [

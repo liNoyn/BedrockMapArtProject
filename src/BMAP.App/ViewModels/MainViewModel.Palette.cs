@@ -106,7 +106,6 @@ public sealed partial class MainViewModel
     {
         BaseProfile = baseProfile;
         Profile = baseProfile.WithCustomBlocks(CustomBlocks.Select(c => c.Block));
-        if (ShadingModelOption?.Value is { } model) Profile = Profile.WithShadingModel(model);
         Raise(nameof(SelectedBaseProfile));
         Raise(nameof(ProfileNote));
         Raise(nameof(ColourSetsForCustom));

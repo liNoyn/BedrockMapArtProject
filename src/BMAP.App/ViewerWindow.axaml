@@ -1,0 +1,97 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:BMAP.App.ViewModels"
+        x:Class="BMAP.App.ViewerWindow"
+        x:DataType="vm:MainViewModel"
+        Title="{Binding L[ViewerTitle]}"
+        Icon="/Assets/bmap.ico"
+        Width="1280" Height="860" MinWidth="760" MinHeight="520">
+
+  <!-- MapartCraft's "View online": the build in 3D, as a placement plan per block, and as a height map. -->
+  <DockPanel>
+    <Border DockPanel.Dock="Top" Background="#2B2B2B" Padding="10,6">
+      <StackPanel Spacing="4">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <ListBox Classes="tabs" ItemsSource="{Binding ViewerModes}" SelectedItem="{Binding SelectedViewerMode}">
+            <ListBox.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" />
+              </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+          </ListBox>
+          <TextBlock Classes="lbl" Text="{Binding L[ViewMap]}" Margin="8,0,0,0" />
+          <ComboBox ItemsSource="{Binding ViewAreas}" SelectedItem="{Binding ViewArea}" MinWidth="110">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:ViewAreaOption">
+                <TextBlock Text="{Binding Label}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <CheckBox Content="{Binding L[ShowSupports]}" IsChecked="{Binding ShowSupports}" />
+        </StackPanel>
+
+        <!-- 3D tools -->
+        <WrapPanel IsVisible="{Binding IsBuild3D}">
+          <ComboBox ItemsSource="{Binding ColorModes3D}" SelectedItem="{Binding ColorMode3D}" Width="190" Margin="0,0,6,2" />
+          <Button Classes="small" Content="{Binding L[Reset3D]}" Command="{Binding Reset3DCommand}" Margin="0,0,3,2" />
+          <Button Classes="small" Content="{Binding L[TopView3D]}" Command="{Binding TopView3DCommand}" Margin="0,0,3,2" />
+          <Button Classes="small" Content="{Binding L[Turn3D]}" Command="{Binding Turn3DCommand}" Margin="0,0,3,2" />
+          <Button Classes="small" Content="{Binding L[Tallest3D]}" Command="{Binding Tallest3DCommand}" Margin="0,0,10,2" />
+          <CheckBox Content="{Binding L[Lighting3D]}" IsChecked="{Binding Lighting3D}" Margin="0,0,8,0" />
+          <CheckBox Content="{Binding L[Grid3D]}" IsChecked="{Binding Grid3D}" Margin="0,0,8,0" />
+          <CheckBox Content="{Binding L[Outlines3D]}" IsChecked="{Binding Outlines3D}" Margin="0,0,8,0" />
+          <CheckBox Content="{Binding L[Perspective3D]}" IsChecked="{Binding Perspective3D}" Margin="0,0,10,0" />
+          <TextBlock Classes="lbl" Text="{Binding L[Layer3D]}" />
+          <Slider Minimum="0" Maximum="{Binding MaxLayer3D}" Value="{Binding Layer3D}" Width="160" IsSnapToTickEnabled="True" TickFrequency="1" />
+          <TextBlock Text="{Binding Layer3DText}" VerticalAlignment="Center" Margin="6,0,0,0" MinWidth="90" FontSize="12" />
+        </WrapPanel>
+
+        <!-- 2D tools -->
+        <WrapPanel IsVisible="{Binding IsBuildScroll}">
+          <TextBlock Classes="lbl" Text="{Binding L[CellSize]}" />
+          <Slider Minimum="1" Maximum="24" Value="{Binding CellSize}" Width="120" IsSnapToTickEnabled="True" TickFrequency="1" Margin="0,0,10,0" />
+          <CheckBox Content="{Binding L[ShowHeights]}" IsChecked="{Binding ShowHeights}" Margin="0,0,8,0" />
+          <CheckBox Content="{Binding L[EditProgress]}" IsChecked="{Binding EditProgress}" Margin="0,0,8,0" />
+          <CheckBox Content="{Binding L[Paint]}" IsChecked="{Binding PaintMode}" Margin="0,0,8,0" />
+        </WrapPanel>
+        <WrapPanel IsVisible="{Binding PaintMode}">
+          <TextBlock Classes="lbl" Text="{Binding L[Brush]}" />
+          <ComboBox ItemsSource="{Binding Brushes}" SelectedItem="{Binding Brush}" Width="220" Margin="0,0,6,2">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:BrushOption">
+                <TextBlock Text="{Binding Label}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <ComboBox ItemsSource="{Binding BrushShades}" SelectedItem="{Binding BrushShade}" Width="90" Margin="0,0,6,2" IsVisible="{Binding IsStaircase}" />
+          <Button Classes="small" Content="{Binding L[Undo]}" Command="{Binding UndoEditCommand}" Margin="0,0,6,2" ToolTip.Tip="Ctrl+Z" />
+          <Button Classes="small" Content="{Binding L[ClearEdits]}" Command="{Binding ClearEditsCommand}" Margin="0,0,6,2" />
+          <TextBlock Text="{Binding EditsText}" VerticalAlignment="Center" Classes="note" />
+        </WrapPanel>
+      </StackPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Bottom" Background="#2B2B2B" Padding="10,3">
+      <StackPanel>
+        <TextBlock Text="{Binding View3DInfo}" FontSize="12" TextTrimming="CharacterEllipsis" IsVisible="{Binding IsBuild3D}" />
+        <TextBlock Text="{Binding HoverInfo}" FontSize="12" TextTrimming="CharacterEllipsis" IsVisible="{Binding IsBuildScroll}" />
+        <StackPanel Orientation="Horizontal" Spacing="16">
+          <TextBlock Text="{Binding ViewerInfo}" FontSize="11" Opacity="0.75" />
+          <TextBlock Text="{Binding L[Help3D]}" FontSize="11" Opacity="0.6" IsVisible="{Binding IsBuild3D}" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <Grid Background="#22262E">
+      <Border x:Name="View3DPanel" IsVisible="{Binding IsBuild3D}" Background="#22262E" ClipToBounds="True" Cursor="SizeAll" Focusable="True">
+        <Image Source="{Binding View3D}" Stretch="Fill" RenderOptions.BitmapInterpolationMode="None" />
+      </Border>
+      <ScrollViewer IsVisible="{Binding IsBuildScroll}" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+        <Image x:Name="BuildImage" Source="{Binding ViewerImage}" Stretch="None" RenderOptions.BitmapInterpolationMode="None"
+               HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" />
+      </ScrollViewer>
+      <TextBlock Text="{Binding L[ViewerEmpty]}" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.6"
+                 IsVisible="{Binding !HasLayout}" IsHitTestVisible="False" />
+    </Grid>
+  </DockPanel>
+</Window>

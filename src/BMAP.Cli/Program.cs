@@ -108,7 +108,7 @@ try
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var rows = BMAP.BlockEngine.HeightAdvisor.Analyze(img, profile, preset.ToSelection(),
                 new BMAP.BlockEngine.QuantizeOptions { Mode = BMAP.BlockEngine.StaircaseMode.Valley, Dither = dither },
-                profile.Find("cobblestone")!, BMAP.BlockEngine.SupportMode.None);
+                profile.Find("cobblestone")!, BMAP.BlockEngine.SupportMode.None, onMapGrid: opts.ContainsKey("grid"));
             Console.WriteLine("mode      limit  maxH  build  ΔE     quality  blocks");
             foreach (var r in rows)
                 Console.WriteLine($"{r.Mode,-9} {(r.Mode == BMAP.BlockEngine.StaircaseMode.Flat ? "-" : r.Limit == 0 ? "∞" : r.Limit.ToString()),5} {r.MaxHeight,5} {r.BuildHeight,6} {r.MeanDeltaE,6:0.00} {r.Quality,7:0}% {r.Blocks,7}{(r.Recommended ? "  <= recommended" : "")}");
@@ -268,7 +268,7 @@ try
                                 seen[(s.Name, mul)] = seen.GetValueOrDefault((s.Name, mul)) + 1;
                 }
             var rc = BMAP.Shading.Calibrator.RoundingCheck(images, bases, profile.Shades);
-            Console.WriteLine($"rounding (light/dark pixels): {rc.Shaded} explained, both models {rc.Both}, only Java base-floor {rc.OnlyFromBase}, only gd-codes from-normal {rc.OnlyFromNormal}");
+            Console.WriteLine($"rounding (light/dark pixels): {rc.Shaded} explained, both models {rc.Both}, only base-floor {rc.OnlyFromBase}, only gd-codes from-normal {rc.OnlyFromNormal}");
             Console.WriteLine("colour sets seen (x180 / x220 / x255):");
             foreach (var g in seen.GroupBy(k => k.Key.Set).OrderByDescending(g => g.Sum(x => x.Value)))
                 Console.WriteLine($"    {g.Key,-22} {seen.GetValueOrDefault((g.Key, 180)),7} {seen.GetValueOrDefault((g.Key, 220)),7} {seen.GetValueOrDefault((g.Key, 255)),7}");

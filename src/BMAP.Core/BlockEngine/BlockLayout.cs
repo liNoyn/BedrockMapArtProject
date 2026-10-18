@@ -205,8 +205,47 @@ public sealed class BlockLayout
     }
 
     /// <summary>Lowest heights that still give every pixel its shade ("valley" staircasing).</summary>
+    /// <summary>
+    /// Height differences to the north neighbour that give the wanted shade at layout (x, z) under the parity rule:
+    /// light needs ≥ +1 (odd) / ≥ +2 (even), dark ≤ −1 (even) / ≤ −2 (odd), and normal allows 0 plus −1 (odd) or +1 (even).
+    /// </summary>
+    private static (int Lo, int Hi) ParityRange(QuantizeResult q, int x, int z)
+    {
+        if (q.Get(x, z - 1) < 0) return (0, 0); // empty pixel: keep the height
+        bool odd = ((x + z - 1) & 1) == 1;
+        return q.GetShade(x, z - 1) switch
+        {
+            Shade.Bright => (odd ? 1 : 2, int.MaxValue / 4),
+            Shade.Dark => (int.MinValue / 4, odd ? -2 : -1),
+            _ => odd ? (-1, 0) : (0, 1),
+        };
+    }
+
+    /// <summary>
+    /// Lowest heights for the parity rule: every pixel has a range of allowed differences to its northern neighbour,
+    /// so the column can also drift down by one on "normal" pixels. need[z] = the lowest height of cell z from which
+    /// the rest of the column is still reachable with heights ≥ 0; then each cell takes the lowest allowed height.
+    /// </summary>
+    private static void ValleyParityColumn(QuantizeResult q, int x, int w, int depth, int[] heights)
+    {
+        var need = new int[depth];
+        for (int z = depth - 2; z >= 0; z--)
+        {
+            var (_, hi) = ParityRange(q, x, z + 1);
+            need[z] = hi >= int.MaxValue / 8 ? 0 : Math.Max(0, need[z + 1] - hi);
+        }
+        heights[x] = need[0];
+        for (int z = 1; z < depth; z++)
+        {
+            var (lo, _) = ParityRange(q, x, z);
+            int prev = heights[(z - 1) * w + x];
+            heights[z * w + x] = lo <= int.MinValue / 8 ? need[z] : Math.Max(need[z], prev + lo);
+        }
+    }
+
     private static void ValleyColumn(QuantizeResult q, int x, int w, int depth, int[] heights, int up, int down, bool parity)
     {
+        if (parity) { ValleyParityColumn(q, x, w, depth, heights); return; }
         // need[z]: minimal height of cell z so that all shades south of it are still reachable with heights >= 0.
         var need = new int[depth];
         for (int z = depth - 2; z >= 0; z--)

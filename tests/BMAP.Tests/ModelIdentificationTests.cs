@@ -51,7 +51,7 @@ public class ModelIdentificationTests
         Assert.Equal(2, r.BestModel!.Model.BrightStep);
         Assert.Equal(2, r.BestModel.Model.DarkStep);
         Assert.Equal(1.0, r.BestModel.ValidationAccuracy, 3);
-        Assert.True(r.Models.Single(m => m.Model.Id == "java-step1").ValidationAccuracy < 0.8);
+        Assert.True(r.Models.Single(m => m.Model.Id == "step1").ValidationAccuracy < 0.8);
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public class ModelIdentificationTests
     public void Checkerboard_IsIdentified_AndParityIsReported()
     {
         var r = Measure(new ShadeMultipliers { Model = ShadingModelKind.Checker });
-        Assert.Equal("checker", r.BestModel!.Model.Id);
+        Assert.Equal("parity", r.BestModel!.Model.Id);
         Assert.Contains(r.Parity, p => p.Delta == 1 && Math.Abs(p.EvenRatio - p.OddRatio) > 0.05);
     }
 
@@ -101,7 +101,7 @@ public class CheckerArithmeticTests
         // The parity term cannot change the result in double arithmetic: 0.8 - 0.2 rounds above 0.6.
         double d = 1 * 4.0 / 5.0 + (0 - 0.5) * 0.4;
         Assert.True(d > 0.6);
-        var exact = ShadingModel.Candidates.Single(m => m.Id == "checker");
+        var exact = ShadingModel.Candidates.Single(m => m.Id == "parity");
         Assert.Equal(Shade.Normal, exact.Classify(1, 0, 0));
         Assert.Equal(Shade.Bright, exact.Classify(1, 1, 0));
         Assert.Equal(Shade.Bright, exact.Classify(2, 0, 0));
@@ -116,7 +116,7 @@ public class ParityStairTests
     private static readonly ColorProfile Profile = ColorProfile.LoadBuiltIn();
     private static ColorProfile Checker => new()
     {
-        Id = "checker", Name = "checker", ColourSets = Profile.ColourSets,
+        Id = "parity", Name = "parity", ColourSets = Profile.ColourSets,
         Shades = new ShadeMultipliers { Model = ShadingModelKind.Checker, BrightStep = 2, DarkStep = 2 },
     };
 
@@ -149,5 +149,51 @@ public class ParityStairTests
             BMAP.BlockEngine.BlockPreset.BuiltIns(java)[0].ToSelection(), new BMAP.BlockEngine.QuantizeOptions { Mode = BMAP.BlockEngine.StaircaseMode.Valley });
         var javaLayout = BMAP.BlockEngine.BlockLayout.Generate(q, Profile.Find("cobblestone")!);
         Assert.True(ShadingAnalyzer.Analyze(javaLayout, Checker, q.Preview).Mismatches > 0);
+    }
+}
+
+public class HeightPlannerTests
+{
+    [Fact]
+    public void PlannerFillsTheLimit_AndStaysWithinIt()
+    {
+        var profile = ColorProfile.LoadBuiltIn(); // measured parity rule
+        var sel = BMAP.BlockEngine.BlockPreset.BuiltIns(profile)[0].ToSelection();
+        var img = TestHelpers.Gradient(128, 128);
+        var cobble = profile.Find("cobblestone")!;
+        var opt = new BMAP.BlockEngine.QuantizeOptions { Mode = BMAP.BlockEngine.StaircaseMode.Valley, MaxHeight = 8 };
+        var naive = BMAP.BlockEngine.ColorQuantizer.Quantize(img, profile, sel, opt);
+        var planned = BMAP.BlockEngine.HeightPlanner.Quantize(img, profile, sel, opt, cobble, BMAP.BlockEngine.SupportMode.Important, onMapGrid: true);
+        int Range(BMAP.BlockEngine.QuantizeResult q)
+        {
+            var l = BMAP.BlockEngine.BlockLayout.Generate(q, cobble, 0, BMAP.BlockEngine.SupportMode.Important, onMapGrid: true);
+            Assert.Equal(0, ShadingAnalyzer.Analyze(l, profile, q.Preview).Mismatches);
+            return Enumerable.Range(0, l.Cells.Length).Where(i => l.Cells[i] != BMAP.BlockEngine.BlockLayout.Empty).Max(i => l.Heights[i])
+                 - Enumerable.Range(0, l.Cells.Length).Where(i => l.Cells[i] != BMAP.BlockEngine.BlockLayout.Empty).Min(i => l.Heights[i]);
+        }
+        Assert.InRange(Range(planned), 0, 8);
+        Assert.True(Range(planned) >= Range(naive));
+        Assert.True(BMAP.BlockEngine.HeightAdvisor.DistanceDeltaE2000(img, planned.Preview) <= BMAP.BlockEngine.HeightAdvisor.DistanceDeltaE2000(img, naive.Preview) + 1e-9);
+    }
+}
+
+public class HeightPlannerLimitTests
+{
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void SmallLimits_AreNeverExceeded(int limit)
+    {
+        var profile = ColorProfile.LoadBuiltIn();
+        var sel = BMAP.BlockEngine.BlockPreset.BuiltIns(profile)[0].ToSelection();
+        var cobble = profile.Find("cobblestone")!;
+        var q = BMAP.BlockEngine.HeightPlanner.Quantize(TestHelpers.Gradient(64, 64), profile, sel,
+            new BMAP.BlockEngine.QuantizeOptions { Mode = BMAP.BlockEngine.StaircaseMode.Valley, MaxHeight = limit, Dither = BMAP.BlockEngine.DitherMode.FloydSteinberg },
+            cobble, BMAP.BlockEngine.SupportMode.None, onMapGrid: true);
+        var l = BMAP.BlockEngine.BlockLayout.Generate(q, cobble, 0, BMAP.BlockEngine.SupportMode.None, onMapGrid: true);
+        var cells = Enumerable.Range(0, l.Cells.Length).Where(i => l.Cells[i] != BMAP.BlockEngine.BlockLayout.Empty).ToList();
+        Assert.InRange(cells.Max(i => l.Heights[i]) - cells.Min(i => l.Heights[i]), 0, limit);
+        Assert.Equal(0, ShadingAnalyzer.Analyze(l, profile, q.Preview).Mismatches);
     }
 }

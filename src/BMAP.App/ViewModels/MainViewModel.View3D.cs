@@ -160,7 +160,7 @@ public sealed partial class MainViewModel
     /// <summary>Renders the 3D view in the background. Requests during a render are merged into one follow-up render.</summary>
     private async void Request3D(bool fast = false)
     {
-        if (SelectedPreviewMode.Value != PreviewMode.Build3D) return;
+        if (!ViewerOpen || !IsBuild3D) return;
         if (_rendering3D) { _dirty3D = true; _dirtyFast = fast; return; }
         if (_layout is not { } layout || Profile is not { } profile) { View3D = null; return; }
 
@@ -200,7 +200,7 @@ public sealed partial class MainViewModel
             var result = await Task.Run(() => Viewer3D.Render(mesh, profile, camForSize, w, h, tex is null ? null : tex.GetIcon, options));
             _last3D = result;
             View3D = BitmapHelper.ToBitmap(result.Image);
-            PreviewInfo = L.Format("Info3D", mesh.FaceCount, sw.ElapsedMilliseconds);
+            ViewerInfo = L.Format("Info3D", mesh.FaceCount, sw.ElapsedMilliseconds);
         }
         catch (Exception ex) { Log(ex.Message); }
         finally { _rendering3D = false; }
