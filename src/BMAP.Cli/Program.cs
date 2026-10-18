@@ -437,10 +437,13 @@ try
 
         case "kit":
         {
-            // kit <outDir> [--y -60] [--en]: the in-game verification kit (colour pad + flat / classic / valley builds + pack).
+            // kit <outDir> [--y -60] [--en] [--parts a,b] [--name folder]: the in-game verification kit (colour pad +
+            // builds + pack). Parts: colour_pad, flat, classic, valley_2x2, large_4x4.
             var opts = ParseOptions(args.Skip(2));
             var profile = BMAP.Palette.ColorProfile.LoadBuiltIn();
-            var dir = BMAP.Shading.VerificationKit.Create(args[1], profile, int.Parse(opts.GetValueOrDefault("y", "-60")), opts.ContainsKey("en"));
+            var parts = opts.TryGetValue("parts", out var ps) ? ps.Split(',') : null;
+            var dir = BMAP.Shading.VerificationKit.Create(args[1], profile, int.Parse(opts.GetValueOrDefault("y", "-60")), opts.ContainsKey("en"),
+                parts, opts.GetValueOrDefault("name", "BMAP_verification_kit"));
             Console.WriteLine(dir);
             break;
         }
