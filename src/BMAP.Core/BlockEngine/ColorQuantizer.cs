@@ -112,6 +112,12 @@ public sealed class QuantizeResult
     /// <summary>Height difference for a light step and for a dark step (may differ).</summary>
     public int UpStep { get; init; } = 1;
     public int DownStep { get; init; } = 1;
+    /// <summary>
+    /// The game shades a ±1 step only on every other pixel (light where x + row is odd, dark where it is even) and ±2
+    /// always (measured on Bedrock 1.26.51). Layouts placed on the map grid can then use single steps where the parity
+    /// allows it.
+    /// </summary>
+    public bool ParityShading { get; init; }
 
     public int Get(int x, int y) => EntryIndex[y * Width + x];
     public Shade GetShade(int x, int y) => Shades[y * Width + x];
@@ -120,7 +126,7 @@ public sealed class QuantizeResult
     public QuantizeResult Clone() => new()
     {
         Width = Width, Height = Height, EntryIndex = (int[])EntryIndex.Clone(), Shades = (Shade[])Shades.Clone(),
-        Entries = [.. Entries], Preview = Preview.Clone(), Mode = Mode, Step = Step, UpStep = UpStep, DownStep = DownStep,
+        Entries = [.. Entries], Preview = Preview.Clone(), Mode = Mode, Step = Step, UpStep = UpStep, DownStep = DownStep, ParityShading = ParityShading,
     };
 }
 
@@ -218,7 +224,7 @@ public static partial class ColorQuantizer
         }
         return new QuantizeResult
         {
-            Width = w, Height = h, EntryIndex = idx, Shades = q.Shades, Entries = flat, Preview = q.Preview, Mode = q.Mode, Step = q.Step, UpStep = q.UpStep, DownStep = q.DownStep,
+            Width = w, Height = h, EntryIndex = idx, Shades = q.Shades, Entries = flat, Preview = q.Preview, Mode = q.Mode, Step = q.Step, UpStep = q.UpStep, DownStep = q.DownStep, ParityShading = q.ParityShading,
         };
     }
 
@@ -306,6 +312,7 @@ public static partial class ColorQuantizer
             Width = w, Height = h, EntryIndex = idx, Shades = shades, Entries = entries, Preview = preview,
             Mode = options.Mode == StaircaseMode.Flat ? StaircaseMode.Flat : resultMode, Step = step,
             UpStep = profile.Shades.BuildUp, DownStep = profile.Shades.BuildDown,
+            ParityShading = profile.Shades.Model == BMAP.Shading.ShadingModelKind.Checker,
         };
     }
 

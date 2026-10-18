@@ -89,7 +89,8 @@ public sealed partial class MainViewModel
             var support = SelectedSupportBlock ?? profile.Blocks.First();
             var supports = SupportModeOption.Value;
             var progress = new Progress<int>(p => AnalysisProgress = p);
-            var rows = await Task.Run(() => HeightAdvisor.Analyze(img, profile, selection, options, support, supports, progress: progress));
+            bool grid = UseOrigin;
+            var rows = await Task.Run(() => HeightAdvisor.Analyze(img, profile, selection, options, support, supports, progress: progress, onMapGrid: grid));
             foreach (var r in rows) HeightRows.Add(new HeightRowViewModel(r, L, ApplyHeightOption));
             var rec = rows.Single(r => r.Recommended);
             var flat = rows[0];
@@ -227,7 +228,7 @@ public sealed partial class MainViewModel
     }
 
     private bool _useOrigin = true;
-    public bool UseOrigin { get => _useOrigin; set { if (Set(ref _useOrigin, value)) { Raise(nameof(OriginText)); UpdatePlacement(); } } }
+    public bool UseOrigin { get => _useOrigin; set { if (Set(ref _useOrigin, value)) { Raise(nameof(OriginText)); UpdatePlacement(); ApplyEditsAndLayout(); RefreshPreview(); } } }
     private int _originMapX, _originMapZ, _originY = 64;
     public int OriginMapX { get => _originMapX; set { if (Set(ref _originMapX, value)) Raise(nameof(OriginText)); } }
     public int OriginMapZ { get => _originMapZ; set { if (Set(ref _originMapZ, value)) Raise(nameof(OriginText)); } }

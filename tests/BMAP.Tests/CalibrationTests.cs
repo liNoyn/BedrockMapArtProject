@@ -1,4 +1,4 @@
-﻿using BMAP.Bedrock;
+using BMAP.Bedrock;
 using BMAP.BlockEngine;
 using BMAP.Imaging;
 using BMAP.Nbt;
@@ -52,7 +52,7 @@ public class CalibrationTests
     public void JavaRule_IsMeasuredBack()
     {
         var pad = ShadingTestPad.Create(Profile, Cobble);
-        var drawn = MapSimulator.Simulate(pad.Layout, Profile).Image;
+        var drawn = MapSimulator.Simulate(pad.Layout, WithRule(new ShadeMultipliers())).Image; // a game with Java's rule
         var r = Calibrator.Analyze(pad.Descriptor, FakeMap(drawn), Profile, "test");
         Assert.Equal(0, r.Orientation);
         Assert.Equal(1, r.BrightStep);
@@ -91,7 +91,7 @@ public class CalibrationTests
     [Fact]
     public void ColourPad_ReadsEveryBlock_AndBuildsAVerifiedProfile()
     {
-        var pad = ShadingTestPad.CreateColourPad(Profile, Cobble, 1);
+        var pad = ShadingTestPad.CreateColourPad(Profile, Cobble, Profile.Shades.Step);
         Assert.Equal(0, ShadingAnalyzer.Analyze(pad.Layout, Profile, null).WillFall);
         // The "game" shows white concrete slightly differently from the estimate.
         var game = Profile.WithMeasurements(new Dictionary<string, Dictionary<Shade, string>>

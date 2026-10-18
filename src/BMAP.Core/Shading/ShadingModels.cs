@@ -79,7 +79,7 @@ public sealed record ShadingModel(string Id, string Name, ShadingModelKind Kind,
         new("java-step1", "Java（段差 1）", ShadingModelKind.Threshold, 1, 1, ShadeRounding.FromBase, "Java Edition / BMAP before v0.6"),
         new("step2", "段差 2（gd-codes・Nukkit）", ShadingModelKind.Threshold, 2, 2, ShadeRounding.FromBase, "CloudburstMC/Nukkit Player.java (integer 4/5), gd-codes findYMap (±2)"),
         new("step2-normal", "段差 2・通常色から丸め（gd-codes）", ShadingModelKind.Threshold, 2, 2, ShadeRounding.FromNormal, "gd-codes/mc-pixelart-maker data.js darkPixel / lightPixel"),
-        new("checker", "Java 式の厳密計算（段差 1 は偶奇で交互）", ShadingModelKind.Checker, 2, 2, ShadeRounding.FromBase, "Java MapItem formula with exact arithmetic (parity hypothesis)"),
+        new("checker", "段差 1 は偶奇で交互・2 以上は常に（Bedrock 1.26.51 で実測）", ShadingModelKind.Checker, 2, 2, ShadeRounding.FromBase, "Java MapItem formula with exact arithmetic; measured on Bedrock 1.26.51"),
         new("graded", "段階的（PowerNukkitX）", ShadingModelKind.Graded, 1, 1, ShadeRounding.FromBase, "PowerNukkitX Level.getMapColorAt"),
     ];
 }
