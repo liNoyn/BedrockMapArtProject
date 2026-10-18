@@ -42,6 +42,43 @@ public class DitherTests
     }
 
     [Fact]
+    public void Optimized_IsDeterministic_AndBeatsDiffusionAndKnollFromADistance()
+    {
+        var img = TestHelpers.Gradient(128, 128);
+        foreach (var mode in new[] { StaircaseMode.Flat, StaircaseMode.Valley })
+        {
+            var a = Q(img, new QuantizeOptions { Dither = DitherMode.Optimized, Mode = mode });
+            var b = Q(img, new QuantizeOptions { Dither = DitherMode.Optimized, Mode = mode });
+            Assert.Equal(a.EntryIndex, b.EntryIndex);
+            double opt = HeightAdvisor.DistanceDeltaE2000(img, a.Preview);
+            Assert.True(opt < HeightAdvisor.DistanceDeltaE2000(img, Q(img, new QuantizeOptions { Dither = DitherMode.FloydSteinberg, Mode = mode }).Preview));
+            Assert.True(opt < HeightAdvisor.DistanceDeltaE2000(img, Q(img, new QuantizeOptions { Dither = DitherMode.KnollBayer, Mode = mode }).Preview));
+        }
+    }
+
+    [Fact]
+    public void Optimized_KeepsAnExactColourFlat()
+    {
+        // A colour the palette has exactly needs no mixing: no noise may be added.
+        var colour = Profile.ColorOf(Profile.Find("red_wool")!, Shade.Normal);
+        var q = Q(RgbaImage.Filled(64, 64, colour), new QuantizeOptions { Dither = DitherMode.Optimized, Mode = StaircaseMode.Valley });
+        Assert.Single(q.EntryIndex.Distinct());
+        Assert.All(q.Shades, s => Assert.Equal(Shade.Normal, s));
+    }
+
+    [Fact]
+    public void Optimized_WithAHeightLimit_KeepsTheStaircaseWithinTheLimit()
+    {
+        var img = TestHelpers.Gradient(128, 128);
+        var o = new QuantizeOptions { Dither = DitherMode.Optimized, Mode = StaircaseMode.Valley, MaxHeight = 4 };
+        var q = Q(img, o);
+        var fs = Q(img, o with { Dither = DitherMode.FloydSteinberg });
+        // Only same-shade swaps: the shades (and so the heights) are those of the diffusion it started from.
+        Assert.Equal(fs.Shades, q.Shades);
+        Assert.True(HeightAdvisor.DistanceDeltaE2000(img, q.Preview) < HeightAdvisor.DistanceDeltaE2000(img, fs.Preview));
+    }
+
+    [Fact]
     public void Knoll_MixesTwoColoursForAColourBetweenThem()
     {
         // Halfway (in linear light) between white and black concrete: both must appear, in similar amounts.

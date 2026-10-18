@@ -48,6 +48,12 @@ renderer are implemented in the project without further libraries.
   contrast, saturation, gamma, sharpen. Transparency: blend, dither, or keep (no block).
 - Colour distance: Oklab (default), CIELAB ΔE76, CIEDE2000, weighted RGB, RGB. Resizing in linear light.
 - **Dithering**
+  - **Optimised** (default, recommended): starts from error diffusion and changes one pixel at a time to whichever map
+    colour brings the picture closest to the source (the idea of direct binary search). The difference is measured per
+    pixel and blurred by 1 and 2 pixels (the colour seen from a distance), so pale colours the palette lacks are mixed
+    closely while flat areas and lines stay clean. About 40 % lower colour error than error diffusion (mean of 7 images:
+    staircase 1.81 → 1.08, flat 2.95 → 2.00, height limit 4: 2.18 → 1.63). With a height limit only pixels of the same shade
+    are swapped, so the staircase stays as planned. Lower "dither strength" mixes less and looks sharper.
   - Error diffusion: Floyd–Steinberg, Jarvis–Judice–Ninke, Burkes, Sierra Lite, Stucki, Atkinson. The error is diffused
     **in linear light** (default), so dithered areas keep their brightness when seen from a distance; serpentine scan and
     adjustable strength.

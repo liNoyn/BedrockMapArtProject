@@ -227,7 +227,8 @@ public sealed class Loc : INotifyPropertyChanged
         ["PrNeedsFix"] = ("要修正", "Needs fixing"),
         ["ExportMaterials"] = ("素材リストを CSV で保存…", "Save material list as CSV…"),
 
-        ["DitherKnollBayer"] = ("Knoll パターン（Bayer 8x8・おすすめの規則ディザ）", "Knoll pattern (Bayer 8x8, recommended ordered)"),
+        ["DitherKnollBayer"] = ("Knoll パターン（Bayer 8x8・規則的な模様）", "Knoll pattern (Bayer 8x8, regular pattern)"),
+        ["DitherOptimized"] = ("最適化（おすすめ・元画像に一番近い）", "Optimised (recommended, closest to the source)"),
         ["DitherKnollBlue"] = ("Knoll パターン（ブルーノイズ）", "Knoll pattern (blue noise)"),
         ["DitherBlueNoise"] = ("ブルーノイズ 64x64", "Blue noise 64x64"),
         ["LinearDiffusion"] = ("リニア光でディザ（遠目の明るさが正確）", "Dither in linear light (accurate brightness from afar)"),

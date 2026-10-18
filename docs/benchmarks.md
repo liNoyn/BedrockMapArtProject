@@ -71,3 +71,28 @@ instead of tracing a ray for every face, and stores occupancy per column instead
 - G. Sharma, W. Wu, E. Dalal, "The CIEDE2000 color-difference formula", Color Research & Application, 2005.
 - S. Abasi, M. Amani Tehran, M. Fairchild, "Distance metrics for very large color differences", Color Research &
   Application, 2020 ([HyAB in the colour library](https://colour.readthedocs.io/en/latest/generated/colour.difference.delta_E_HyAB.html)).
+
+## Optimised dithering (v0.9.0)
+
+Measured with `convert <image> <out.png> --dither ...` on 7 images (an anime illustration with pale pink hair and skin,
+which the palette lacks — the nearest map colour is ΔE2000 ≈ 10 away — plus the 6 panoramas), one map each, means:
+
+| configuration | per-pixel ΔE2000 | linΔE2000 | ms |
+|---|---:|---:|---:|
+| Valley, Knoll Bayer (linear) | 8.13 | 2.38 | 233 |
+| Valley, Floyd–Steinberg (linear) | 7.41 | 1.81 | 78 |
+| **Valley, Optimised** | 7.69 | **1.08** | 192 |
+| Flat, Knoll Bayer | 10.43 | 3.39 | 103 |
+| Flat, Floyd–Steinberg | 9.38 | 2.95 | 44 |
+| **Flat, Optimised** | 9.55 | **2.00** | 127 |
+| Valley ≤ 4, Floyd–Steinberg | 8.09 | 2.18 | 77 |
+| **Valley ≤ 4, Optimised** | 8.29 | **1.63** | 155 |
+
+- The optimiser minimises `w0·|e|² + |G1 * e|² + |G2 * e|²` (e = map − source, G = Gaussians with σ 1 and 2) by
+  single-pixel swaps among the 16 candidates closest to the source colour, in linear light, with errors in dark tones
+  weighted up by (Y / 0.5)^-0.5. The per-pixel term w0 is the "dither strength" (0.05 at 100 %, 0.6 at 0 %).
+- Working space: linear light beat Oklab and sRGB values (anime image: linΔE2000 2.24 vs 4.17 / 3.32 at the same w0).
+  The dark weighting changed little (1.066–1.093), 0.5 kept for slightly lower per-pixel error.
+- Starting from Floyd–Steinberg or Knoll gives the same result (2.24 / 2.25); 32 candidates instead of 16 gains 1 %
+  at twice the time. 4 × 4 maps take 1.4 s.
+- On the anime image the old default Knoll gave linΔE2000 3.88, Optimised 1.49: the hair stays pink instead of grey.

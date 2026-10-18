@@ -28,6 +28,11 @@ public enum DitherMode
     KnollBayer,
     /// <summary>Knoll's pattern dithering with the blue-noise matrix.</summary>
     KnollBlueNoise,
+    /// <summary>
+    /// Error diffusion followed by direct optimisation of the whole picture (<see cref="ColorQuantizer.Refine"/>):
+    /// the closest match to the source at every viewing distance. Slower.
+    /// </summary>
+    Optimized,
 }
 
 /// <summary>How heights are used for shading (MapartCraft's "3D" setting).</summary>
@@ -91,6 +96,8 @@ public sealed record QuantizeOptions
     public bool LinearDiffusion { get; init; } = true;
     /// <summary>Pixels with alpha below this become empty (no block). Only relevant when transparency is kept.</summary>
     public int AlphaThreshold { get; init; } = 128;
+    /// <summary>Optimise the result directly afterwards (see <see cref="ColorQuantizer.Refine"/>); null = off.</summary>
+    public RefineSettings? Refine { get; init; }
 }
 
 /// <summary>A palette entry in one particular shade, i.e. one reachable map colour.</summary>
@@ -245,9 +252,12 @@ public static partial class ColorQuantizer
         var idx = new int[n];
         var shades = new Shade[n];
         var preview = new RgbaImage(w, h);
+        var chosen = new int[n];
+        Array.Fill(chosen, -1);
 
         void Assign(int i, int c)
         {
+            chosen[i] = c;
             var cand = candidates[c];
             idx[i] = cand.Entry;
             shades[i] = cand.Shade;
@@ -259,6 +269,14 @@ public static partial class ColorQuantizer
 
         bool IsEmpty(int i) => image.Pixels[i * 4 + 3] < options.AlphaThreshold;
 
+        // Optimised: start from linear-light Floyd–Steinberg, then optimise. The strength slider trades mixing
+        // (closer colours from a distance) against calm, sharp pixels.
+        if (options.Dither == DitherMode.Optimized)
+            options = options with
+            {
+                Dither = DitherMode.FloydSteinberg, DitherStrength = 1,
+                Refine = options.Refine ?? new RefineSettings { PixelWeight = 0.05 + (1 - Math.Clamp(options.DitherStrength, 0, 1)) * 0.55 },
+            };
         var ordered = OrderedMatrix(options.Dither);
         var knoll = KnollMatrix(options.Dither);
         if (options.HeightLimited && (options.Dither == DitherMode.None || ordered != null || knoll != null))
@@ -305,6 +323,13 @@ public static partial class ColorQuantizer
         else
         {
             ErrorDiffuse(image, w, h, options, new NearestMatcher(candidates, options.Metric), candidates, IsEmpty, idx, shades, Assign, ct);
+        }
+
+        if (options.Refine is { } refine)
+        {
+            // With a height limit or a shade penalty only same-shade swaps are allowed, so the staircase stays as planned.
+            Refine(image, w, h, candidates, chosen, options.HeightLimited || options.ShadePenalty > 0, refine, ct);
+            for (int i = 0; i < n; i++) if (chosen[i] >= 0) Assign(i, chosen[i]);
         }
 
         return new QuantizeResult

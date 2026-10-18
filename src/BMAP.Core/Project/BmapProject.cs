@@ -33,7 +33,7 @@ public sealed class BmapProject
     // Block construction
     public string ColorProfileId { get; set; } = ColorProfile.DefaultId;
     public ColorMetric Metric { get; set; } = ColorMetric.Oklab;
-    public DitherMode Dither { get; set; } = DitherMode.None;
+    public DitherMode Dither { get; set; } = DitherMode.Optimized;
     public double DitherStrength { get; set; } = 1.0;
     /// <summary>Maximum staircase height (0 = unlimited).</summary>
     public int MaxHeight { get; set; }
