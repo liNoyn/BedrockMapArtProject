@@ -118,3 +118,37 @@ light + 0.1 × Oklab contrast of the pair × 2√(t(1−t))) plus its nearest co
   mix from far colours (pale pink hair turned beige), so it was dropped in favour of pairs.
 - Contrast penalties 0.07–0.15 were close; 0.25 and above lost colour (far error ×2–3). The strength slider raises it.
 - Speed: one map 0.2 s, 4 × 4 maps 1.2 s.
+## Larger corpus, triples, hue-aware mixes (v0.11.0)
+
+Corpus: 21 illustrations (the user's test set), 8 Kodak photos, 8 flat pale colours the palette lacks; one map each,
+centre-cropped, Valley. `speckle` = extra local contrast the map adds over the source (Oklab × 100, neighbouring
+pixels): the roughness people see up close, which blur-based scores reward instead of punishing.
+
+| setting | group | px | near | far | speckle |
+|---|---|---:|---:|---:|---:|
+| Floyd–Steinberg | illustrations | 8.23 | 3.62 | 2.57 | 3.84 |
+| v0.10 (pairs) | illustrations | 7.76 | 3.19 | 2.32 | 4.32 |
+| **v0.11** | illustrations | **7.45** | 3.58 | 2.50 | **3.54** |
+| Floyd–Steinberg | photos | 7.94 | 2.10 | 0.97 | 3.37 |
+| v0.10 (pairs) | photos | 7.70 | 2.47 | 1.38 | 3.03 |
+| **v0.11** | photos | **7.31** | 2.72 | 1.38 | **2.61** |
+| v0.10 (pairs) | flat pale colours | 14.53 | 7.11 | 6.70 | 8.78 |
+| **v0.11** | flat pale colours | 13.03 | **5.77** | **5.02** | 8.76 |
+
+What changed and why:
+- **Triples**: colours inside a triangle of map colours can be matched exactly; at equal speckle the far error dropped.
+- **Pair partners from all colours** (12 closest × any partner) and the best partners in the triple search: a pale
+  pink needs pink wool, which is nowhere near it in linear light.
+- **Off-hue penalty** (0.5 × distance from the target's hue line): salmon orange was mixed from pure red (redstone
+  block) and yellow — right on average, loud dots. A penalty on per-pixel distance instead fixed that but turned pale
+  pink hair grey, so it was replaced by the hue-line distance (white and pink lie on the pink hue line).
+- **Quadratic contrast penalty** (0.05 × spread²): white with emerald for a pale green is now avoided; 0.2+ flattened
+  pale colours too much.
+- Blur σ 1.5 instead of 1.0 in the optimiser: less speckle at the same far error.
+- Very pale tints (ΔE ≈ 10 from white, e.g. #F6DFDE) still become white/grey: any mix is rougher than the tint.
+- Photos: Floyd–Steinberg stays closer from a distance; v0.11 is calmer pixel by pixel.
+
+Block selection: "Recommended (no support, all colours)" — the first block per colour set that needs no support and
+does not fall — gives the same results as "one block per colour" on the whole corpus (illustrations identical, photos
+within 0.04) with fewer support blocks; only the grass colour (slime) still needs support. It is now the first preset.
+The survival preset lacks colours and is worse (illustrations far 2.84 vs 2.50).

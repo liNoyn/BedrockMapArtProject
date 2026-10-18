@@ -251,6 +251,8 @@ try
                     PerceptualWeight = double.Parse(opts.GetValueOrDefault("ow", "0"), System.Globalization.CultureInfo.InvariantCulture),
                     Radius = double.Parse(opts.GetValueOrDefault("rad", "0"), System.Globalization.CultureInfo.InvariantCulture),
                     PairLambda = double.Parse(opts.GetValueOrDefault("pair", "0"), System.Globalization.CultureInfo.InvariantCulture),
+                    TriplePool = int.Parse(opts.GetValueOrDefault("tri", "0")),
+                    ChromaSpread = double.Parse(opts.GetValueOrDefault("kc", "1"), System.Globalization.CultureInfo.InvariantCulture),
                 } : null,
             };
             var sw = System.Diagnostics.Stopwatch.StartNew();

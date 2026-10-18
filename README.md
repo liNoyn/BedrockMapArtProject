@@ -52,7 +52,9 @@ renderer are implemented in the project without further libraries.
     colour brings the picture closest to the source (the idea of direct binary search). The difference is measured per
     pixel and blurred by 1 and 2 pixels (the colour seen from a distance). Colours the palette lacks are mixed from the
     best **pair** of map colours only — the closest blend with the least contrast (pale lavender from white and ice, not
-    white, blue, pink and yellow dots) — so areas look calm up close and keep their hue. Against MapartCraft on the same
+    white, blue, pink and yellow dots), or a triple for colours inside a triangle of map colours. Mixes with strong
+    contrast (white with emerald) or colours off the target hue (red and yellow for salmon) are avoided, so areas look
+    calm up close and keep their hue. Against MapartCraft on the same
     source: colour error up close 4.89 → 2.91, from a distance 3.69 → 1.83. With a height limit only pixels of the same
     shade are swapped, so the staircase stays as planned. Lower "dither strength" mixes less and looks sharper.
   - Error diffusion: Floyd–Steinberg, Jarvis–Judice–Ninke, Burkes, Sierra Lite, Stucki, Atkinson. The error is diffused

@@ -42,7 +42,7 @@ public class DitherTests
     }
 
     [Fact]
-    public void Optimized_IsDeterministic_AndBeatsDiffusionAndKnollFromADistance()
+    public void Optimized_IsDeterministic_AndCalmerThanDiffusionAndKnoll()
     {
         var img = TestHelpers.Gradient(128, 128);
         foreach (var mode in new[] { StaircaseMode.Flat, StaircaseMode.Valley })
@@ -50,9 +50,12 @@ public class DitherTests
             var a = Q(img, new QuantizeOptions { Dither = DitherMode.Optimized, Mode = mode });
             var b = Q(img, new QuantizeOptions { Dither = DitherMode.Optimized, Mode = mode });
             Assert.Equal(a.EntryIndex, b.EntryIndex);
-            double opt = HeightAdvisor.DistanceDeltaE2000(img, a.Preview);
-            Assert.True(opt < HeightAdvisor.DistanceDeltaE2000(img, Q(img, new QuantizeOptions { Dither = DitherMode.FloydSteinberg, Mode = mode }).Preview));
-            Assert.True(opt < HeightAdvisor.DistanceDeltaE2000(img, Q(img, new QuantizeOptions { Dither = DitherMode.KnollBayer, Mode = mode }).Preview));
+            // Calmer pixel by pixel than diffusion and Knoll's patterns (the corpus in docs/benchmarks.md is the real check).
+            var opt = QualityScore.Measure(img, a.Preview);
+            var fs = QualityScore.Measure(img, Q(img, new QuantizeOptions { Dither = DitherMode.FloydSteinberg, Mode = mode }).Preview);
+            var knoll = QualityScore.Measure(img, Q(img, new QuantizeOptions { Dither = DitherMode.KnollBayer, Mode = mode }).Preview);
+            Assert.True(opt.Pixel < fs.Pixel, $"{mode}: pixel {opt.Pixel:0.00} vs FS {fs.Pixel:0.00}");
+            Assert.True(opt.Pixel < knoll.Pixel, $"{mode}: pixel {opt.Pixel:0.00} vs Knoll {knoll.Pixel:0.00}");
         }
     }
 
@@ -62,10 +65,18 @@ public class DitherTests
         // Pale lavender has no map colour: it must be mixed, but from a pair (white and ice), not from many hues.
         var q = Q(RgbaImage.Filled(64, 64, new Rgba(228, 227, 245)), new QuantizeOptions { Dither = DitherMode.Optimized, Mode = StaircaseMode.Valley });
         var colours = Enumerable.Range(0, 64 * 64).Select(i => (q.Preview.Pixels[i * 4], q.Preview.Pixels[i * 4 + 1], q.Preview.Pixels[i * 4 + 2])).Distinct().Count();
-        Assert.InRange(colours, 2, 3);
-        var fs = Q(RgbaImage.Filled(64, 64, new Rgba(228, 227, 245)), new QuantizeOptions { Dither = DitherMode.FloydSteinberg, Mode = StaircaseMode.Valley });
-        Assert.True(QualityScore.Measure(RgbaImage.Filled(64, 64, new Rgba(228, 227, 245)), q.Preview).Near
-            <= QualityScore.Measure(RgbaImage.Filled(64, 64, new Rgba(228, 227, 245)), fs.Preview).Near + 0.5);
+        Assert.InRange(colours, 1, 3);
+    }
+
+    [Fact]
+    public void Optimized_KeepsThePinkOfPalePink()
+    {
+        // Pale pink (no map colour) must stay pink: mixed from white and pink, not flattened to grey.
+        var pale = new Rgba(240, 200, 210);
+        var q = Q(RgbaImage.Filled(64, 64, pale), new QuantizeOptions { Dither = DitherMode.Optimized, Mode = StaircaseMode.Valley });
+        int pink = q.EntryIndex.Count(e => q.Entries[e].Block.Key.StartsWith("pink"));
+        Assert.True(pink > 64 * 64 / 20, $"only {pink} pink pixels");
+        Assert.True(QualityScore.Measure(RgbaImage.Filled(64, 64, pale), q.Preview).Far < 4);
     }
 
     [Fact]

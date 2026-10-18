@@ -45,7 +45,12 @@ public class BlockTests
     public void Presets_PickOneBlockPerColourSet()
     {
         Assert.Equal(63, Presets[0].Keys.Count); // wool slab colours are not selected by default (third-party, unverified)
-        var survival = Presets[1].ToSelection().Resolve(Profile);
+        // The recommended default covers the same colour sets as "one block per colour", without support blocks where possible.
+        var one = Presets.Single(p => p.NameEn == "One block per colour");
+        Assert.Equal(one.Keys.Count, Presets[0].Keys.Count);
+        var recommended = Presets[0].ToSelection().Resolve(Profile);
+        Assert.True(recommended.Count(e => e.Block.NeedsSupport || e.Block.Gravity) < one.ToSelection().Resolve(Profile).Count(e => e.Block.NeedsSupport || e.Block.Gravity));
+        var survival = Presets.Single(p => p.NameEn == "Survival friendly").ToSelection().Resolve(Profile);
         Assert.DoesNotContain(survival, e => e.Block.Gravity || e.Block.NeedsSupport || e.Block.Rarity > 1);
         Assert.All(Presets.Single(p => p.NameEn == "Carpets").Keys, k => Assert.EndsWith("_carpet", k));
         Assert.Empty(Presets.Single(p => p.NameEn == "None").Keys);
