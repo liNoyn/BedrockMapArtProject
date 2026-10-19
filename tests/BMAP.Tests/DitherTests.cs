@@ -84,6 +84,31 @@ public class DitherTests
     }
 
     [Theory]
+    [InlineData("#FEBCD7")]
+    [InlineData("#F9A8C9")]
+    [InlineData("#B8C0FF")]
+    [InlineData("#D5AAFF")]
+    public void Optimized_KeepsTheColourOfLightPastels(string hex)
+    {
+        // Light pastels lie outside what pink (or blue) and white can mix at their lightness. In linear light the
+        // lightness errors of pale colours are numerically large, so the optimiser used to add white until the
+        // lightness matched and lost a third of the colour (a user's light pink cushion looked pale). Chroma errors now
+        // weigh more (ChromaWeight): the mean colour must keep most of the source's chroma.
+        var src = RgbaImage.Filled(64, 64, Rgba.FromHex(hex));
+        var q = Q(src, new QuantizeOptions { Dither = DitherMode.Optimized, Mode = StaircaseMode.Classic });
+        double r = 0, g = 0, b = 0;
+        for (int i = 0; i < 64 * 64; i++)
+        {
+            r += ColorMath.SrgbToLinear(q.Preview.Pixels[i * 4]); g += ColorMath.SrgbToLinear(q.Preview.Pixels[i * 4 + 1]); b += ColorMath.SrgbToLinear(q.Preview.Pixels[i * 4 + 2]);
+        }
+        var mean = ColorMath.LinearToOklab(r / 4096, g / 4096, b / 4096);
+        var c = Rgba.FromHex(hex);
+        var s = ColorMath.ToOklab(c.R, c.G, c.B);
+        double cm = Math.Sqrt(mean.A * mean.A + mean.B * mean.B), cs = Math.Sqrt(s.A * s.A + s.B * s.B);
+        Assert.True(cm > 0.85 * cs, $"{hex}: chroma {cm:0.000} of {cs:0.000}");
+    }
+
+    [Theory]
     [InlineData("#EED0D4")]
     [InlineData("#ECD4D4")]
     [InlineData("#EDD1D6")]

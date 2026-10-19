@@ -61,6 +61,24 @@ public static partial class ColorQuantizer
             var v = Vec(image.Pixels[i * 4], image.Pixels[i * 4 + 1], image.Pixels[i * 4 + 2]);
             ov[i * 3] = v[0]; ov[i * 3 + 1] = v[1]; ov[i * 3 + 2] = v[2];
         }
+        // Colour (chroma) errors count ChromaWeight times as much as grey-axis errors: every vector is scaled by √k across
+        // the grey axis (1,1,1), so |e|² becomes |e along grey|² + k·|e across grey|². In linear light, errors in the
+        // lightness of pale colours are numerically large, so without this a light pink was mixed with too much white:
+        // lightness right, a third of its colour gone.
+        if (settings.ChromaWeight != 1 && settings.Space != RefineSpace.Oklab)
+        {
+            float s = (float)Math.Sqrt(Math.Max(0, settings.ChromaWeight));
+            void Scale(float[] a, int count)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    float m = (a[i * 3] + a[i * 3 + 1] + a[i * 3 + 2]) / 3;
+                    a[i * 3] = m + s * (a[i * 3] - m); a[i * 3 + 1] = m + s * (a[i * 3 + 1] - m); a[i * 3 + 2] = m + s * (a[i * 3 + 2] - m);
+                }
+            }
+            Scale(cv, nc);
+            Scale(ov, n);
+        }
         // Per-pixel weight: the eye sees the same difference in light better in dark tones (lightness ~ Y^(1/3)), so
         // errors are scaled by (Y / 0.5)^(-p) with Y the source luminance (linear space only).
         var sw = new float[n];
@@ -653,6 +671,8 @@ public sealed record RefineSettings
     /// as plain grey is close by distance but has lost its colour.
     /// </summary>
     public double PlanChroma { get; init; }
+    /// <summary>Weight of colour (chroma) errors relative to errors along the grey axis in the optimiser (1 = plain).</summary>
+    public double ChromaWeight { get; init; } = 1;
     /// <summary>Quadratic part of the mix contrast penalty.</summary>
     public double PairQuad { get; init; }
     /// <summary>Plans within this cost of the best one also lend their colours (smooth transitions between plans).</summary>
