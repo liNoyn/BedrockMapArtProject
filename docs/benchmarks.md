@@ -249,3 +249,25 @@ refinement then set pw 0.02, ow 0.08, pair 0.1, hue 0.3, σ1 1, quad 0.25, dark 
 | **v0.14.1** | photos | 7.73 | **1.72** | **0.55** | 3.70 | **0.07** |
 | v0.13 | flat colours (16) | 15.14 | 3.40 | 2.29 | 13.43 | 0.88 |
 | **v0.14.1** | flat colours (16) | 14.27 | **2.95** | **2.04** | 12.83 | **0.36** |
+
+## Calm flat colours (v0.15.1)
+
+The user compared v0.14.1 with an early output of the same illustration and found the early one closer: its purple was
+plain ice (one block), ours a two-shade texture of ice and dark ice that is closer on average (Oklab 0.007 vs 0.046)
+but reads as noise up close. Plan costs now weigh lightness by PlanLightness (0.5) and add MixCost (0.01) to every mix:
+a single colour that only differs in lightness stays solid, while colours that would lose their hue (pale pinks,
+lavender) still mix. Grid over the corpus (lightness 0.4-0.7, mix cost 0.005-0.015) shows a smooth trade between
+accuracy from afar and grain; 0.5 / 0.01 keeps pastels and solid purples and was preferred by eye. One map, Valley:
+
+| setting | group | px | near | far | speckle | fade |
+|---|---|---:|---:|---:|---:|---:|
+| Floyd–Steinberg | illustrations | 7.84 | 3.33 | 2.31 | 3.36 | 0.39 |
+| v0.14.1 | illustrations | 8.04 | 2.18 | 0.95 | 5.24 | 0.12 |
+| **v0.15.1** | illustrations | **7.37** | 2.84 | 1.61 | **3.99** | 0.22 |
+| v0.14.1 | photos | 7.73 | 1.72 | 0.55 | 3.70 | 0.07 |
+| **v0.15.1** | photos | **7.07** | 2.35 | 1.18 | **2.87** | 0.17 |
+| v0.14.1 | flat colours (16) | 14.27 | 2.95 | 2.04 | 12.83 | 0.36 |
+| **v0.15.1** | flat colours (16) | **13.24** | 3.33 | 2.51 | **11.11** | **0.28** |
+
+The far and near scores rise (blur-based scores reward any mix that gets the average right); per-pixel error and
+grain fall, which matches what users judged closer. The dither strength slider still goes calmer.
