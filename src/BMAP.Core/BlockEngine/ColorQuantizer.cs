@@ -279,9 +279,9 @@ public static partial class ColorQuantizer
                 Dither = DitherMode.FloydSteinberg, DitherStrength = 1,
                 Refine = options.Refine ?? new RefineSettings
                 {
-                    PixelWeight = 0.03 + calm * 0.37, PerceptualWeight = 0.05 + calm * 0.15, PairLambda = 0.08 + calm * 0.32, Neighbours = 24,
-                    TriplePool = 16, PlanHue = 0.4 + calm, PlanChroma = 1, PlanPixel = calm * 0.5, PairQuad = 0.5 + calm * 2.5, HueTolerance = 0.03,
-                    Sigma1 = 1.25, Sigma2 = 3, Weight2 = 2, Denoise = 4, SwapPasses = 2,
+                    PixelWeight = 0.02 + calm * 0.38, PerceptualWeight = 0.08 + calm * 0.12, PairLambda = 0.1 + calm * 0.3, Neighbours = 24,
+                    TriplePool = 16, PlanHue = 0.3 + calm, PlanChroma = 1, PlanPixel = calm * 0.5, PairQuad = 0.25 + calm * 2.75, HueTolerance = 0.03,
+                    Sigma1 = 1, Sigma2 = 3, Weight2 = 2, DarkWeight = 0.3, ChromaWeight = 12, Denoise = 4, SwapPasses = 2,
                 },
             };
         }

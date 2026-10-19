@@ -226,3 +226,26 @@ Same output bit for bit (hashes of 21 conversions: 1, 2 and 4 maps square; Valle
 the optimiser's error spreading runs on SIMD rows, the nearest-colour lists that the mix plans replace are no longer
 built, the bilateral filter uses a weight table, and the nearest-colour search has a fast path for Oklab. Optimized,
 4 x 4 maps (512 x 512): 1.28–1.67 s → 0.47–0.59 s.
+
+## Light pastels keep their colour (v0.14.1)
+
+A user's light pink cushion (#FEBCD7) looked pale. Measured over that area: lightness right (Oklab L 0.869 vs 0.861) but
+chroma 0.060 vs 0.085, a third of the colour gone. Light pink lies outside what pink wool and white can mix at its
+lightness, and in linear light the lightness errors of pale colours are numerically large, so the optimiser kept adding
+white. New setting ChromaWeight (12): errors across the grey axis count 12 times (every vector is scaled by √k across
+(1,1,1), so the optimiser itself is unchanged). The cushion now has chroma 0.071 at L 0.852 (0.087 averaged in Oklab).
+
+New corpus additions: the cushion image and 8 more pastel solids (light pink, pink, periwinkle, mint, peach, baby blue,
+cream, lilac); new metric "fade" = Oklab chroma the map lacks after a σ 2 blur (x100). A 40-point random search plus a
+refinement then set pw 0.02, ow 0.08, pair 0.1, hue 0.3, σ1 1, quad 0.25, dark weight 0.3. One map, Valley:
+
+| setting | group | px | near | far | speckle | fade |
+|---|---|---:|---:|---:|---:|---:|
+| Floyd–Steinberg | illustrations | 7.84 | 3.33 | 2.31 | 3.36 | 0.39 |
+| v0.13 | illustrations | 7.93 | 2.46 | 1.16 | 4.82 | 0.17 |
+| **v0.14.1** | illustrations | 8.04 | **2.18** | **0.95** | 5.24 | **0.12** |
+| Floyd–Steinberg | photos | 7.65 | 1.87 | 0.77 | 3.44 | 0.11 |
+| v0.13 | photos | 7.67 | 1.98 | 0.67 | 3.43 | 0.11 |
+| **v0.14.1** | photos | 7.73 | **1.72** | **0.55** | 3.70 | **0.07** |
+| v0.13 | flat colours (16) | 15.14 | 3.40 | 2.29 | 13.43 | 0.88 |
+| **v0.14.1** | flat colours (16) | 14.27 | **2.95** | **2.04** | 12.83 | **0.36** |
