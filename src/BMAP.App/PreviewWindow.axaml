@@ -5,7 +5,7 @@
         x:DataType="vm:MainViewModel"
         Title="{Binding L[ZoomTitle]}"
         Icon="/Assets/bmap.ico"
-        Width="1100" Height="900" MinWidth="480" MinHeight="400">
+        Width="1100" Height="900" MinWidth="240" MinHeight="200">
 
   <!-- The map preview enlarged: fit to the window, or zoom in with the wheel and drag to pan. -->
   <DockPanel>

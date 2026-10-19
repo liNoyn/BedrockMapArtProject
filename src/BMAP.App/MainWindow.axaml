@@ -8,20 +8,21 @@
         x:DataType="vm:MainViewModel"
         Title="Bedrock Map Art Project"
         Icon="/Assets/bmap.ico"
-        Width="1600" Height="980" MinWidth="1150" MinHeight="680"
+        Width="1600" Height="980" MinWidth="480" MinHeight="360"
         DragDrop.AllowDrop="True">
 
   <!-- MapartCraft layout: block selection | map preview + materials | settings + green buttons. -->
   <DockPanel>
 
     <!-- Header -->
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="12,6,12,2">
-      <StackPanel Orientation="Horizontal" Spacing="10">
-        <TextBlock Classes="h1" Text="Bedrock Map Art Project" VerticalAlignment="Center" />
-        <TextBlock Text="{Binding ProjectName}" Opacity="0.55" VerticalAlignment="Bottom" Margin="0,0,0,3" MaxWidth="320"
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,2*" Margin="12,6,12,2">
+      <!-- Title and project name shorten with "…" when the window is narrow. -->
+      <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Left">
+        <TextBlock Classes="h1" Text="Bedrock Map Art Project" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        <TextBlock Grid.Column="1" Text="{Binding ProjectName}" Opacity="0.55" VerticalAlignment="Bottom" Margin="10,0,0,3" MaxWidth="320"
                    TextTrimming="CharacterEllipsis" />
-      </StackPanel>
-      <WrapPanel Grid.Column="2" VerticalAlignment="Center">
+      </Grid>
+      <WrapPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0,0,0">
         <Button Classes="link" Content="{Binding L[OpenImage]}" Command="{Binding OpenImageCommand}" />
         <Button Classes="link" Content="{Binding L[NewProject]}" Command="{Binding NewProjectCommand}" />
         <Button Classes="link" Content="{Binding L[OpenProject]}" Command="{Binding OpenProjectCommand}" />
@@ -50,15 +51,24 @@
       </DockPanel>
     </Border>
 
-    <Grid ColumnDefinitions="*,4,600,4,330">
+    <!-- Columns share the width in proportion (about 660 / 600 / 330 px at 1600 px) and every splitter can make them
+         as narrow as 100 px, so the window can be shrunk freely. -->
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="6.6*" MinWidth="100" />
+        <ColumnDefinition Width="4" />
+        <ColumnDefinition Width="6*" MinWidth="100" />
+        <ColumnDefinition Width="4" />
+        <ColumnDefinition Width="3.3*" MinWidth="100" />
+      </Grid.ColumnDefinitions>
 
       <!-- ===================== Block selection ===================== -->
       <DockPanel Margin="10,4,6,6">
         <StackPanel DockPanel.Dock="Top" Spacing="3">
           <TextBlock Classes="h2" Text="{Binding L[SecBlocks]}" />
-          <StackPanel Orientation="Horizontal" Spacing="4">
+          <WrapPanel Classes="tools">
             <TextBlock Classes="lbl" Text="{Binding L[Preset]}" />
-            <ComboBox ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}" MinWidth="190">
+            <ComboBox ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}" MinWidth="120">
               <ComboBox.ItemTemplate>
                 <DataTemplate x:DataType="pb:BlockPreset">
                   <TextBlock Text="{Binding Label}" />
@@ -68,13 +78,13 @@
             <Button Classes="small" Content="{Binding L[Load]}" Command="{Binding ApplyPresetCommand}" />
             <Button Classes="small" Content="{Binding L[DeletePreset]}" Command="{Binding DeletePresetCommand}" />
             <Button Classes="small" Content="{Binding L[Save]}" Command="{Binding SavePresetCommand}" />
-          </StackPanel>
-          <StackPanel Orientation="Horizontal" Spacing="4">
+          </WrapPanel>
+          <WrapPanel Classes="tools">
             <Button Classes="small" Content="{Binding L[SelectAll]}" Command="{Binding SelectAllBlocksCommand}" />
             <Button Classes="small" Content="{Binding L[ClearAll]}" Command="{Binding ClearAllBlocksCommand}" />
-            <ComboBox ItemsSource="{Binding Mixings}" SelectedItem="{Binding MixingOption}" MinWidth="200" ToolTip.Tip="{Binding L[MixingHint]}" />
-            <TextBlock Text="{Binding PaletteSummary}" FontWeight="Bold" Foreground="#A6D8AA" VerticalAlignment="Center" Margin="6,0,0,0" />
-          </StackPanel>
+            <ComboBox ItemsSource="{Binding Mixings}" SelectedItem="{Binding MixingOption}" MinWidth="120" ToolTip.Tip="{Binding L[MixingHint]}" />
+            <TextBlock Text="{Binding PaletteSummary}" FontWeight="Bold" Foreground="#A6D8AA" VerticalAlignment="Center" />
+          </WrapPanel>
           <Button Content="{Binding L[DownloadTextures]}" Command="{Binding DownloadTexturesCommand}" Classes="green"
                   IsVisible="{Binding TexturesMissing}" HorizontalAlignment="Left" />
         </StackPanel>
@@ -185,18 +195,18 @@
               </Button>
             </Grid>
           </Border>
-          <Grid ColumnDefinitions="*,Auto,Auto">
-            <TextBlock Text="{Binding OutputSizeText}" FontSize="12" VerticalAlignment="Center" />
-            <Button Grid.Column="2" x:Name="ZoomButton" Classes="small" Content="{Binding L[ZoomPreview]}" ToolTip.Tip="{Binding L[ZoomPreviewTip]}"
-                    IsEnabled="{Binding HasPreview}" Margin="6,0,0,0" VerticalAlignment="Center" />
-            <ListBox Grid.Column="1" Classes="tabs" ItemsSource="{Binding PreviewModes}" SelectedItem="{Binding SelectedPreviewMode}">
+          <WrapPanel Classes="tools">
+            <TextBlock Text="{Binding OutputSizeText}" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,2" />
+            <ListBox Classes="tabs" ItemsSource="{Binding PreviewModes}" SelectedItem="{Binding SelectedPreviewMode}">
               <ListBox.ItemsPanel>
                 <ItemsPanelTemplate>
-                  <StackPanel Orientation="Horizontal" />
+                  <WrapPanel />
                 </ItemsPanelTemplate>
               </ListBox.ItemsPanel>
             </ListBox>
-          </Grid>
+            <Button x:Name="ZoomButton" Classes="small" Content="{Binding L[ZoomPreview]}" ToolTip.Tip="{Binding L[ZoomPreviewTip]}"
+                    IsEnabled="{Binding HasPreview}" VerticalAlignment="Center" />
+          </WrapPanel>
           <TextBlock Classes="note" Text="{Binding PreviewInfo}" />
           <TextBlock Classes="note" Text="{Binding SourceInfo}" />
           <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding HasFrames}">
@@ -213,9 +223,9 @@
 
           <!-- Materials (MapartCraft shows them under the preview) -->
           <TextBlock Classes="h2" Text="{Binding L[SecMaterials]}" Margin="0,10,0,0" />
-          <StackPanel Orientation="Horizontal" Spacing="4">
+          <WrapPanel Classes="tools">
             <TextBlock Classes="lbl" Text="{Binding L[MaterialsPerMap]}" />
-            <ComboBox ItemsSource="{Binding MaterialAreas}" SelectedItem="{Binding MaterialArea}" MinWidth="130">
+            <ComboBox ItemsSource="{Binding MaterialAreas}" SelectedItem="{Binding MaterialArea}" MinWidth="110">
               <ComboBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:ViewAreaOption">
                   <TextBlock Text="{Binding Label}" />
@@ -223,7 +233,7 @@
               </ComboBox.ItemTemplate>
             </ComboBox>
             <Button Classes="small" Content="CSV" Command="{Binding ExportMaterialsCommand}" ToolTip.Tip="{Binding L[ExportMaterials]}" />
-          </StackPanel>
+          </WrapPanel>
           <Border BorderBrush="#808080" BorderThickness="0,0,0,1" Margin="0,4,0,1">
             <Grid ColumnDefinitions="28,*,90,66,70">
               <TextBlock Grid.Column="1" Text="{Binding L[Block]}" FontWeight="Bold" />

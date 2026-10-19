@@ -5,7 +5,7 @@
         x:DataType="vm:MainViewModel"
         Title="{Binding L[ViewerTitle]}"
         Icon="/Assets/bmap.ico"
-        Width="1280" Height="860" MinWidth="760" MinHeight="520">
+        Width="1280" Height="860" MinWidth="320" MinHeight="240">
 
   <!-- MapartCraft's "View online": the build in 3D, as a placement plan per block, and as a height map. -->
   <DockPanel>
