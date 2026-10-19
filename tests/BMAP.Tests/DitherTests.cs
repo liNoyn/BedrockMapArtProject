@@ -50,15 +50,16 @@ public class DitherTests
             var a = Q(img, new QuantizeOptions { Dither = DitherMode.Optimized, Mode = mode });
             var b = Q(img, new QuantizeOptions { Dither = DitherMode.Optimized, Mode = mode });
             Assert.Equal(a.EntryIndex, b.EntryIndex);
-            // Closer to the source seen from afar than diffusion and Knoll's patterns, and not much noisier pixel by pixel
-            // (the corpus in docs/benchmarks.md is the real check).
+            // Calmer pixel by pixel than diffusion and Knoll's patterns while about as close from afar. Optimized keeps
+            // colours that differ only in lightness solid (users preferred that look), which costs a little on a pure
+            // gradient (the corpus in docs/benchmarks.md is the real check).
             var opt = QualityScore.Measure(img, a.Preview);
             var fs = QualityScore.Measure(img, Q(img, new QuantizeOptions { Dither = DitherMode.FloydSteinberg, Mode = mode }).Preview);
             var knoll = QualityScore.Measure(img, Q(img, new QuantizeOptions { Dither = DitherMode.KnollBayer, Mode = mode }).Preview);
-            Assert.True(opt.Far < fs.Far, $"{mode}: far {opt.Far:0.00} vs FS {fs.Far:0.00}");
-            Assert.True(opt.Far < knoll.Far, $"{mode}: far {opt.Far:0.00} vs Knoll {knoll.Far:0.00}");
-            Assert.True(opt.Pixel < fs.Pixel * 1.05, $"{mode}: pixel {opt.Pixel:0.00} vs FS {fs.Pixel:0.00}");
+            Assert.True(opt.Pixel < fs.Pixel, $"{mode}: pixel {opt.Pixel:0.00} vs FS {fs.Pixel:0.00}");
             Assert.True(opt.Pixel < knoll.Pixel, $"{mode}: pixel {opt.Pixel:0.00} vs Knoll {knoll.Pixel:0.00}");
+            Assert.True(opt.Far < fs.Far * 1.2, $"{mode}: far {opt.Far:0.00} vs FS {fs.Far:0.00}");
+            Assert.True(opt.Far < knoll.Far * 1.2, $"{mode}: far {opt.Far:0.00} vs Knoll {knoll.Far:0.00}");
         }
     }
 
@@ -81,6 +82,17 @@ public class DitherTests
         int pink = q.EntryIndex.Count(e => q.Entries[e].Block.Key.StartsWith("pink"));
         Assert.True(pink > 64 * 64 / 20, $"only {pink} pink pixels");
         Assert.True(QualityScore.Measure(RgbaImage.Filled(64, 64, pale), q.Preview).Far < 4);
+    }
+
+    [Fact]
+    public void Optimized_KeepsAFlatColourCloseToOneBlockSolid()
+    {
+        // A flat purple (#7E7CCB, a user's illustration) lies between ice and its dark shade. Mixing the two is closer on
+        // average but draws a two-tone texture; ice alone is only lighter, with the same hue, and looked closer to the
+        // user. At least 90 % of the area must be one block in one shade (PlanLightness, MixCost).
+        var q = Q(RgbaImage.Filled(64, 64, Rgba.FromHex("#7E7CCB")), new QuantizeOptions { Dither = DitherMode.Optimized, Mode = StaircaseMode.Classic });
+        int top = Enumerable.Range(0, 64 * 64).GroupBy(i => (q.EntryIndex[i], q.Shades[i])).Max(g => g.Count());
+        Assert.True(top > 0.9 * 64 * 64, $"most common block covers only {top} pixels");
     }
 
     [Theory]

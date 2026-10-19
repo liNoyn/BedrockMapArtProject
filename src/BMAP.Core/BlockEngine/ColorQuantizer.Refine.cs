@@ -385,7 +385,17 @@ public static partial class ColorQuantizer
                 // because the mix pays for its contrast and the grey pays nothing for turning the hair grey.
                 double kappa = settings.PlanChroma;
                 double Fade(Lab mix) => kappa > 0 && tC > 0.02 ? kappa * Math.Max(0, tC - (mix.A * tA + mix.B * tB) / tC - 0.5 * tC) : 0;
-                double best = D(ck[nearest], target) * (1 + beta) + gamma * Off(nearest) + Fade(ck[nearest]);
+                // Distance of a plan's colour to the target with lightness weighted by PlanLightness. Below 1 a single colour
+                // that only differs in lightness (a flat purple drawn as plain ice, slightly lighter) beats a mix of two
+                // shades that is closer on average but shows as texture up close; colour (a, b) errors keep full weight.
+                double wl = settings.PlanLightness, mixCost = settings.MixCost;
+                double Dw(Lab a) => wl == 1 ? D(a, target)
+                    : Math.Sqrt(wl * wl * (a.L - target.L) * (a.L - target.L) + (a.A - target.A) * (a.A - target.A) + (a.B - target.B) * (a.B - target.B));
+                double SingleCost(int c) => Dw(ck[c]) + beta * D(ck[c], target) + gamma * Off(c) + Fade(ck[c]);
+                if (wl != 1)
+                    foreach (int c in close)
+                        if (SingleCost(c) < SingleCost(nearest)) nearest = c;
+                double best = SingleCost(nearest);
                 int ba = nearest, bb = -1;
                 // Near-best plans are kept too (within PlanMargin): one hard choice per colour made neighbouring colours
                 // flip between plans (grey vs white + pink in a pale gradient), which showed as square patches.
@@ -413,7 +423,7 @@ public static partial class ColorQuantizer
                         double t = Math.Clamp(((tr - lin[a * 3]) * dx + (tg - lin[a * 3 + 1]) * dy + (tb - lin[a * 3 + 2]) * dz) / len, 0, 1);
                         if (t <= 0 || t >= 1) continue;
                         var mix = ColorMath.LinearToOklab(lin[a * 3] + t * dx, lin[a * 3 + 1] + t * dy, lin[a * 3 + 2] + t * dz);
-                        double cost = D(mix, target) + Spread(S(ck[a], ck[c]) * 2 * Math.Sqrt(t * (1 - t)), Math.Abs(OffS(a) - OffS(c)) * 2 * Math.Sqrt(t * (1 - t)))
+                        double cost = Dw(mix) + mixCost + Spread(S(ck[a], ck[c]) * 2 * Math.Sqrt(t * (1 - t)), Math.Abs(OffS(a) - OffS(c)) * 2 * Math.Sqrt(t * (1 - t)))
                             + beta * ((1 - t) * D(ck[a], target) + t * D(ck[c], target)) + gamma * ((1 - t) * Off(a) + t * Off(c)) + Fade(mix);
                         if (cost < best) { best = cost; ba = a; bb = c; }
                         Keep(cost, a, c, -1);
@@ -448,7 +458,7 @@ public static partial class ColorQuantizer
                             double spread = 2 * Math.Sqrt(w0 * u * dab * dab + w0 * v * dac * dac + u * v * dbc * dbc);
                             double oa = OffS(a), ob = OffS(b2), oc = OffS(c);
                             double cross = 2 * Math.Sqrt(w0 * u * (oa - ob) * (oa - ob) + w0 * v * (oa - oc) * (oa - oc) + u * v * (ob - oc) * (ob - oc));
-                            double cost = D(mix, target) + Spread(spread, cross)
+                            double cost = Dw(mix) + mixCost + Spread(spread, cross)
                                 + beta * (w0 * D(ck[a], target) + u * D(ck[b2], target) + v * D(ck[c], target))
                                 + gamma * (w0 * Off(a) + u * Off(b2) + v * Off(c)) + Fade(mix);
                             if (cost < best) { best = cost; t1 = a; t2 = b2; t3 = c; }
@@ -671,6 +681,10 @@ public sealed record RefineSettings
     /// as plain grey is close by distance but has lost its colour.
     /// </summary>
     public double PlanChroma { get; init; }
+    /// <summary>Weight of lightness in the distance of a plan's colour to the target (1 = plain Oklab distance).</summary>
+    public double PlanLightness { get; init; } = 1;
+    /// <summary>Extra cost of any plan that mixes two or three colours, so a close single colour stays solid.</summary>
+    public double MixCost { get; init; }
     /// <summary>Weight of colour (chroma) errors relative to errors along the grey axis in the optimiser (1 = plain).</summary>
     public double ChromaWeight { get; init; } = 1;
     /// <summary>Quadratic part of the mix contrast penalty.</summary>

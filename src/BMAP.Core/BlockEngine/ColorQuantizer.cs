@@ -282,6 +282,8 @@ public static partial class ColorQuantizer
                     PixelWeight = 0.02 + calm * 0.38, PerceptualWeight = 0.08 + calm * 0.12, PairLambda = 0.1 + calm * 0.3, Neighbours = 24,
                     TriplePool = 16, PlanHue = 0.3 + calm, PlanChroma = 1, PlanPixel = calm * 0.5, PairQuad = 0.25 + calm * 2.75, HueTolerance = 0.03,
                     Sigma1 = 1, Sigma2 = 3, Weight2 = 2, DarkWeight = 0.3, ChromaWeight = 12, Denoise = 4, SwapPasses = 2,
+                    // A single colour that is close except for lightness stays solid instead of a two-shade texture.
+                    PlanLightness = 0.5, MixCost = 0.01,
                 },
             };
         }
