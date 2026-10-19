@@ -38,6 +38,10 @@
       <Setter Property="FontFamily" Value="Lato, Segoe UI, Yu Gothic UI, Meiryo, sans-serif" />
       <Setter Property="FontSize" Value="13" />
     </Style>
+    <!-- Tool rows that wrap onto the next line when their column is narrow. -->
+    <Style Selector="WrapPanel.tools > :is(Control)">
+      <Setter Property="Margin" Value="0,0,4,2" />
+    </Style>
     <!-- One setting per line: "label: control" -->
     <Style Selector="Grid.row">
       <Setter Property="Margin" Value="0,1" />

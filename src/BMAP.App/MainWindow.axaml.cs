@@ -53,7 +53,7 @@ public partial class MainWindow : Window, IDialogService
         if (this.FindControl<ScrollViewer>("PreviewColumn") is not { } column || this.FindControl<Border>("PreviewBox") is not { } box) return;
         column.SizeChanged += (_, _) =>
         {
-            double side = Math.Max(256, Math.Floor(column.Bounds.Width - 20));
+            double side = Math.Max(48, Math.Floor(column.Bounds.Width - 20));
             box.Width = box.Height = side;
         };
         if (this.FindControl<Button>("ZoomButton") is { } zoom) zoom.Click += (_, _) => OpenZoom();
@@ -222,7 +222,7 @@ public partial class MainWindow : Window, IDialogService
 
     private static Window MakeDialog(string title) => new()
     {
-        Title = title, Width = 620, SizeToContent = SizeToContent.Height, MaxHeight = 720,
-        WindowStartupLocation = WindowStartupLocation.CenterOwner, CanResize = false,
+        Title = title, Width = 620, SizeToContent = SizeToContent.Height,
+        WindowStartupLocation = WindowStartupLocation.CenterOwner, MinWidth = 240, MinHeight = 120,
     };
 }
