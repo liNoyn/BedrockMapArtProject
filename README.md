@@ -8,8 +8,7 @@
 A Windows desktop app that turns images into map art for **Minecraft Bedrock Edition**.
 It rebuilds the features and the screen layout of [MapartCraft](https://github.com/rebane2001/mapartcraft) (a web app for
 Java Edition) for Bedrock: the image is reduced to block map colours and exported as **`.mcstructure` files** (64 × 64
-pieces for structure blocks, one per map, or one file) with a build guide (textured placement plans, row-by-row steps,
-material CSV and world coordinates).
+pieces for structure blocks, one per map, or one file).
 
 The window has MapartCraft's three columns: **block selection** on the left, the **map preview** (map, original, shading,
 difference, calibration) and the **materials** in the middle, and **map settings** with the green export buttons on the
@@ -118,8 +117,9 @@ renderer are implemented in the project without further libraries.
   height colouring; ambient occlusion and sun shadows; chunk and map lines; a height slice for building layer by layer;
   jump to the tallest column; hover highlight with coordinates and shade. 8 × 8 maps (5.4 M faces) are ready in about a second.
 - Material list per map with stacks, alternatives, **owned and missing** counts and CSV export; build progress per map and chunk.
-- Output: `.mcstructure` (64 × 64 / per map / whole) and a zip, placement instructions with `/structure load` commands,
-  `placement.csv`, placement images, row-by-row steps, `materials.csv`, map preview PNG; behavior pack optional.
+- Output: only the `.mcstructure` files (64 × 64 / per map / whole), written straight into the chosen folder (one file:
+  saved under the chosen name); behavior pack (`.mcpack`) optional. `materials.csv` and the map preview PNG have their own buttons;
+  `BMAP.Cli build` also writes the placement guide (`/structure load` commands, `placement.csv`) and a zip.
 
 ## Build and run
 
@@ -149,7 +149,7 @@ read only), `textures`. Run without arguments for usage.
 
 ## Loading .mcstructure files
 
-1. The files are in the `mcstructure` folder of the output (the placement text lists coordinates and commands).
+1. The app writes the `.mcstructure` files straight into the folder you choose (`BMAP.Cli build` adds a placement text with coordinates and commands).
 2. In game: `/give @s structure_block`, place it, set it to Load, and Import the file.
 3. Load it with the right offset, or run the `/structure load` command from the placement text after importing.
 

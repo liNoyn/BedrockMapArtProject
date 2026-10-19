@@ -190,7 +190,7 @@ public sealed class Loc : INotifyPropertyChanged
         ["MapX"] = ("地図X", "Map X"),
         ["MapZ"] = ("地図Z", "Map Z"),
         ["Result"] = ("結果", "Result"),
-        ["ExportBuild"] = (".mcstructure と建築ガイドを出力…", "Export .mcstructure files and build guide…"),
+        ["ExportBuild"] = (".mcstructure を出力…", "Export .mcstructure files…"),
         ["Output"] = ("出力", "Output"),
         ["SplitTiles"] = ("64×64 に分割（構造ブロックで読み込み可）", "64×64 pieces (structure block import)"),
         ["SplitPerMap"] = ("マップ 1 枚ごと（128×128）", "One per map (128×128)"),

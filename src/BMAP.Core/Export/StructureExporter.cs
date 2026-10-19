@@ -175,34 +175,19 @@ public static class StructureExporter
 
 
     /// <summary>
-    /// Writes the .mcstructure files (the main output), a placement guide (text + CSV) and, optionally, a behavior
-    /// pack with load functions. Every written structure is read back and validated (design 8.5).
+    /// Writes the .mcstructure files into an "mcstructure" subfolder with a placement guide (text + CSV), a zip and,
+    /// optionally, a behavior pack with load functions. Every written structure is read back and validated (design 8.5).
     /// </summary>
     public static StructureExportResult Export(string outDir, string projectName, BlockLayout layout, int mapsX,
         StructureExportOptions options, WorldOrigin? origin)
     {
         string slug = Slug(projectName);
         string ns = $"{options.Namespace}_{slug}";
-        var tiles = Split(layout, mapsX, options);
-        var problems = ValidateCoverage(layout, tiles);
-        if (problems.Count > 0) throw new InvalidOperationException("構造物の分割検証に失敗しました / structure split failed:\n" + string.Join("\n", problems.Take(10)));
+        var tiles = CheckedSplit(layout, mapsX, options);
 
         // Only this project's earlier pieces are removed: the folder may hold the user's own files.
         string structDir = Path.Combine(outDir, "mcstructure");
-        Directory.CreateDirectory(structDir);
-        foreach (var old in Directory.GetFiles(structDir, $"{slug}_*.mcstructure")) File.Delete(old);
-        var files = new List<string>();
-        foreach (var t in tiles)
-        {
-            var bytes = t.Structure.ToBytes();
-            var path = Path.Combine(structDir, FileName(slug, t) + ".mcstructure");
-            File.WriteAllBytes(path, bytes);
-            var back = McStructure.FromBytes(File.ReadAllBytes(path));
-            var errs = back.Validate();
-            if (errs.Count > 0 || back.CountBlocks() != t.BlockCount)
-                throw new InvalidDataException($"{Path.GetFileName(path)}: re-read check failed {string.Join(", ", errs)}");
-            files.Add(path);
-        }
+        var files = WritePieces(structDir, slug, tiles);
 
         File.WriteAllText(Path.Combine(outDir, "placement.csv"), PlacementCsv(slug, tiles, origin), new UTF8Encoding(true));
         File.WriteAllText(Path.Combine(outDir, options.English ? "PLACEMENT.txt" : "配置方法.txt"),
@@ -212,24 +197,84 @@ public static class StructureExporter
         if (File.Exists(zip)) File.Delete(zip);
         ZipFiles(files, zip);
 
-        string? mcpack = null;
-        if (options.WriteBehaviorPack)
-        {
-            string packDir = Path.Combine(outDir, $"BMAP_{slug}_BP");
-            if (Directory.Exists(packDir)) Directory.Delete(packDir, true);
-            var packStructDir = Path.Combine(packDir, "structures", ns);
-            Directory.CreateDirectory(packStructDir);
-            foreach (var t in tiles)
-                File.Copy(Path.Combine(structDir, FileName(slug, t) + ".mcstructure"), Path.Combine(packStructDir, t.Id + ".mcstructure"));
-            WriteManifest(packDir, projectName);
-            WriteFunctions(packDir, slug, ns, tiles, mapsX, layout, origin);
-            mcpack = Path.Combine(outDir, $"BMAP_{slug}.mcpack");
-            if (File.Exists(mcpack)) File.Delete(mcpack);
-            ZipDirectory(packDir, mcpack);
-        }
+        string? mcpack = options.WriteBehaviorPack ? WriteMcpack(outDir, projectName, slug, ns, tiles, mapsX, layout, origin, keepFolder: true) : null;
         return new StructureExportResult(structDir, files, zip, mcpack, tiles, ns, slug);
     }
 
+    /// <summary>
+    /// Writes only the .mcstructure files, straight into <paramref name="outDir"/>: no subfolders, guide, CSV or zip.
+    /// A build of one piece is written to <paramref name="singleFile"/> when given. With
+    /// <see cref="StructureExportOptions.WriteBehaviorPack"/> the .mcpack file is added (its folder is not kept).
+    /// </summary>
+    public static StructureExportResult ExportStructuresOnly(string outDir, string projectName, BlockLayout layout, int mapsX,
+        StructureExportOptions options, WorldOrigin? origin, string? singleFile = null)
+    {
+        string slug = Slug(projectName);
+        string ns = $"{options.Namespace}_{slug}";
+        var tiles = CheckedSplit(layout, mapsX, options);
+        List<string> files;
+        if (tiles.Count == 1 && singleFile != null)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(singleFile))!);
+            files = [WritePiece(singleFile, tiles[0])];
+            outDir = Path.GetDirectoryName(Path.GetFullPath(singleFile))!;
+        }
+        else files = WritePieces(outDir, slug, tiles);
+        string? mcpack = options.WriteBehaviorPack ? WriteMcpack(outDir, projectName, slug, ns, tiles, mapsX, layout, origin, keepFolder: false) : null;
+        return new StructureExportResult(outDir, files, "", mcpack, tiles, ns, slug);
+    }
+
+    /// <summary>Pieces of the build, checked to cover every block exactly once.</summary>
+    public static List<StructureTile> CheckedSplit(BlockLayout layout, int mapsX, StructureExportOptions options)
+    {
+        var tiles = Split(layout, mapsX, options);
+        var problems = ValidateCoverage(layout, tiles);
+        if (problems.Count > 0) throw new InvalidOperationException("構造物の分割検証に失敗しました / structure split failed:\n" + string.Join("\n", problems.Take(10)));
+        return tiles;
+    }
+
+    /// <summary>Writes the pieces as {slug}_{id}.mcstructure, after removing this project's earlier pieces only.</summary>
+    private static List<string> WritePieces(string dir, string slug, List<StructureTile> tiles)
+    {
+        Directory.CreateDirectory(dir);
+        foreach (var old in Directory.GetFiles(dir, $"{slug}_*.mcstructure")) File.Delete(old);
+        return tiles.Select(t => WritePiece(Path.Combine(dir, FileName(slug, t) + ".mcstructure"), t)).ToList();
+    }
+
+    /// <summary>Writes one piece and reads it back to check it.</summary>
+    private static string WritePiece(string path, StructureTile t)
+    {
+        File.WriteAllBytes(path, t.Structure.ToBytes());
+        var back = McStructure.FromBytes(File.ReadAllBytes(path));
+        var errs = back.Validate();
+        if (errs.Count > 0 || back.CountBlocks() != t.BlockCount)
+            throw new InvalidDataException($"{Path.GetFileName(path)}: re-read check failed {string.Join(", ", errs)}");
+        return path;
+    }
+
+    /// <summary>Behavior pack with the pieces and load functions, zipped to BMAP_{slug}.mcpack in <paramref name="outDir"/>.</summary>
+    private static string WriteMcpack(string outDir, string projectName, string slug, string ns, List<StructureTile> tiles, int mapsX,
+        BlockLayout layout, WorldOrigin? origin, bool keepFolder)
+    {
+        string packDir = keepFolder ? Path.Combine(outDir, $"BMAP_{slug}_BP") : Path.Combine(Path.GetTempPath(), $"bmap_pack_{Guid.NewGuid():N}");
+        if (Directory.Exists(packDir)) Directory.Delete(packDir, true);
+        try
+        {
+            var packStructDir = Path.Combine(packDir, "structures", ns);
+            Directory.CreateDirectory(packStructDir);
+            foreach (var t in tiles) File.WriteAllBytes(Path.Combine(packStructDir, t.Id + ".mcstructure"), t.Structure.ToBytes());
+            WriteManifest(packDir, projectName);
+            WriteFunctions(packDir, slug, ns, tiles, mapsX, layout, origin);
+            string mcpack = Path.Combine(outDir, $"BMAP_{slug}.mcpack");
+            if (File.Exists(mcpack)) File.Delete(mcpack);
+            ZipDirectory(packDir, mcpack);
+            return mcpack;
+        }
+        finally
+        {
+            if (!keepFolder && Directory.Exists(packDir)) Directory.Delete(packDir, true);
+        }
+    }
     /// <summary>File name of a piece; it becomes the structure's name after importing it in game.</summary>
     public static string FileName(string slug, StructureTile t) => $"{slug}_{t.Id}";
 

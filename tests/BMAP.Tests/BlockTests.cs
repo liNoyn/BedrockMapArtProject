@@ -368,6 +368,30 @@ public class BlockTests
     }
 
     [Fact]
+    public void ExportStructuresOnly_WritesJustTheMcstructureFiles()
+    {
+        // The app's export: the pieces go straight into the chosen folder, nothing else (no subfolders, guide, CSV, zip).
+        var dir = TestHelpers.TempDir();
+        File.WriteAllText(Path.Combine(dir, "my_house.mcstructure"), "user file");
+        var q = Quantize(TestHelpers.Gradient(128, 128));
+        var layout = BlockLayout.Generate(q, Cobble, supports: SupportMode.Important);
+        var result = StructureExporter.ExportStructuresOnly(dir, "Test Art", layout, 1, new StructureExportOptions(), null);
+        Assert.True(result.Files.Count > 1);
+        Assert.Empty(Directory.GetDirectories(dir));
+        Assert.Equal(result.Files.Select(Path.GetFileName).Append("my_house.mcstructure").OrderBy(f => f),
+            Directory.GetFiles(dir).Select(Path.GetFileName).OrderBy(f => f));
+        Assert.All(result.Files, f => Assert.Equal(result.Tiles.Single(t => StructureExporter.FileName("test_art", t) + ".mcstructure" == Path.GetFileName(f)).BlockCount,
+            McStructure.FromBytes(File.ReadAllBytes(f)).CountBlocks()));
+
+        // One piece (Whole) goes to the file the user named; the pack option adds only the .mcpack file.
+        var one = Path.Combine(TestHelpers.TempDir(), "named.mcstructure");
+        var single = StructureExporter.ExportStructuresOnly(dir, "Test Art", layout, 1,
+            new StructureExportOptions { Split = StructureSplit.Whole, WriteBehaviorPack = true }, null, one);
+        Assert.Equal([one], single.Files);
+        Assert.Equal(["BMAP_test_art.mcpack", "named.mcstructure"], Directory.GetFileSystemEntries(Path.GetDirectoryName(one)!).Select(Path.GetFileName).OrderBy(f => f, StringComparer.Ordinal));
+    }
+
+    [Fact]
     public void Export_KeepsOtherFilesInTheStructureFolder()
     {
         var dir = TestHelpers.TempDir();
