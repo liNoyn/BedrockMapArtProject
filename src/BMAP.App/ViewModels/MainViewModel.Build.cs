@@ -172,10 +172,10 @@ public sealed partial class MainViewModel
     // ---- manual editing (paint) ----
     public ObservableCollection<BrushOption> Brushes { get; } = [];
     private BrushOption? _brush;
-    public BrushOption? Brush { get => _brush; set => Set(ref _brush, value); }
+    public BrushOption? Brush { get => _brush; set { if (Set(ref _brush, value)) Raise(nameof(BrushSwatch)); } }
     public IReadOnlyList<LocOption<Shade>> BrushShades { get; private set; } = [];
     private LocOption<Shade> _brushShade = null!;
-    public LocOption<Shade> BrushShade { get => _brushShade; set { if (value != null) Set(ref _brushShade, value); } }
+    public LocOption<Shade> BrushShade { get => _brushShade; set { if (value != null && Set(ref _brushShade, value)) Raise(nameof(BrushSwatch)); } }
     private bool _paintMode;
     public bool PaintMode { get => _paintMode; set { if (Set(ref _paintMode, value) && value) EditProgress = false; } }
     public string EditsText => L.Format("EditsCount", _edits.Count);
@@ -340,31 +340,125 @@ public sealed partial class MainViewModel
         Brushes.Add(new BrushOption(BrushOption.None, L["BrushNone"], null));
         var used = _quantized?.Entries.Select(e => e.Block.Key).ToHashSet() ?? [];
         foreach (var b in Profile.Blocks.OrderByDescending(b => used.Contains(b.Key)).ThenBy(b => b.ColourSetId))
-            Brushes.Add(new BrushOption(b.Key, (used.Contains(b.Key) ? "● " : "") + b.LocalName(L.English), b));
+            Brushes.Add(new BrushOption(b.Key, (used.Contains(b.Key) ? "● " : "") + b.LocalName(L.English), b, SwatchOf(b, Shade.Normal)));
         Brush = Brushes.FirstOrDefault(x => x.Key == current) ?? Brushes.ElementAtOrDefault(2) ?? Brushes[0];
     }
 
     private bool _painting;
     private int _brushEntryCount = -1;
 
-    /// <summary>Paints the pixel under the pointer (layout x, z) with the current brush.</summary>
-    private void Paint(int x, int z, bool start, bool end)
+    private Avalonia.Media.IBrush? SwatchOf(BlockDefinition b, Shade shade)
     {
-        if (Brush is null || _baseQuantized is null || z < 1) return;
-        if (start) { _edits.BeginStroke(); _painting = true; }
-        if (!_painting) return;
-        int px = x, py = z - 1;
+        if (Profile is null) return null;
+        var c = Profile.ColorOf(b, shade);
+        return new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(c.R, c.G, c.B));
+    }
+
+    // ---- touch-up in the enlarged map (top view) ----
+    public IReadOnlyList<int> BrushSizes { get; } = [1, 2, 3, 5, 8];
+    private int _brushSize = 1;
+    public int BrushSize { get => _brushSize; set => Set(ref _brushSize, Math.Max(1, value)); }
+    private bool _touchUpMode;
+    /// <summary>Touch-up mode of the enlarged map: left drag paints, right click picks the block under the cursor.</summary>
+    public bool TouchUpMode
+    {
+        get => _touchUpMode;
+        set
+        {
+            if (!Set(ref _touchUpMode, value) || !value) return;
+            if (SelectedPreviewMode.Value != PreviewMode.BlockMap) SelectedPreviewMode = PreviewModes.First(p => p.Value == PreviewMode.BlockMap);
+            if (Brushes.Count == 0) RebuildBrushes();
+        }
+    }
+    /// <summary>The colour the brush paints (block in the chosen shade), for the swatch next to the brush list.</summary>
+    public Avalonia.Media.IBrush? BrushSwatch => Brush?.Block is { } b ? SwatchOf(b, IsStaircase ? BrushShade.Value : Shade.Normal) : null;
+
+    /// <summary>Paints a BrushSize square of map pixels (picture x, y) in the enlarged map; a stroke runs from start to end.</summary>
+    public void TouchUpPaint(int x, int y, bool start, bool end)
+    {
+        if (_baseQuantized is not { } q || Brush is null || SelectedPreviewMode.Value != PreviewMode.BlockMap) return;
+        if (start && !_painting) { _edits.BeginStroke(); _painting = true; }
+        int r0 = (BrushSize - 1) / 2;
+        bool changed = false;
+        for (int dy = 0; dy < BrushSize; dy++)
+            for (int dx = 0; dx < BrushSize; dx++)
+            {
+                int px = x - r0 + dx, py = y - r0 + dy;
+                if (px < 0 || py < 0 || px >= q.Width || py >= q.Height) continue;
+                changed |= PaintPixel(px, py, false, false);
+            }
+        if (end) FinishStroke();
+        else if (changed) { ApplyEditsToPreview(); Raise(nameof(EditsText)); }
+    }
+
+    /// <summary>Eyedropper: the brush becomes the block and shade of this map pixel.</summary>
+    public void TouchUpPick(int x, int y)
+    {
+        if (_quantized is not { } q || x < 0 || y < 0 || x >= q.Width || y >= q.Height) return;
+        if (Brushes.Count == 0) RebuildBrushes();
+        int i = y * q.Width + x, e = q.EntryIndex[i];
+        Brush = e < 0 ? Brushes.FirstOrDefault(b => b.Key == BrushOption.None) : Brushes.FirstOrDefault(b => b.Key == q.Entries[e].Block.Key) ?? Brush;
+        if (e >= 0) BrushShade = BrushShades.FirstOrDefault(s => s.Value == q.Shades[i]) ?? BrushShade;
+        Raise(nameof(BrushSwatch));
+    }
+
+    /// <summary>Block, shade and edit state of a map pixel, for the status line of the enlarged map.</summary>
+    public string DescribePixel(int x, int y)
+    {
+        if (_quantized is not { } q || x < 0 || y < 0 || x >= q.Width || y >= q.Height) return "";
+        int i = y * q.Width + x, e = q.EntryIndex[i];
+        string what = e < 0 ? L["BrushNone"] : q.Entries[e].Block.LocalName(L.English) + (IsStaircase ? $" ({BrushShades.First(s => s.Value == q.Shades[i]).Label})" : "");
+        bool edited = _edits.Edits.Any(ed => ed.X == x && ed.Y == y);
+        return what + (edited ? $"  [{L["Edited"]}]" : "");
+    }
+
+    /// <summary>Sets one edit; the first changed pixel of a stroke opens it (one undo step per stroke).</summary>
+    private bool PaintPixel(int px, int py, bool start, bool end)
+    {
+        if (Brush is null || _baseQuantized is null) return false;
+        if (start && !_painting) { _edits.BeginStroke(); _painting = true; }
+        if (!_painting) return false;
         bool changed = Brush.Key == BrushOption.Auto
             ? _edits.Set(new PixelEdit(px, py, null), clear: true)
             : _edits.Set(new PixelEdit(px, py, Brush.Key == BrushOption.None ? null : Brush.Key, BrushShade.Value));
-        if (end) { _edits.EndStroke(); _painting = false; }
-        if (!changed && !end) return;
+        if (end) FinishStroke();
+        return changed;
+    }
+
+    /// <summary>While a stroke runs only the map picture is updated (cheap); the build is redone when it ends.</summary>
+    private void ApplyEditsToPreview()
+    {
+        if (_baseQuantized is null || Profile is null) return;
+        var q = _baseQuantized.Clone();
+        _edits.ApplyTo(q, Profile);
+        _quantized = q;
+        RefreshMainPreview();
+    }
+
+    private void FinishStroke()
+    {
+        if (_painting) { _edits.EndStroke(); _painting = false; }
         ApplyEditsAndLayout();
         UpdateBlockInfo();
         RefreshPreview();
         Raise(nameof(EditsText));
         UndoEditCommand.RaiseCanExecuteChanged();
         ClearEditsCommand.RaiseCanExecuteChanged();
+    }
+
+    /// <summary>Paints the pixel under the pointer (layout x, z) with the current brush (2D plan of the viewer).</summary>
+    private void Paint(int x, int z, bool start, bool end)
+    {
+        if (Brush is null || _baseQuantized is null || z < 1) return;
+        bool changed = PaintPixel(x, z - 1, start, false);
+        if (end) FinishStroke();
+        else if (changed)
+        {
+            ApplyEditsAndLayout();
+            UpdateBlockInfo();
+            RefreshPreview();
+            Raise(nameof(EditsText));
+        }
     }
 
     public void EndPaintStroke()

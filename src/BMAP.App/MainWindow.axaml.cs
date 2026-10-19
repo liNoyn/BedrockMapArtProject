@@ -57,6 +57,7 @@ public partial class MainWindow : Window, IDialogService
             box.Width = box.Height = side;
         };
         if (this.FindControl<Button>("ZoomButton") is { } zoom) zoom.Click += (_, _) => OpenZoom();
+        if (this.FindControl<Button>("TouchUpButton") is { } touch) touch.Click += (_, _) => { _vm.TouchUpMode = true; OpenZoom(); };
         box.DoubleTapped += (_, _) => { if (_vm.HasPreview) OpenZoom(); };
     }
 

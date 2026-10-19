@@ -243,8 +243,9 @@ public sealed class CustomBlockViewModel(CustomBlock block, Action<CustomBlockVi
 }
 
 /// <summary>A paint brush: a block, "no block" or "back to the automatic result".</summary>
-public sealed record BrushOption(string Key, string Label, BlockDefinition? Block)
+public sealed record BrushOption(string Key, string Label, BlockDefinition? Block, Avalonia.Media.IBrush? Swatch = null)
 {
+    public bool HasSwatch => Swatch != null;
     public const string Auto = "<auto>";
     public const string None = "<none>";
     public override string ToString() => Label;
