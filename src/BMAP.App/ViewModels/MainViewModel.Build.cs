@@ -474,41 +474,38 @@ public sealed partial class MainViewModel
     private async Task ExportBlockAsync()
     {
         if (_quantized is null || _layout is null || Profile is null) return;
-        var folder = await _dialogs.PickFolderAsync(L["ExportBuild"]);
-        if (folder is null) return;
+        var layout = _layout;
+        string name = ProjectName;
+        int mx = MapsX;
+        var origin = Origin;
+        var structureOptions = CurrentStructureOptions();
+        if (layout.MaxHeight > 380) { Log(L.English ? "Export failed: the build is taller than the world height." : "建築データの出力に失敗しました: ワールドの高さを超えています。"); return; }
+        // Only the .mcstructure files are written, no folder of their own: one piece goes to a file the user names,
+        // several pieces straight into the folder the user picks.
+        string slug = StructureExporter.Slug(name);
+        int pieces = StructureExporter.Split(layout, mx, structureOptions).Count;
+        string? singleFile = null, folder;
+        if (pieces == 1)
+        {
+            singleFile = await _dialogs.SaveFileAsync(L["ExportBuild"], $"{slug}.mcstructure", "mcstructure");
+            if (singleFile is null) return;
+            folder = Path.GetDirectoryName(singleFile)!;
+        }
+        else
+        {
+            folder = await _dialogs.PickFolderAsync(L["ExportBuild"]);
+            if (folder is null) return;
+        }
         IsBusy = true;
         Status = L["Exporting"];
         try
         {
-            var q = _quantized;
-            var layout = _layout;
-            var profile = Profile;
-            string name = ProjectName;
-            int mx = MapsX, my = MapsY;
-            var origin = Origin;
-            var tex = Textures.IsAvailable ? Textures : null;
-            string outDir = Path.Combine(folder, $"BMAP_{StructureExporter.Slug(name)}");
-            var structureOptions = CurrentStructureOptions();
-            bool en = L.English;
-            var result = await Task.Run(() =>
-            {
-                if (layout.MaxHeight > 380) throw new InvalidOperationException(L.English ? "The build is taller than the world height." : "ワールドの高さを超えています。");
-                var materials = MaterialCalculator.Calculate(layout, mx);
-                BuildGuideGenerator.WriteAll(Path.Combine(outDir, "guide"), layout, q, profile, materials, mx, my, origin, name, en);
-                // Textured 2D build views per map (MapartCraft "view online" as images).
-                for (int my2 = 0; my2 < my; my2++)
-                    for (int mx2 = 0; mx2 < mx; mx2++)
-                    {
-                        var img = BMAP.Preview.LayoutRenderer.RenderTopDown(layout, profile, BMAP.Preview.LayoutRegion.Map(mx2, my2), 8,
-                            tex is null ? null : tex.GetIcon, true);
-                        ImageCodec.SavePng(img, Path.Combine(outDir, "guide", "maps", $"map_{my2 * mx + mx2 + 1:00}_blocks.png"));
-                    }
-                return StructureExporter.Export(outDir, name, layout, mx, structureOptions, origin);
-            });
-            Log((L.English ? "Exported: " : "出力しました: ") + outDir);
+            var result = await Task.Run(() => StructureExporter.ExportStructuresOnly(folder, name, layout, mx, structureOptions, origin, singleFile));
             Log(L.Format("ExportedFiles", result.Files.Count, result.StructureDirectory));
+            foreach (var f in result.Files.Take(8)) Log("  " + Path.GetFileName(f));
+            if (result.Files.Count > 8) Log($"  … (+{result.Files.Count - 8})");
             if (result.McpackPath != null) Log("  " + Path.GetFileName(result.McpackPath));
-            OpenFolder(outDir);
+            OpenFolder(result.StructureDirectory);
         }
         catch (Exception ex) { Log((L.English ? "Export failed: " : "建築データの出力に失敗しました: ") + ex.Message); }
         finally { IsBusy = false; Status = L["Ready"]; }
