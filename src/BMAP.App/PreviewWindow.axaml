@@ -10,26 +10,51 @@
   <!-- The map preview enlarged: fit to the window, or zoom in with the wheel and drag to pan. -->
   <DockPanel>
     <Border DockPanel.Dock="Top" Background="#2B2B2B" Padding="10,6">
-      <StackPanel Orientation="Horizontal" Spacing="6">
-        <ListBox Classes="tabs" ItemsSource="{Binding PreviewModes}" SelectedItem="{Binding SelectedPreviewMode}">
-          <ListBox.ItemsPanel>
-            <ItemsPanelTemplate>
-              <StackPanel Orientation="Horizontal" />
-            </ItemsPanelTemplate>
-          </ListBox.ItemsPanel>
-        </ListBox>
-        <Button x:Name="FitButton" Classes="small" Content="{Binding L[ZoomFit]}" Margin="10,0,0,0" />
-        <Button x:Name="OutButton" Classes="small" Content="−" MinWidth="26" />
-        <Button x:Name="InButton" Classes="small" Content="+" MinWidth="26" />
-        <Button x:Name="OneButton" Classes="small" Content="1:1" />
-        <TextBlock x:Name="ZoomText" VerticalAlignment="Center" FontSize="12" MinWidth="60" />
+      <StackPanel Spacing="4">
+        <WrapPanel Classes="tools">
+          <ListBox Classes="tabs" ItemsSource="{Binding PreviewModes}" SelectedItem="{Binding SelectedPreviewMode}">
+            <ListBox.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel />
+              </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+          </ListBox>
+          <Button x:Name="FitButton" Classes="small" Content="{Binding L[ZoomFit]}" />
+          <Button x:Name="OutButton" Classes="small" Content="−" MinWidth="26" />
+          <Button x:Name="InButton" Classes="small" Content="+" MinWidth="26" />
+          <Button x:Name="OneButton" Classes="small" Content="1:1" />
+          <TextBlock x:Name="ZoomText" VerticalAlignment="Center" FontSize="12" MinWidth="50" />
+          <ToggleButton Content="{Binding L[TouchUp]}" IsChecked="{Binding TouchUpMode}" ToolTip.Tip="{Binding L[TouchUpTip]}" Padding="10,2" />
+        </WrapPanel>
+
+        <!-- Touch up: paint blocks on the map seen from above -->
+        <WrapPanel Classes="tools" IsVisible="{Binding TouchUpMode}">
+          <Border Width="22" Height="22" Background="{Binding BrushSwatch}" BorderBrush="#A0A0A0" BorderThickness="1" VerticalAlignment="Center" />
+          <ComboBox ItemsSource="{Binding Brushes}" SelectedItem="{Binding Brush}" Width="240">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:BrushOption">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <Border Width="14" Height="14" Background="{Binding Swatch}" IsVisible="{Binding HasSwatch}" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+                </StackPanel>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <ComboBox ItemsSource="{Binding BrushShades}" SelectedItem="{Binding BrushShade}" Width="90" IsVisible="{Binding IsStaircase}" />
+          <TextBlock Classes="lbl" Text="{Binding L[BrushSize]}" />
+          <ComboBox ItemsSource="{Binding BrushSizes}" SelectedItem="{Binding BrushSize}" Width="64" />
+          <Button Classes="small" Content="{Binding L[Undo]}" Command="{Binding UndoEditCommand}" ToolTip.Tip="Ctrl+Z" />
+          <Button Classes="small" Content="{Binding L[ClearEdits]}" Command="{Binding ClearEditsCommand}" />
+          <TextBlock Text="{Binding EditsText}" VerticalAlignment="Center" Classes="note" />
+        </WrapPanel>
       </StackPanel>
     </Border>
 
     <Border DockPanel.Dock="Bottom" Background="#2B2B2B" Padding="10,3">
-      <StackPanel Orientation="Horizontal" Spacing="16">
-        <TextBlock x:Name="PixelText" FontSize="12" />
-        <TextBlock Text="{Binding L[ZoomHelp]}" FontSize="11" Opacity="0.6" />
+      <StackPanel>
+        <TextBlock x:Name="PixelText" FontSize="12" TextTrimming="CharacterEllipsis" />
+        <TextBlock Text="{Binding L[ZoomHelp]}" FontSize="11" Opacity="0.6" TextWrapping="Wrap" IsVisible="{Binding !TouchUpMode}" />
+        <TextBlock Text="{Binding L[TouchUpHelp]}" FontSize="11" Opacity="0.8" Foreground="#A6D8AA" TextWrapping="Wrap" IsVisible="{Binding TouchUpMode}" />
       </StackPanel>
     </Border>
 

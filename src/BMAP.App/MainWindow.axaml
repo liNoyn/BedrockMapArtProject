@@ -206,6 +206,8 @@
             </ListBox>
             <Button x:Name="ZoomButton" Classes="small" Content="{Binding L[ZoomPreview]}" ToolTip.Tip="{Binding L[ZoomPreviewTip]}"
                     IsEnabled="{Binding HasPreview}" VerticalAlignment="Center" />
+            <Button x:Name="TouchUpButton" Classes="small" Content="{Binding L[TouchUpOpen]}" ToolTip.Tip="{Binding L[TouchUpTip]}"
+                    IsEnabled="{Binding HasLayout}" VerticalAlignment="Center" />
           </WrapPanel>
           <TextBlock Classes="note" Text="{Binding PreviewInfo}" />
           <TextBlock Classes="note" Text="{Binding SourceInfo}" />

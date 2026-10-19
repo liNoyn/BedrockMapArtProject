@@ -116,6 +116,8 @@ renderer are implemented in the project without further libraries.
 - **3D build view**: free orbit / pan / zoom, perspective (perspective-correct textures); texture / map colour / shade /
   height colouring; ambient occlusion and sun shadows; chunk and map lines; a height slice for building layer by layer;
   jump to the tallest column; hover highlight with coordinates and shade. 8 × 8 maps (5.4 M faces) are ready in about a second.
+- **Touch up** from above: in the enlarged map ("Touch up…") left drag paints blocks (brush size, shade), right click picks
+  the block under the cursor, Ctrl+Z undoes; edits are kept when settings change and saved with the project.
 - Material list per map with stacks, alternatives, **owned and missing** counts and CSV export; build progress per map and chunk.
 - Output: only the `.mcstructure` files (64 × 64 / per map / whole), written straight into the chosen folder (one file:
   saved under the chosen name); behavior pack (`.mcpack`) optional. `materials.csv` and the map preview PNG have their own buttons;
