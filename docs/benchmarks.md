@@ -271,3 +271,20 @@ accuracy from afar and grain; 0.5 / 0.01 keeps pastels and solid purples and was
 
 The far and near scores rise (blur-based scores reward any mix that gets the average right); per-pixel error and
 grain fall, which matches what users judged closer. The dither strength slider still goes calmer.
+
+## Light pinks: pink, not pink + white (v0.15.2)
+
+The user asked why the single-colour pink cushion and pink hair were full of white dots. Both are lighter than every
+pink block (lightest: pink wool slab #F38BAA, Oklab L 0.75), so pink + white was the only way to match their lightness.
+Measured: cushion #FCBCD4 (L 0.86, C 0.085), hair #ECCCD0 (L 0.87, C 0.035). New PlanChromaExcess (0.1): for light
+targets (L ≥ 0.75) a block of the same hue with up to 60 % more chroma than the target is barely penalised for being
+stronger, so the cushion is drawn in pink wool (a little darker, no dots). The hair stays pink + white: one block would
+be hot pink (3 x its chroma) or white terracotta (beige), both further from it than the mix. Without the light-only rule
+and the 60 % cap, photos and skin tones turned garish (tried and dropped).
+
+| setting | group | px | near | far | speckle | fade |
+|---|---|---:|---:|---:|---:|---:|
+| v0.15.1 | illustrations | 7.37 | 2.84 | 1.61 | 3.99 | 0.22 |
+| **v0.15.2** | illustrations | 7.36 | 2.95 | 1.72 | **3.84** | 0.21 |
+| v0.15.1 | photos | 7.07 | 2.35 | 1.18 | 2.87 | 0.17 |
+| **v0.15.2** | photos | 6.95 | 2.46 | 1.31 | **2.68** | 0.17 |

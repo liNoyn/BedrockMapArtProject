@@ -389,8 +389,26 @@ public static partial class ColorQuantizer
                 // that only differs in lightness (a flat purple drawn as plain ice, slightly lighter) beats a mix of two
                 // shades that is closer on average but shows as texture up close; colour (a, b) errors keep full weight.
                 double wl = settings.PlanLightness, mixCost = settings.MixCost;
-                double Dw(Lab a) => wl == 1 ? D(a, target)
-                    : Math.Sqrt(wl * wl * (a.L - target.L) * (a.L - target.L) + (a.A - target.A) * (a.A - target.A) + (a.B - target.B) * (a.B - target.B));
+                // The a/b error splits into chroma (along the target's hue) and hue (across it); for light pastels (Oklab
+                // L ≥ 0.75) more chroma than the target counts PlanChromaExcess times: the palette has no light pinks, and
+                // a stronger pink of the same hue reads as "pink" where pink + white reads as dots. Darker colours keep the
+                // plain distance (otherwise photos turn garish).
+                double we = target.L >= 0.75 ? settings.PlanChromaExcess : 1;
+                double Dw(Lab a)
+                {
+                    if (wl == 1 && we == 1) return D(a, target);
+                    double dl = a.L - target.L, da = a.A - target.A, db = a.B - target.B, ab2 = da * da + db * db;
+                    if (we != 1 && tC > 0.02)
+                    {
+                        double ca = Math.Sqrt(a.A * a.A + a.B * a.B), dc = ca - tC;
+                        double dh2 = Math.Max(0, ab2 - dc * dc);
+                        // Only a moderately stronger colour is tolerated (up to 60 % more chroma: pink wool for a light pink
+                        // cushion), not a much stronger one (orange for a peach skin, hot pink for a pale pink hair).
+                        if (dc > 0) dc = Math.Min(dc, 0.6 * tC) * we + Math.Max(0, dc - 0.6 * tC);
+                        ab2 = dh2 + dc * dc;
+                    }
+                    return Math.Sqrt(wl * wl * dl * dl + ab2);
+                }
                 double SingleCost(int c) => Dw(ck[c]) + beta * D(ck[c], target) + gamma * Off(c) + Fade(ck[c]);
                 if (wl != 1)
                     foreach (int c in close)
@@ -685,6 +703,9 @@ public sealed record RefineSettings
     public double PlanLightness { get; init; } = 1;
     /// <summary>Extra cost of any plan that mixes two or three colours, so a close single colour stays solid.</summary>
     public double MixCost { get; init; }
+    /// <summary>Weight of chroma beyond the target's in a plan's colour (1 = plain distance; below 1 a stronger colour of
+    /// the same hue is preferred to mixing in white or grey).</summary>
+    public double PlanChromaExcess { get; init; } = 1;
     /// <summary>Weight of colour (chroma) errors relative to errors along the grey axis in the optimiser (1 = plain).</summary>
     public double ChromaWeight { get; init; } = 1;
     /// <summary>Quadratic part of the mix contrast penalty.</summary>

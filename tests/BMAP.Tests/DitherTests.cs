@@ -95,6 +95,17 @@ public class DitherTests
         Assert.True(top > 0.9 * 64 * 64, $"most common block covers only {top} pixels");
     }
 
+    [Fact]
+    public void Optimized_DrawsALightPinkAreaInPinkNotPinkAndWhite()
+    {
+        // A light pink cushion (#FCBCD4) is lighter than every pink block. Pink with white dots matched it on average but
+        // read as dots; pink wool alone is a little stronger and darker with the same hue, and is what the user expected.
+        // At least 90 % of the area must be pink blocks (PlanChromaExcess for light pastels).
+        var q = Q(RgbaImage.Filled(64, 64, Rgba.FromHex("#FCBCD4")), new QuantizeOptions { Dither = DitherMode.Optimized, Mode = StaircaseMode.Classic });
+        int pink = q.EntryIndex.Count(e => e >= 0 && q.Entries[e].Block.Key.StartsWith("pink"));
+        Assert.True(pink > 0.9 * 64 * 64, $"only {pink} pink pixels");
+    }
+
     [Theory]
     [InlineData("#FEBCD7")]
     [InlineData("#F9A8C9")]
