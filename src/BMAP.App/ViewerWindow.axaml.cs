@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using BMAP.App.ViewModels;
@@ -81,6 +81,13 @@ public partial class ViewerWindow : Window
             e.Pointer.Capture(null);
             _vm.Settle3D();
         };
+        panel.PointerCaptureLost += (_, _) =>
+        {
+            if (last is null) return;
+            last = null;
+            _vm.Settle3D();
+        };
+        panel.PointerExited += (_, _) => { if (last is null) _vm.ClearHover3D(); };
         panel.PointerWheelChanged += (_, e) =>
         {
             var p = e.GetPosition(panel);

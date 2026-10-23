@@ -56,8 +56,10 @@ public static class HeightAdvisor
         progress?.Report(done * 100 / total);
         foreach (int limit in todo)
         {
-            var r = Run(mode, limit);
-            raw.Add((mode, limit, r.MaxHeight, r.BuildHeight, r.Error, r.Blocks));
+            // A Classic staircase cannot enforce a run-based limit. Offer enforceable Valley alternatives even
+            // when the currently selected, unlimited reference is Classic.
+            var r = Run(StaircaseMode.Valley, limit);
+            raw.Add((StaircaseMode.Valley, limit, r.MaxHeight, r.BuildHeight, r.Error, r.Blocks));
             progress?.Report(++done * 100 / total);
         }
         raw.Add((mode, 0, free.MaxHeight, free.BuildHeight, free.Error, free.Blocks));

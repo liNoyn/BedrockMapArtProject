@@ -33,6 +33,8 @@ public enum DitherMode
     /// the closest match to the source at every viewing distance. Slower.
     /// </summary>
     Optimized,
+    /// <summary>Discrete multiscale optimization in linear light, with perceptual detail and edge preservation.</summary>
+    Perceptual,
 }
 
 /// <summary>How heights are used for shading (MapartCraft's "3D" setting).</summary>
@@ -154,6 +156,9 @@ public static partial class ColorQuantizer
     {
         var entries = selection.Resolve(profile);
         if (entries.Count == 0) throw new InvalidOperationException("使用できるブロックがありません。パレットでブロックを選んでください。");
+        ct.ThrowIfCancellationRequested();
+        if (options.Dither == DitherMode.Perceptual && options.DitherStrength <= 0 && options.Refine is null)
+            options = options with { Dither = DitherMode.None };
 
         var result = QuantizeWith(image, profile, entries, options, ct);
         // Survival limit: drop the least used blocks until the number of block types fits (design 6.8).
@@ -269,15 +274,30 @@ public static partial class ColorQuantizer
 
         bool IsEmpty(int i) => image.Pixels[i * 4 + 3] < options.AlphaThreshold;
 
+        // All preprocessing uses the same mask as the quantizer. RGB hidden below the alpha threshold must not
+        // leak through denoising or mixture planning into visible pixels.
+        if (Enumerable.Range(0, n).Any(i => image.Pixels[i * 4 + 3] > 0 && IsEmpty(i)))
+        {
+            image = image.Clone();
+            for (int i = 0; i < n; i++) if (IsEmpty(i)) image.Pixels[i * 4 + 3] = 0;
+        }
+
         // Optimised: start from linear-light Floyd–Steinberg, then optimise with two-colour mixes (docs/benchmarks.md).
         // The strength slider trades mixing (truer colours) against calm, sharp pixels.
-        if (options.Dither == DitherMode.Optimized)
+        if (options.Dither is DitherMode.Optimized or DitherMode.Perceptual)
         {
             double calm = 1 - Math.Clamp(options.DitherStrength, 0, 1);
+            bool perceptual = options.Dither == DitherMode.Perceptual;
             options = options with
             {
                 Dither = DitherMode.FloydSteinberg, DitherStrength = 1,
-                Refine = options.Refine ?? new RefineSettings
+                Refine = options.Refine ?? (perceptual ? new RefineSettings
+                {
+                    PixelWeight = 0.015 + calm * 0.4, PerceptualWeight = 0.025 + calm * 0.15,
+                    Sigma1 = 0.8, Weight1 = 1, Sigma2 = 2, Weight2 = 1,
+                    ChromaWeight = 2, DarkWeight = 0.35, EdgeWeight = 0.4,
+                    Neighbours = 20, MaxPasses = 8, SwapPasses = 2, Rounds = 2,
+                } : new RefineSettings
                 {
                     PixelWeight = 0.02 + calm * 0.38, PerceptualWeight = 0.08 + calm * 0.12, PairLambda = 0.1 + calm * 0.3, Neighbours = 24,
                     TriplePool = 16, PlanHue = 0.3 + calm, PlanChroma = 1, PlanPixel = calm * 0.5, PairQuad = 0.25 + calm * 2.75, HueTolerance = 0.03,
@@ -285,7 +305,7 @@ public static partial class ColorQuantizer
                     // A single colour that is close except for lightness, or that is a stronger colour of the same hue,
                     // stays solid instead of a two-shade texture or a mix with white.
                     PlanLightness = 0.5, MixCost = 0.01, PlanChromaExcess = 0.1,
-                },
+                }),
             };
         }
         // Without a height limit the diffusion start may use the denoised image as well (with a limit its shades must
@@ -591,7 +611,7 @@ public static partial class ColorQuantizer
     /// Finds the nearest candidate colour, restricted to a set of shades and with an optional extra cost for the
     /// dark/light shades. Results are cached per (quantised colour, shade mask).
     /// </summary>
-    private sealed partial class NearestMatcher
+    internal sealed partial class NearestMatcher
     {
         private readonly List<Candidate> _candidates;
         private readonly ColorMetric _metric;
@@ -615,10 +635,11 @@ public static partial class ColorQuantizer
         /// <summary>Nearest candidate whose shade is in <paramref name="shadeMask"/>, or -1 if there is none.</summary>
         public int Find(double r, double g, double b, int shadeMask, double penalty)
         {
-            int ri = Q(r), gi = Q(g), bi = Q(b);
-            int key = (shadeMask << 24) | (ri << 16) | (gi << 8) | bi;
+            double ri = Math.Clamp(r, 0, 255), gi = Math.Clamp(g, 0, 255), bi = Math.Clamp(b, 0, 255);
+            bool integral = ri == (int)ri && gi == (int)gi && bi == (int)bi;
+            int key = (shadeMask << 24) | ((int)ri << 16) | ((int)gi << 8) | (int)bi;
             // The cache holds results for one penalty only (the first one used).
-            bool cacheable = _penaltyForCache == penalty;
+            bool cacheable = integral && _penaltyForCache == penalty;
             if (cacheable && _cache.TryGetValue(key, out int hit)) return hit;
 
             int best = -1;
@@ -644,8 +665,8 @@ public static partial class ColorQuantizer
                     double d = Distance(ri, gi, bi, lab, i, penalty);
                     if (d < bestD) { bestD = d; best = i; } // strict '<' keeps the first (preferred) candidate on ties
                 }
-            if (_cache.Count == 0) _penaltyForCache = penalty;
-            if (_penaltyForCache == penalty && _cache.Count < 1 << 20) _cache[key] = best;
+            if (integral && _cache.Count == 0) _penaltyForCache = penalty;
+            if (integral && _penaltyForCache == penalty && _cache.Count < 1 << 20) _cache[key] = best;
             return best;
         }
 
@@ -654,18 +675,18 @@ public static partial class ColorQuantizer
         /// <summary>The (penalised) distance of a candidate, in the same units <see cref="Find"/> minimises.</summary>
         public double Cost(double r, double g, double b, int candidate, double penalty)
         {
-            int ri = Q(r), gi = Q(g), bi = Q(b);
+            double ri = Math.Clamp(r, 0, 255), gi = Math.Clamp(g, 0, 255), bi = Math.Clamp(b, 0, 255);
             return Distance(ri, gi, bi, LabOf(ri, gi, bi), candidate, penalty);
         }
 
-        private Lab LabOf(int r, int g, int b) => _metric switch
+        private Lab LabOf(double r, double g, double b) => _metric switch
         {
             ColorMetric.Lab or ColorMetric.Ciede2000 => ColorMath.ToLab(r, g, b),
             ColorMetric.Oklab => ColorMath.ToOklab(r, g, b),
             _ => default,
         };
 
-        private double Distance(int ri, int gi, int bi, Lab lab, int i, double penalty)
+        private double Distance(double ri, double gi, double bi, Lab lab, int i, double penalty)
         {
             var c = _candidates[i].Color;
             double d = _metric switch
@@ -691,7 +712,6 @@ public static partial class ColorQuantizer
             _ => 100,
         };
 
-        private static int Q(double v) => (int)Math.Round(Math.Clamp(v, 0, 255));
         private static double Sq(double v) => v * v;
     }
 }

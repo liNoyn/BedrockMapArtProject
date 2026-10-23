@@ -1,6 +1,7 @@
 using BMAP.BlockEngine;
 using BMAP.Imaging;
 using BMAP.Palette;
+using BMAP.Shading;
 using SkiaSharp;
 
 namespace BMAP.Preview;
@@ -36,6 +37,7 @@ public static class LayoutRenderer
         using var fill = new SKPaint { Style = SKPaintStyle.Fill };
         using var sampling = new SKPaint { FilterQuality = SKFilterQuality.None };
         int maxH = Math.Max(1, layout.MaxHeight);
+        var simulated = MapSimulator.Simulate(layout, profile);
 
         for (int dz = 0; dz < region.Depth; dz++)
             for (int dx = 0; dx < region.Width; dx++)
@@ -51,7 +53,7 @@ public static class LayoutRenderer
                 if (tex != null) canvas.DrawBitmap(tex, rect, sampling);
                 else
                 {
-                    var c = z == 0 ? new Rgba(150, 150, 150) : profile.ColorOf(b, layout.Mode == StaircaseMode.Flat ? Shade.Normal : ShadeAt(layout, x, z));
+                    var c = z == 0 ? new Rgba(150, 150, 150) : simulated.Image[x, z - 1];
                     fill.Color = new SKColor(c.R, c.G, c.B);
                     canvas.DrawRect(rect, fill);
                 }
@@ -94,13 +96,6 @@ public static class LayoutRenderer
         }
         foreach (var bmp in cache.Values) bmp?.Dispose();
         return Snapshot(surface, w, h);
-    }
-
-    private static Shade ShadeAt(BlockLayout layout, int x, int z)
-    {
-        if (z == 0) return Shade.Normal;
-        int d = layout.HeightAt(x, z) - layout.HeightAt(x, z - 1);
-        return d > 0 ? Shade.Bright : d < 0 ? Shade.Dark : Shade.Normal;
     }
 
     /// <summary>

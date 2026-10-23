@@ -21,7 +21,9 @@ public static class HeightPlanner
         int limit = options.MaxHeight;
         // The optimiser only swaps colours of the same shade under a height limit, so the heights are those of the
         // diffusion it starts from: search with the faster diffusion and optimise once at the end.
-        var search = options.Dither == DitherMode.Optimized && options.Refine is null ? options with { Dither = DitherMode.FloydSteinberg, DitherStrength = 1 } : options;
+        bool usesDiffusionSeed = options.Dither == DitherMode.Optimized || (options.Dither == DitherMode.Perceptual && options.DitherStrength > 0);
+        var search = usesDiffusionSeed && options.Refine is null
+            ? options with { Dither = DitherMode.FloydSteinberg, DitherStrength = 1 } : options;
         QuantizeResult Run(QuantizeOptions o, int runs) => ColorQuantizer.Quantize(image, profile, selection,
             runs == 0 ? o with { Mode = StaircaseMode.Flat, MaxHeight = 0 } : o with { MaxHeight = runs * step }, ct);
         int Height(QuantizeResult q) => BlockLayout.Generate(q, supportBlock, 0, supports, onMapGrid: onMapGrid).MaxHeight;

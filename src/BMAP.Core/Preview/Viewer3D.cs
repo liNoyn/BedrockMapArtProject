@@ -34,7 +34,8 @@ public sealed record Camera3D
     public Camera3D Clamp() => this with
     {
         Pitch = Math.Clamp(Pitch, 5, 90),
-        Zoom = Math.Clamp(Zoom, 0.25, 64),
+        // The lower range also permits the GUI's half-resolution drag renders at its minimum interactive zoom.
+        Zoom = Math.Clamp(Zoom, 0.001, 64),
         Yaw = ((Yaw % 360) + 360) % 360,
     };
 }
@@ -61,8 +62,8 @@ public sealed class SceneMesh
 {
     internal readonly List<Face> Faces = [];
     public IReadOnlyList<BlockPlacement> Blocks { get; }
-    /// <summary>Map shade of each block when it is the top-most block of its column.</summary>
-    internal readonly Shade[] TopShade;
+    /// <summary>Height difference to the northern column in the complete build (independent of the view slice).</summary>
+    internal readonly int[] TopDelta;
     /// <summary>Per block: 0 = fine, 1 = map colour differs from the plan, 2 = depends on terrain, 3 = falls / breaks.</summary>
     internal readonly byte[] Problem;
     internal readonly bool[] IsTop;
@@ -72,10 +73,16 @@ public sealed class SceneMesh
     /// <summary>Largest horizontal extent in blocks (used for the default zoom).</summary>
     public float Extent { get; }
     public int MaxY { get; }
+    public int MinY { get; }
+    internal float HalfWidth { get; }
+    internal float HalfDepth { get; }
+    internal float HalfHeight => (MaxY + 1 - MinY) / 2f;
+    // Keep the entire bounding sphere in front of the perspective camera, even for tall, narrow builds.
+    public float CameraDistance => 2 * MathF.Sqrt(HalfWidth * HalfWidth + HalfDepth * HalfDepth + HalfHeight * HalfHeight) + 20;
     public int FaceCount => Faces.Count;
 
     /// <summary>
-    /// Face directions: 0 up, 1 north (-Z), 2 south (+Z), 3 west (-X), 4 east (+X).
+    /// Face directions: 0 up, 1 north (-Z), 2 south (+Z), 3 west (-X), 4 east (+X), 5 down.
     /// Ao: ambient occlusion level 0..3 per corner (2 bits each, corner order as in the corner table).
     /// Sun: 1 when the face centre sees the sun, 0 in shadow.
     /// </summary>
@@ -84,14 +91,16 @@ public sealed class SceneMesh
     /// <summary>Direction towards the sun (normalised): high in the south-east, so the north/west sides are shaded.</summary>
     internal static readonly float[] SunDir = Normalize(0.42f, 1f, 0.55f);
 
-    private SceneMesh(List<BlockPlacement> blocks, Shade[] topShade, byte[] problem, bool[] isTop, float cx, float cy, float cz, float extent, int maxY)
+    private SceneMesh(List<BlockPlacement> blocks, int[] topDelta, byte[] problem, bool[] isTop, LayoutRegion region, int minY, int maxY)
     {
         Blocks = blocks;
-        TopShade = topShade;
+        TopDelta = topDelta;
         Problem = problem;
         IsTop = isTop;
-        CenterX = cx; CenterY = cy; CenterZ = cz;
-        Extent = extent;
+        CenterX = region.X0 + region.Width / 2f; CenterY = (minY + maxY + 1) / 2f; CenterZ = region.Z0 + region.Depth / 2f;
+        HalfWidth = region.Width / 2f; HalfDepth = region.Depth / 2f;
+        Extent = Math.Max(region.Width, region.Depth);
+        MinY = minY;
         MaxY = maxY;
     }
 
@@ -124,7 +133,7 @@ public sealed class SceneMesh
                 problemAt[(issue.X, issue.Z)] = Math.Max(problemAt.GetValueOrDefault((issue.X, issue.Z)), code);
             }
 
-        var shades = new Shade[blocks.Count];
+        var deltas = new int[blocks.Count];
         var problem = new byte[blocks.Count];
         var isTop = new bool[blocks.Count];
         for (int i = 0; i < blocks.Count; i++)
@@ -132,16 +141,16 @@ public sealed class SceneMesh
             var b = blocks[i];
             int ti = b.Z * w + b.X;
             isTop[i] = topY[ti] == b.Y;
-            if (isTop[i] && b.Z > 0 && topY[ti - w] != int.MinValue) shades[i] = layout.ParityShading
-                    ? ShadingModel.Candidates.First(m => m.Kind == ShadingModelKind.Checker).Classify(b.Y - topY[ti - w], b.X, b.Z - 1)
-                    : ShadeRule.Compare(b.Y, topY[ti - w], layout.UpStep, layout.DownStep);
-            else shades[i] = Shade.Normal;
+            if (isTop[i] && b.Z > 0 && topY[ti - w] != int.MinValue)
+            {
+                deltas[i] = b.Y - topY[ti - w];
+            }
             if (isTop[i] || problemAt.GetValueOrDefault((b.X, b.Z)) == 3) problem[i] = problemAt.GetValueOrDefault((b.X, b.Z));
         }
 
-        float cx = region.X0 + region.Width / 2f, cz = region.Z0 + region.Depth / 2f;
+        int minY = blocks.Count == 0 ? 0 : blocks.Min(b => b.Y);
         int maxY = blocks.Count == 0 ? 0 : blocks.Max(b => b.Y);
-        var mesh = new SceneMesh(blocks, shades, problem, isTop, cx, (maxY + 1) / 2f, cz, Math.Max(region.Width, region.Depth), maxY);
+        var mesh = new SceneMesh(blocks, deltas, problem, isTop, region, minY, maxY);
 
         // Compact per-column occupancy for face culling and ambient occlusion (a dense 3D grid would need hundreds of
         // megabytes for 8x8 maps).
@@ -163,8 +172,10 @@ public sealed class SceneMesh
         for (int i = 0; i < blocks.Count; i++)
         {
             var b = blocks[i];
-            for (byte dir = 0; dir < 5; dir++)
+            for (byte dir = 0; dir < 6; dir++)
             {
+                // Orbit pitch is at least 5 degrees. Bottoms below even the lowest possible camera are never visible.
+                if (dir == 5 && b.Y <= mesh.CenterY + mesh.CameraDistance * MathF.Sin(5 * MathF.PI / 180)) continue;
                 var n = Viewer3D.NormalsI[dir];
                 if (Occ(b.X + n[0], b.Y + n[1], b.Z + n[2])) continue;
                 byte ao = 0;
@@ -231,10 +242,27 @@ public sealed class SceneMesh
     }
 
     /// <summary>A camera that shows the whole scene in a view of the given size.</summary>
-    public Camera3D FitCamera(int width, int height, double yaw = 35, double pitch = 40)
+    public Camera3D FitCamera(int width, int height, double yaw = 35, double pitch = 40, bool perspective = false)
     {
-        double span = Math.Max(1, Extent * 1.25 + MaxY * 0.5);
-        return new Camera3D { Yaw = yaw, Pitch = pitch, Zoom = Math.Clamp(Math.Min(width, height) / span, 0.25, 64) };
+        var camera = (new Camera3D { Yaw = yaw, Pitch = pitch, Perspective = perspective }).Clamp();
+        double ya = camera.Yaw * Math.PI / 180, pi = camera.Pitch * Math.PI / 180;
+        double cy = Math.Cos(ya), sy = Math.Sin(ya), cp = Math.Cos(pi), sp = Math.Sin(pi);
+        double minX = double.PositiveInfinity, minY = minX, maxX = double.NegativeInfinity, maxY = maxX;
+        foreach (float x in new[] { -HalfWidth, HalfWidth })
+            foreach (float y in new[] { -HalfHeight, HalfHeight })
+                foreach (float z in new[] { -HalfDepth, HalfDepth })
+                {
+                    double z1 = x * sy + z * cy, d = y * sp + z1 * cp;
+                    double scale = perspective ? CameraDistance / (CameraDistance - d) : 1;
+                    double px = (x * cy - z * sy) * scale, py = (y * cp - z1 * sp) * scale;
+                    minX = Math.Min(minX, px); maxX = Math.Max(maxX, px);
+                    minY = Math.Min(minY, py); maxY = Math.Max(maxY, py);
+                }
+        return (camera with
+        {
+            PanX = (minX + maxX) / 2, PanY = (minY + maxY) / 2,
+            Zoom = Math.Max(0.01, 0.9 * Math.Min(Math.Max(1, width) / Math.Max(1, maxX - minX), Math.Max(1, height) / Math.Max(1, maxY - minY))),
+        }).Clamp();
     }
 
     private static float[] Normalize(float x, float y, float z)
@@ -265,15 +293,16 @@ public static class Viewer3D
         [0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1], // south
         [0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0], // west
         [1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 0, 1], // east
+        [0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0], // down (visible below floating blocks in perspective)
     ];
-    internal static readonly int[][] NormalsI = [[0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]];
+    internal static readonly int[][] NormalsI = [[0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0], [0, -1, 0]];
     /// <summary>Without lighting: a fixed brightness per side (up brightest, east/north darkest).</summary>
-    private static readonly float[] FlatLight = [1.0f, 0.72f, 0.86f, 0.80f, 0.66f];
+    private static readonly float[] FlatLight = [1.0f, 0.72f, 0.86f, 0.80f, 0.66f, 0.5f];
     /// <summary>Ambient occlusion levels 0..3 → brightness (Minecraft-like smooth lighting).</summary>
     private static readonly float[] AoLevel = [0.5f, 0.68f, 0.84f, 1f];
 
     public static RenderResult3D Render(SceneMesh mesh, ColorProfile profile, Camera3D camera, int width, int height,
-        LayoutRenderer.IconSource? icons, View3DOptions? options = null)
+        LayoutRenderer.IconSource? icons, View3DOptions? options = null, Func<BlockDefinition, int, RgbaImage?>? faceTextures = null)
     {
         var opt = options ?? new View3DOptions();
         width = Math.Max(1, width);
@@ -292,20 +321,22 @@ public static class Viewer3D
         float panX = (float)cam.PanX, panY = (float)cam.PanY;
         // Direction towards the camera in world space (for back-face culling, orthographic).
         float vx = sy * cp, vy = sp, vz = cy * cp;
-        float camDist = mesh.Extent * 1.6f + 20;
+        float camDist = mesh.CameraDistance;
         // Camera position for perspective back-face culling.
         float camX = mesh.CenterX + vx * camDist, camY = mesh.CenterY + vy * camDist, camZ = mesh.CenterZ + vz * camDist;
 
-        var textures = new Dictionary<string, Rgba[]?>();
-        Rgba[]? Texture(BlockDefinition b)
+        var textures = new Dictionary<(string, int), Rgba[]?>();
+        var model = profile.Shades.ShadingModel;
+        Rgba[]? Texture(BlockDefinition b, int face)
         {
-            if (opt.Mode != ViewColorMode.Texture || icons is null) return null;
-            if (textures.TryGetValue(b.Key, out var t)) return t;
-            var icon = icons(b);
+            if (opt.Mode != ViewColorMode.Texture || (icons is null && faceTextures is null)) return null;
+            var key = (b.Key, faceTextures is null ? -1 : face);
+            if (textures.TryGetValue(key, out var t)) return t;
+            var icon = faceTextures is null ? icons?.Invoke(b) : faceTextures(b, face);
             t = icon is null ? null : icon.Width == 16 && icon.Height == 16
                 ? Enumerable.Range(0, 256).Select(i => icon[i % 16, i / 16]).ToArray()
                 : Resample16(icon);
-            textures[b.Key] = t;
+            textures[key] = t;
             return t;
         }
 
@@ -345,8 +376,8 @@ public static class Viewer3D
                     invW = camDist / dist;
                     scale = zoom * invW;
                 }
-                sxs[k] = halfW + (x1 - panX) * scale;
-                sys[k] = halfH - (vyv - panY) * scale;
+                sxs[k] = halfW + x1 * scale - panX * zoom;
+                sys[k] = halfH - vyv * scale + panY * zoom;
                 szs[k] = d;
                 sws[k] = invW;
                 aoc[k] = opt.Lighting ? AoLevel[(f.Ao >> (k * 2)) & 3] : 1;
@@ -354,8 +385,8 @@ public static class Viewer3D
             if (behind) continue;
 
             var block = mesh.Blocks[f.Block];
-            var tex = Texture(block.Block);
-            Rgba flat = FaceColour(mesh, profile, f, block, opt.Mode);
+            var tex = Texture(block.Block, f.Dir);
+            Rgba flat = FaceColour(mesh, profile, model, f, block, opt.Mode);
             float light;
             if (opt.Lighting)
             {
@@ -407,13 +438,13 @@ public static class Viewer3D
                         float w0 = ((x1 - px) * (y2 - py) - (x2 - px) * (y1 - py)) * inv;
                         float w1 = ((x2 - px) * (y0 - py) - (x0 - px) * (y2 - py)) * inv;
                         float w2 = 1 - w0 - w1;
-                        if (w0 < -1e-4f || w1 < -1e-4f || w2 < -1e-4f) continue;
-                        float z = w0 * za + w1 * zb + w2 * zc;
+                        if (w0 < -1e-6f || w1 < -1e-6f || w2 < -1e-6f) continue;
+                        float iw = w0 * wa + w1 * wb + w2 * wc;
+                        float z = (w0 * za * wa + w1 * zb * wb + w2 * zc * wc) / iw;
                         int i = y * width + x;
                         if (z <= depth[i]) continue;
                         depth[i] = z;
                         ids[i] = f.Block;
-                        float iw = w0 * wa + w1 * wb + w2 * wc;
                         float u = (w0 * ua + w1 * ub + w2 * uc) / iw, v = (w0 * va + w1 * vb + w2 * vc) / iw;
                         Rgba col = tex is null ? flat : tex[Math.Clamp((int)(v * 16), 0, 15) * 16 + Math.Clamp((int)(u * 16), 0, 15)];
                         if (col.A < 128) col = flat; // transparent texels (glass, leaves): show the block colour
@@ -451,9 +482,12 @@ public static class Viewer3D
         static float UvV(int k) => k is 2 or 3 ? 1 : 0;
     }
 
-    private static Rgba FaceColour(SceneMesh mesh, ColorProfile profile, SceneMesh.Face f, BlockPlacement b, ViewColorMode mode)
+    private static Rgba FaceColour(SceneMesh mesh, ColorProfile profile, ShadingModel model, SceneMesh.Face f, BlockPlacement b, ViewColorMode mode)
     {
         bool support = b.IsSupport && b.Z != 0;
+        var definition = profile.Find(b.Block.Key) ?? b.Block;
+        int dy = mesh.TopDelta[f.Block];
+        var shade = model.Classify(dy, b.X, b.Z - 1);
         if (mode == ViewColorMode.Shade)
         {
             byte problem = mesh.Problem[f.Block];
@@ -462,7 +496,7 @@ public static class Viewer3D
             if (problem == 1) return new Rgba(235, 30, 30);
             if (problem == 2) return new Rgba(230, 40, 230);
             if (b.Z == 0) return new Rgba(120, 120, 120);
-            return mesh.TopShade[f.Block] switch
+            return shade switch
             {
                 Shade.Dark => new Rgba(70, 105, 225),
                 Shade.Bright => new Rgba(255, 215, 80),
@@ -473,8 +507,12 @@ public static class Viewer3D
         return mode switch
         {
             ViewColorMode.Height => LayoutRenderer.Ramp(mesh.MaxY == 0 ? 0 : b.Y / (double)mesh.MaxY),
-            ViewColorMode.MapColor => f.Dir == 0 && mesh.IsTop[f.Block] ? profile.ColorOf(b.Block, mesh.TopShade[f.Block]) : profile.ColorOf(b.Block, Shade.Dark),
-            _ => profile.ColorOf(b.Block, Shade.Bright),
+            ViewColorMode.MapColor => f.Dir == 0 && mesh.IsTop[f.Block]
+                ? model.Kind == ShadingModelKind.Graded && !definition.Measured.ContainsKey(shade)
+                    ? model.Colour(definition.BaseColor, dy, b.X, b.Z - 1, profile.Shades)
+                    : profile.ColorOf(definition, shade)
+                : profile.ColorOf(definition, Shade.Dark),
+            _ => profile.ColorOf(definition, Shade.Bright),
         };
     }
 

@@ -140,7 +140,7 @@ public sealed class ShadingReport
     /// <summary>Number of columns (x) per height of their highest block: index = height.</summary>
     public required int[] ColumnHeights { get; init; }
 
-    public bool IsExact => Mismatches == 0 && WillFall == 0 && WillBreak == 0;
+    public bool IsExact => Mismatches == 0 && DependsOnTerrain == 0 && WillFall == 0 && WillBreak == 0;
 }
 
 public static class ShadingAnalyzer
