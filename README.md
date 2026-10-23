@@ -47,6 +47,8 @@ renderer are implemented in the project without further libraries.
   contrast, saturation, gamma, sharpen. Transparency: blend, dither, or keep (no block).
 - Colour distance: Oklab (default), CIELAB ΔE76, CIEDE2000, weighted RGB, RGB. Resizing in linear light.
 - **Dithering**
+  - **Hybrid** (option): flat colour areas keep the calm Optimised result (one block where one block is close),
+    and everything else (gradients, photos, shading) is refined with the Perceptual model around them.
   - **High accuracy / Perceptual** (option): optimizes discrete multiscale errors in linear light,
     perceptual pixel errors and edge detail using colour replacements and neighbour swaps. It prioritizes mixed-colour
     accuracy and can look grainier than the calm model. Strength zero disables dithering; height-limited refinement
