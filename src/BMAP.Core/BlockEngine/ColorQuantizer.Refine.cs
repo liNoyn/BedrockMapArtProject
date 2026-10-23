@@ -601,9 +601,10 @@ public static partial class ColorQuantizer
     /// neighbours of the same area (difference below 0.06: an outline next to a flat area does not make it uneven).
     /// Flat = slope below <paramref name="slope"/> per pixel and at least 6 of the 8 neighbours flat too (neighbours in
     /// another area count as agreeing, so pixels along an outline stay flat).
-    /// A smooth gradient across a map (Oklab 0.2 over 128 pixels) is about 0.0016 per pixel: not flat.
+    /// A smooth gradient across a map (Oklab 0.2 over 128 pixels) is about 0.0016 per pixel: not flat. Connected flat patches
+    /// smaller than <paramref name="minArea"/> pixels are dropped.
     /// </summary>
-    public static bool[] FlatAreas(RgbaImage image, int alphaThreshold, double slope = 0.0008)
+    public static bool[] FlatAreas(RgbaImage image, int alphaThreshold, double slope = 0.0008, int minArea = 150)
     {
         int w = image.Width, h = image.Height, n = w * h;
         var den = Denoise(image, 4);
@@ -660,6 +661,29 @@ public static partial class ColorQuantizer
                     }
                 flat[i] = around == 8;
             }
+        // Small flat patches are dropped: a nearly level spot inside a sky or a slow gradient is not a flat area, and
+        // freezing it left a solid square in the gradient. Real flat areas of illustrations are much larger.
+        {
+            var seen = new bool[n];
+            var stack = new Stack<int>();
+            var members = new List<int>();
+            for (int s = 0; s < n; s++)
+            {
+                if (!flat[s] || seen[s]) continue;
+                members.Clear();
+                stack.Push(s);
+                seen[s] = true;
+                while (stack.Count > 0)
+                {
+                    int i = stack.Pop();
+                    members.Add(i);
+                    int x = i % w, y = i / w;
+                    foreach (int j in new[] { x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1 })
+                        if (j >= 0 && flat[j] && !seen[j]) { seen[j] = true; stack.Push(j); }
+                }
+                if (members.Count < minArea) foreach (int i in members) flat[i] = false;
+            }
+        }
         // Grow each flat area up to its outline: pixels within 4 steps of a flat pixel of the same colour (Oklab < 0.02)
         // belong to it, so the strip next to an outline is not left to the other model. Outline and anti-aliasing
         // pixels differ in colour and stay out.
