@@ -60,6 +60,36 @@ public class HybridDitherTests
     }
 
     [Fact]
+    public void FlatAreas_NextToASimilarAreaAcrossAnOutline_StayFlat()
+    {
+        // A cream face (#F2E6DC) with a brown outline on a cream background (#F3EFE4), and a purple disc. The long-range
+        // gradient check compared pixels across the outline (or against its anti-aliased pixels) and called most of both
+        // areas a gradient, so the hybrid drew them grainy. Both interiors must stay flat.
+        var img = RgbaImage.Filled(128, 128, Rgba.FromHex("#F3EFE4"));
+        var brown = new Rgba(110, 84, 66);
+        for (int y = 0; y < 128; y++)
+            for (int x = 0; x < 128; x++)
+            {
+                double face = Math.Sqrt((x - 40) * (x - 40) / 900.0 + (y - 70) * (y - 70) / 1600.0);
+                double disc = Math.Sqrt((x - 95) * (x - 95) + (y - 35) * (y - 35));
+                if (face <= 0.93) img[x, y] = Rgba.FromHex("#F2E6DC");
+                else if (face <= 1) img[x, y] = brown;
+                if (disc <= 22) img[x, y] = Rgba.FromHex("#7E7CCB");
+                else if (disc <= 25) img[x, y] = brown;
+            }
+        var flat = ColorQuantizer.FlatAreas(img, 128);
+        int faceIn = 0, faceFlat = 0, discIn = 0, discFlat = 0;
+        for (int y = 0; y < 128; y++)
+            for (int x = 0; x < 128; x++)
+            {
+                if (Math.Sqrt((x - 40) * (x - 40) / 900.0 + (y - 70) * (y - 70) / 1600.0) < 0.8) { faceIn++; if (flat[y * 128 + x]) faceFlat++; }
+                if (Math.Sqrt((x - 95) * (x - 95) + (y - 35) * (y - 35)) < 18) { discIn++; if (flat[y * 128 + x]) discFlat++; }
+            }
+        Assert.True(faceFlat > 0.9 * faceIn, $"face: {faceFlat} of {faceIn} flat");
+        Assert.True(discFlat > 0.9 * discIn, $"disc: {discFlat} of {discIn} flat");
+    }
+
+    [Fact]
     public void Gradients_GetThePerceptualQuality()
     {
         var img = TestHelpers.Gradient(73, 59);

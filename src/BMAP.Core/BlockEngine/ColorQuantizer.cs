@@ -162,14 +162,22 @@ public static partial class ColorQuantizer
         var entries = selection.Resolve(profile);
         if (entries.Count == 0) throw new InvalidOperationException("使用できるブロックがありません。パレットでブロックを選んでください。");
         ct.ThrowIfCancellationRequested();
-        if (options.Dither == DitherMode.Perceptual && options.DitherStrength <= 0 && options.Refine is null)
+        if (options.Dither is DitherMode.Perceptual or DitherMode.Hybrid && options.DitherStrength <= 0 && options.Refine is null)
             options = options with { Dither = DitherMode.None };
 
-        // Hybrid: the calm Optimized result first, then the Perceptual model everywhere except flat colour areas.
-        QuantizeResult Run(List<PaletteEntry> e) => options.Dither == DitherMode.Hybrid
-            ? QuantizeWith(image, profile, e, options with { Dither = DitherMode.Perceptual }, ct,
-                QuantizeWith(image, profile, e, options with { Dither = DitherMode.Optimized }, ct))
-            : QuantizeWith(image, profile, e, options, ct);
+        // Detection is independent of the palette: reuse it when reducing the material count.
+        var flat = options.Dither == DitherMode.Hybrid ? FlatAreas(image, options.AlphaThreshold, ct: ct) : null;
+        bool hasFlat = flat?.Any(v => v) == true;
+        bool allFlat = hasFlat && Enumerable.Range(0, image.Width * image.Height)
+            .All(i => image.Pixels[i * 4 + 3] < options.AlphaThreshold || flat![i]);
+        QuantizeResult Run(List<PaletteEntry> e)
+        {
+            if (flat is null) return QuantizeWith(image, profile, e, options, ct);
+            if (!hasFlat) return QuantizeWith(image, profile, e, options with { Dither = DitherMode.Perceptual }, ct);
+            var calm = QuantizeWith(image, profile, e, options with { Dither = DitherMode.Optimized }, ct);
+            if (allFlat) return calm;
+            return QuantizeWith(image, profile, e, options with { Dither = DitherMode.Perceptual }, ct, calm, flat);
+        }
         var result = Run(entries);
         // Survival limit: drop the least used blocks until the number of block types fits (design 6.8).
         if (selection.MaxBlockTypes > 0)
@@ -252,7 +260,7 @@ public static partial class ColorQuantizer
 
     /// <param name="keepFlat">Hybrid: a result whose pixels in flat colour areas are kept (and not refined).</param>
     private static QuantizeResult QuantizeWith(RgbaImage image, ColorProfile profile, List<PaletteEntry> entries,
-        QuantizeOptions options, CancellationToken ct, QuantizeResult? keepFlat = null)
+        QuantizeOptions options, CancellationToken ct, QuantizeResult? keepFlat = null, bool[]? flatAreas = null)
     {
         // The height limit counts blocks, the run limit counts light / dark steps: with a measured rule that needs a
         // difference of 2 per step, a limit of 8 blocks allows runs of 4. A limit below one step means flat.
@@ -323,7 +331,7 @@ public static partial class ColorQuantizer
         // stay those of the plain diffusion the height planner measured).
         RgbaImage? denoised = null;
         if (options.Refine is { Denoise: > 0 } dn0 && !options.HeightLimited && !(options.ShadePenalty > 0))
-            image = denoised = Denoise(image, dn0.Denoise);
+            image = denoised = Denoise(image, dn0.Denoise, ct);
         var ordered = OrderedMatrix(options.Dither);
         var knoll = KnollMatrix(options.Dither);
         if (options.HeightLimited && (options.Dither == DitherMode.None || ordered != null || knoll != null))
@@ -377,7 +385,7 @@ public static partial class ColorQuantizer
             // With a height limit or a shade penalty only same-shade swaps are allowed, so the staircase stays as planned.
             // The optimiser works towards a denoised copy; the start (and so, under a height limit, every shade) stays
             // that of the diffusion on the image itself, which the height planner relies on.
-            var target = denoised ?? (refine.Denoise > 0 ? Denoise(image, refine.Denoise) : image);
+            var target = denoised ?? (refine.Denoise > 0 ? Denoise(image, refine.Denoise, ct) : image);
             bool sameShade = options.HeightLimited || options.ShadePenalty > 0;
             bool[]? frozen = null;
             if (keepFlat is not null)
@@ -386,7 +394,7 @@ public static partial class ColorQuantizer
                 // so the borders between the two still blend. Under a height limit only same-shade pixels are taken
                 // (the staircase must stay as planned).
                 frozen = new bool[n];
-                var flat = FlatAreas(image, options.AlphaThreshold);
+                var flat = flatAreas ?? FlatAreas(image, options.AlphaThreshold, ct: ct);
                 var byKey = new Dictionary<(int, Shade), int>();
                 for (int c = 0; c < candidates.Count; c++) byKey.TryAdd((candidates[c].Entry, candidates[c].Shade), c);
                 for (int i = 0; i < n; i++)
