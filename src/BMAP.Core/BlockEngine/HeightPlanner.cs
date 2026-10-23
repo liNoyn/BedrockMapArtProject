@@ -21,8 +21,10 @@ public static class HeightPlanner
         int limit = options.MaxHeight;
         // The optimiser only swaps colours of the same shade under a height limit, so the heights are those of the
         // diffusion it starts from: search with the faster diffusion and optimise once at the end.
-        bool usesDiffusionSeed = options.Dither == DitherMode.Optimized || (options.Dither == DitherMode.Perceptual && options.DitherStrength > 0);
-        var search = usesDiffusionSeed && options.Refine is null
+        bool usesDiffusionSeed = options.Dither == DitherMode.Optimized ||
+            (options.Dither is DitherMode.Perceptual or DitherMode.Hybrid && options.DitherStrength > 0);
+        // Material pruning may choose a different palette after refinement, which can change the shade plan.
+        var search = usesDiffusionSeed && options.Refine is null && selection.MaxBlockTypes == 0
             ? options with { Dither = DitherMode.FloydSteinberg, DitherStrength = 1 } : options;
         QuantizeResult Run(QuantizeOptions o, int runs) => ColorQuantizer.Quantize(image, profile, selection,
             runs == 0 ? o with { Mode = StaircaseMode.Flat, MaxHeight = 0 } : o with { MaxHeight = runs * step }, ct);
@@ -41,6 +43,10 @@ public static class HeightPlanner
             if (Height(q) <= limit) { best = q; lo = mid; }
             else hi = mid - 1;
         }
-        return ReferenceEquals(search, options) ? best : Run(options, lo);
+        var result = ReferenceEquals(search, options) ? best : Run(options, lo);
+        // Verify the final model too, including any palette changes. Prefer a feasible result over an unverified limit.
+        while (lo > 0 && Height(result) > limit) result = Run(options, --lo);
+        if (Height(result) > limit) throw new InvalidOperationException("The requested height cannot contain the supported layout.");
+        return result;
     }
 }

@@ -174,6 +174,7 @@ try
                 configs.Add(($"{st} none de2000", b with { Dither = BMAP.BlockEngine.DitherMode.None, Metric = BMAP.ColorEngine.ColorMetric.Ciede2000 }));
                 configs.Add(($"{st} Perceptual", b with { Dither = BMAP.BlockEngine.DitherMode.Perceptual }));
                 configs.Add(($"{st} Optimized", b with { Dither = BMAP.BlockEngine.DitherMode.Optimized }));
+                configs.Add(($"{st} Hybrid", b with { Dither = BMAP.BlockEngine.DitherMode.Hybrid }));
                 foreach (var d in new[] { BMAP.BlockEngine.DitherMode.FloydSteinberg, BMAP.BlockEngine.DitherMode.JarvisJudiceNinke, BMAP.BlockEngine.DitherMode.SierraLite })
                 {
                     configs.Add(($"{st} {d} srgb", b with { Dither = d, LinearDiffusion = false }));
@@ -187,7 +188,8 @@ try
                     configs.Add(($"{st} {d} linear", b with { Dither = d }));
                 }
                 if (st == BMAP.BlockEngine.StaircaseMode.Valley)
-                    foreach (var d in new[] { BMAP.BlockEngine.DitherMode.None, BMAP.BlockEngine.DitherMode.FloydSteinberg, BMAP.BlockEngine.DitherMode.Bayer8, BMAP.BlockEngine.DitherMode.KnollBayer })
+                    foreach (var d in new[] { BMAP.BlockEngine.DitherMode.None, BMAP.BlockEngine.DitherMode.FloydSteinberg, BMAP.BlockEngine.DitherMode.Bayer8, BMAP.BlockEngine.DitherMode.KnollBayer,
+                        BMAP.BlockEngine.DitherMode.Optimized, BMAP.BlockEngine.DitherMode.Perceptual, BMAP.BlockEngine.DitherMode.Hybrid })
                         configs.Add(($"Valley<=4 {d}", b with { Dither = d, MaxHeight = 4 }));
             }
             var totals = configs.ToDictionary(c => c.Name, _ => (P: 0.0, D: 0.0, Ms: 0L));
@@ -197,7 +199,9 @@ try
                 foreach (var (name, o) in configs)
                 {
                     var sw = System.Diagnostics.Stopwatch.StartNew();
-                    var q = BMAP.BlockEngine.ColorQuantizer.Quantize(img, profile, sel, o);
+                    // Height-labelled comparisons include support blocks and the same placement-aware planner as build.
+                    var q = BMAP.BlockEngine.HeightPlanner.Quantize(img, profile, sel, o, profile.Find("cobblestone")!,
+                        BMAP.BlockEngine.SupportMode.Important, onMapGrid: true);
                     long ms = sw.ElapsedMilliseconds;
                     var t = totals[name];
                     totals[name] = (t.P + BMAP.BlockEngine.HeightAdvisor.PerceivedDeltaE(img, q.Preview),

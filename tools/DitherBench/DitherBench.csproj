@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+    <CoreProject Condition="'$(CoreProject)' == ''">../../src/BMAP.Core/BMAP.Core.csproj</CoreProject>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="$(CoreProject)" /></ItemGroup>
+</Project>

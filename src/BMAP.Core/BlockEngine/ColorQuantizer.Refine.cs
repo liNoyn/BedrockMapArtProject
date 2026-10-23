@@ -29,7 +29,7 @@ public static partial class ColorQuantizer
     /// </summary>
     /// <param name="chosen">Candidate per pixel (-1 = empty); changed in place.</param>
     /// <param name="sameShade">Only swap between candidates of the current shade (keeps the staircase unchanged).</param>
-    /// <param name="frozen">Pixels that keep their colour (they still count in the error of their neighbours).</param>
+    /// <param name="frozen">Pixels that keep their colour and contribute zero residual, avoiding compensation rims.</param>
     internal static void Refine(RgbaImage image, int w, int h, List<Candidate> candidates, int[] chosen, bool sameShade,
         RefineSettings settings, CancellationToken ct, bool[]? frozen = null)
     {
@@ -187,7 +187,7 @@ public static partial class ColorQuantizer
             for (int x = 0; x < w; x++)
             {
                 int i = y * w + x, cur = chosen[i];
-                if (cur < 0) continue;
+                if (cur < 0 || frozen is not null && frozen[i]) continue;
                 int m = 0;
                 for (int c = 0; c < nc; c++)
                 {
@@ -211,14 +211,14 @@ public static partial class ColorQuantizer
         }, _ => { });
 
         if (settings.PairLambda > 0)
-            PairLists(image, w, h, candidates, chosen, sameShade, settings, ck, ok, take, near, nearCost, counts, PixelCost, ct);
+            PairLists(image, w, h, candidates, chosen, sameShade, settings, ck, ok, take, near, nearCost, counts, PixelCost, ct, frozen);
 
         // Initial error field for the starting colours.
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
             {
                 int i = y * w + x, c = chosen[i];
-                // Frozen pixels are settled, error included: their neighbours do not try to make up for it (that drew
+                // Frozen pixels are settled: omit their residual so neighbours do not try to make up for it (that drew
                 // a rim of compensating dots along the inside of every flat area).
                 if (c < 0 || frozen is not null && frozen[i]) continue;
                 float s = sw[i];
@@ -318,7 +318,7 @@ public static partial class ColorQuantizer
     /// </summary>
     private static void PairLists(RgbaImage image, int w, int h, List<Candidate> candidates, int[] chosen, bool sameShade,
         RefineSettings settings, Lab[] ck, Lab[] ok, int take, int[] near, float[] nearCost, int[] counts, Func<int, int, float> pixelCost,
-        CancellationToken ct)
+        CancellationToken ct, bool[]? frozen = null)
     {
         int nc = candidates.Count;
         var lin = new double[nc * 3];
@@ -496,7 +496,7 @@ public static partial class ColorQuantizer
             for (int x = 0; x < w; x++)
             {
                 int i = y * w + x, cur = chosen[i];
-                if (cur < 0) continue;
+                if (cur < 0 || frozen is not null && frozen[i]) continue;
                 int shade = sameShade ? (int)candidates[cur].Shade : -1;
                 int[] plan;
                 if (smooth is null) plan = Plan(image.Pixels[i * 4], image.Pixels[i * 4 + 1], image.Pixels[i * 4 + 2], shade);
@@ -543,7 +543,7 @@ public static partial class ColorQuantizer
     /// pink and grey in a pale pink), while keeping lines and edges, which differ by far more. Transparent pixels are
     /// left alone and do not contribute.
     /// </summary>
-    internal static RgbaImage Denoise(RgbaImage img, double range)
+    internal static RgbaImage Denoise(RgbaImage img, double range, CancellationToken ct = default)
     {
         // Wider than an 8x8 compression block, or the inside of each block would keep its offset.
         const int R = 6, K = 2 * R + 1;
@@ -565,7 +565,7 @@ public static partial class ColorQuantizer
         }
         var rangeW = rangeTable.ToArray();
         var p = img.Pixels;
-        Parallel.For(0, h, y =>
+        Parallel.For(0, h, new ParallelOptions { CancellationToken = ct }, y =>
         {
             for (int x = 0; x < w; x++)
             {
@@ -596,23 +596,30 @@ public static partial class ColorQuantizer
     }
 
     /// <summary>
-    /// Pixels inside flat colour areas (Hybrid). The slope is the mean Oklab difference to the pixels two steps away in
-    /// eight directions, on a denoised copy (block noise of compressed pictures is not a slope), counting only
+    /// Pixels inside flat colour areas (Hybrid). Local slope uses Oklab differences two/four steps away, with an
+    /// additional directional trend check at eight/sixteen steps, on a denoised copy, counting only
     /// neighbours of the same area (difference below 0.06: an outline next to a flat area does not make it uneven).
-    /// Flat = slope below <paramref name="slope"/> per pixel and at least 6 of the 8 neighbours flat too (neighbours in
+    /// Flat = slope below <paramref name="slope"/> per pixel and all 8 neighbours agreeing (neighbours in
     /// another area count as agreeing, so pixels along an outline stay flat).
     /// A smooth gradient across a map (Oklab 0.2 over 128 pixels) is about 0.0016 per pixel: not flat. Connected flat patches
     /// smaller than <paramref name="minArea"/> pixels are dropped.
     /// </summary>
-    public static bool[] FlatAreas(RgbaImage image, int alphaThreshold, double slope = 0.0008, int minArea = 150)
+    public static bool[] FlatAreas(RgbaImage image, int alphaThreshold, double slope = 0.0008, int minArea = 150, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         int w = image.Width, h = image.Height, n = w * h;
-        var den = Denoise(image, 4);
+        var masked = image;
+        if (Enumerable.Range(0, n).Any(i => image.Pixels[i * 4 + 3] > 0 && image.Pixels[i * 4 + 3] < alphaThreshold))
+        {
+            masked = image.Clone();
+            for (int i = 0; i < n; i++) if (masked.Pixels[i * 4 + 3] < alphaThreshold) masked.Pixels[i * 4 + 3] = 0;
+        }
+        var den = Denoise(masked, 4, ct);
         var ok = new Lab[n];
         var valid = new bool[n];
         for (int i = 0; i < n; i++)
         {
-            valid[i] = image.Pixels[i * 4 + 3] >= alphaThreshold && image.Pixels[i * 4 + 3] > 0;
+            valid[i] = image.Pixels[i * 4 + 3] >= alphaThreshold;
             ok[i] = ColorMath.ToOklab(den.Pixels[i * 4], den.Pixels[i * 4 + 1], den.Pixels[i * 4 + 2]);
         }
         static double Dist(Lab a, Lab b) => Math.Sqrt((a.L - b.L) * (a.L - b.L) + (a.A - b.A) * (a.A - b.A) + (a.B - b.B) * (a.B - b.B));
@@ -620,7 +627,7 @@ public static partial class ColorQuantizer
         (int Dx, int Dy)[] dirs = [(-2, -2), (0, -2), (2, -2), (-2, 0), (2, 0), (-2, 2), (0, 2), (2, 2),
             (-4, -4), (0, -4), (4, -4), (-4, 0), (4, 0), (-4, 4), (0, 4), (4, 4)];
         var raw = new bool[n];
-        Parallel.For(0, h, y =>
+        Parallel.For(0, h, new ParallelOptions { CancellationToken = ct }, y =>
         {
             for (int x = 0; x < w; x++)
             {
@@ -640,6 +647,46 @@ public static partial class ColorQuantizer
                     count++;
                 }
                 raw[i] = count >= 6 && sum / count < slope;
+            }
+        });
+        // Averaging directions dilutes a one-axis gradient with its zero-slope perpendicular neighbours. Check the
+        // directional trend over 8/16 pixels too, so quantized skies do not become one large "flat" component.
+        // Only pixels that are locally level themselves are compared: an outline's anti-aliased pixels are within
+        // the colour limit of the area they border, and comparing against them un-flattened every pixel within
+        // 16 pixels of an outline (a whole small disc in an illustration).
+        var local = (bool[])raw.Clone();
+        Parallel.For(0, h, new ParallelOptions { CancellationToken = ct }, y =>
+        {
+            for (int x = 0; x < w; x++)
+            {
+                int i = y * w + x;
+                if (!local[i]) continue;
+                for (int direction = 0; direction < 8 && raw[i]; direction++)
+                    for (int scale = 4; scale <= 8; scale *= 2)
+                    {
+                        int dx = dirs[direction].Dx * scale, dy = dirs[direction].Dy * scale;
+                        int xx = x + dx, yy = y + dy;
+                        if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+                        int j = yy * w + xx;
+                        if (!valid[j] || !local[j]) continue;
+                        // The path must not cross an outline: two similar flat areas separated by one (a cream face on
+                        // a cream background) are not one gradient. An outline is a jump between neighbouring pixels;
+                        // a quantized sky only steps by one level.
+                        bool crosses = false;
+                        int prev = i;
+                        for (int k = 1; k <= scale * 2 && !crosses; k++)
+                        {
+                            int px = x + dirs[direction].Dx * k / 2, py = y + dirs[direction].Dy * k / 2;
+                            int m = py * w + px;
+                            if (m == prev) continue;
+                            if (!valid[m] || Dist(ok[prev], ok[m]) > 0.015) crosses = true;
+                            prev = m;
+                        }
+                        if (crosses) continue;
+                        double distance = Dist(ok[i], ok[j]);
+                        if (distance < 0.06 && distance / Math.Sqrt(dx * dx + dy * dy) >= slope)
+                            raw[i] = false;
+                    }
             }
         });
         var flat = new bool[n];
@@ -669,6 +716,7 @@ public static partial class ColorQuantizer
             var members = new List<int>();
             for (int s = 0; s < n; s++)
             {
+                if ((s & 4095) == 0) ct.ThrowIfCancellationRequested();
                 if (!flat[s] || seen[s]) continue;
                 members.Clear();
                 stack.Push(s);
@@ -678,17 +726,19 @@ public static partial class ColorQuantizer
                     int i = stack.Pop();
                     members.Add(i);
                     int x = i % w, y = i / w;
-                    foreach (int j in new[] { x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1 })
-                        if (j >= 0 && flat[j] && !seen[j]) { seen[j] = true; stack.Push(j); }
+                    if ((members.Count & 4095) == 0) ct.ThrowIfCancellationRequested();
+                    if (x > 0) Visit(i - 1); if (x < w - 1) Visit(i + 1);
+                    if (y > 0) Visit(i - w); if (y < h - 1) Visit(i + w);
                 }
                 if (members.Count < minArea) foreach (int i in members) flat[i] = false;
             }
+            void Visit(int j) { if (flat[j] && !seen[j]) { seen[j] = true; stack.Push(j); } }
         }
         // Grow each flat area up to its outline: pixels within 4 steps of a flat pixel of the same colour (Oklab < 0.02)
         // belong to it, so the strip next to an outline is not left to the other model. Outline and anti-aliasing
         // pixels differ in colour and stay out.
         var grown = (bool[])flat.Clone();
-        Parallel.For(0, h, y =>
+        Parallel.For(0, h, new ParallelOptions { CancellationToken = ct }, y =>
         {
             for (int x = 0; x < w; x++)
             {
