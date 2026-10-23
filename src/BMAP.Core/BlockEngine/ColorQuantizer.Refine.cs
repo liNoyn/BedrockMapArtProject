@@ -29,8 +29,9 @@ public static partial class ColorQuantizer
     /// </summary>
     /// <param name="chosen">Candidate per pixel (-1 = empty); changed in place.</param>
     /// <param name="sameShade">Only swap between candidates of the current shade (keeps the staircase unchanged).</param>
+    /// <param name="frozen">Pixels that keep their colour (they still count in the error of their neighbours).</param>
     internal static void Refine(RgbaImage image, int w, int h, List<Candidate> candidates, int[] chosen, bool sameShade,
-        RefineSettings settings, CancellationToken ct)
+        RefineSettings settings, CancellationToken ct, bool[]? frozen = null)
     {
         int n = w * h, nc = candidates.Count;
         if (nc < 2) return;
@@ -217,7 +218,9 @@ public static partial class ColorQuantizer
             for (int x = 0; x < w; x++)
             {
                 int i = y * w + x, c = chosen[i];
-                if (c < 0) continue;
+                // Frozen pixels are settled, error included: their neighbours do not try to make up for it (that drew
+                // a rim of compensating dots along the inside of every flat area).
+                if (c < 0 || frozen is not null && frozen[i]) continue;
                 float s = sw[i];
                 Spread(x, y, s * (cv[c * 3] - ov[i * 3]), s * (cv[c * 3 + 1] - ov[i * 3 + 1]), s * (cv[c * 3 + 2] - ov[i * 3 + 2]));
             }
@@ -246,7 +249,7 @@ public static partial class ColorQuantizer
                     for (int s = 0; s < w; s++)
                     {
                         int x = reverse ? w - 1 - s : s, i = y * w + x, cur = chosen[i];
-                        if (cur < 0) continue;
+                        if (cur < 0 || frozen is not null && frozen[i]) continue;
                         int count = counts[i], start = i * take;
                         float qr = cv[cur * 3], qg = cv[cur * 3 + 1], qb = cv[cur * 3 + 2], sp = sw[i], cs = c0 * sp * sp;
                         float er = ce[i * 3], eg = ce[i * 3 + 1], eb = ce[i * 3 + 2];
@@ -278,13 +281,13 @@ public static partial class ColorQuantizer
                     for (int x = 0; x < w; x++)
                     {
                         int i = y * w + x, ci = chosen[i];
-                        if (ci < 0) continue;
+                        if (ci < 0 || frozen is not null && frozen[i]) continue;
                         foreach (var (dx, dy) in offsets)
                         {
                             int x2 = x + dx, y2 = y + dy;
                             if (x2 < 0 || x2 >= w || y2 >= h) continue;
                             int j = y2 * w + x2, cj = chosen[j];
-                            if (cj < 0 || cj == ci || !InList(i, cj) || !InList(j, ci)) continue;
+                            if (cj < 0 || cj == ci || frozen is not null && frozen[j] || !InList(i, cj) || !InList(j, ci)) continue;
                             float si = sw[i], sj = sw[j];
                             float ar = si * (cv[cj * 3] - cv[ci * 3]), ag = si * (cv[cj * 3 + 1] - cv[ci * 3 + 1]), ab = si * (cv[cj * 3 + 2] - cv[ci * 3 + 2]);
                             float br = sj * (cv[ci * 3] - cv[cj * 3]), bg = sj * (cv[ci * 3 + 1] - cv[cj * 3 + 1]), bb = sj * (cv[ci * 3 + 2] - cv[cj * 3 + 2]);
@@ -590,6 +593,94 @@ public static partial class ColorQuantizer
             }
         });
         return dst;
+    }
+
+    /// <summary>
+    /// Pixels inside flat colour areas (Hybrid). The slope is the mean Oklab difference to the pixels two steps away in
+    /// eight directions, on a denoised copy (block noise of compressed pictures is not a slope), counting only
+    /// neighbours of the same area (difference below 0.06: an outline next to a flat area does not make it uneven).
+    /// Flat = slope below <paramref name="slope"/> per pixel and at least 6 of the 8 neighbours flat too (neighbours in
+    /// another area count as agreeing, so pixels along an outline stay flat).
+    /// A smooth gradient across a map (Oklab 0.2 over 128 pixels) is about 0.0016 per pixel: not flat.
+    /// </summary>
+    public static bool[] FlatAreas(RgbaImage image, int alphaThreshold, double slope = 0.0008)
+    {
+        int w = image.Width, h = image.Height, n = w * h;
+        var den = Denoise(image, 4);
+        var ok = new Lab[n];
+        var valid = new bool[n];
+        for (int i = 0; i < n; i++)
+        {
+            valid[i] = image.Pixels[i * 4 + 3] >= alphaThreshold && image.Pixels[i * 4 + 3] > 0;
+            ok[i] = ColorMath.ToOklab(den.Pixels[i * 4], den.Pixels[i * 4 + 1], den.Pixels[i * 4 + 2]);
+        }
+        static double Dist(Lab a, Lab b) => Math.Sqrt((a.L - b.L) * (a.L - b.L) + (a.A - b.A) * (a.A - b.A) + (a.B - b.B) * (a.B - b.B));
+        // Two and four steps away: the wider step sees a slow gradient over its 8-bit steps.
+        (int Dx, int Dy)[] dirs = [(-2, -2), (0, -2), (2, -2), (-2, 0), (2, 0), (-2, 2), (0, 2), (2, 2),
+            (-4, -4), (0, -4), (4, -4), (-4, 0), (4, 0), (-4, 4), (0, 4), (4, 4)];
+        var raw = new bool[n];
+        Parallel.For(0, h, y =>
+        {
+            for (int x = 0; x < w; x++)
+            {
+                int i = y * w + x;
+                if (!valid[i]) continue;
+                double sum = 0;
+                int count = 0;
+                foreach (var (dx, dy) in dirs)
+                {
+                    int xx = x + dx, yy = y + dy;
+                    if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+                    int j = yy * w + xx;
+                    if (!valid[j]) continue;
+                    double d = Dist(ok[i], ok[j]) / Math.Sqrt(dx * dx + dy * dy);
+                    if (d * Math.Sqrt(dx * dx + dy * dy) >= 0.06) continue;
+                    sum += d;
+                    count++;
+                }
+                raw[i] = count >= 6 && sum / count < slope;
+            }
+        });
+        var flat = new bool[n];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                int i = y * w + x;
+                if (!raw[i]) continue;
+                int around = 0;
+                for (int dy = -1; dy <= 1; dy++)
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        if (dx == 0 && dy == 0) continue;
+                        // Neighbours outside the image or in another area (an outline) do not count against it.
+                        int xx = x + dx, yy = y + dy;
+                        if (xx < 0 || yy < 0 || xx >= w || yy >= h) { around++; continue; }
+                        int j = yy * w + xx;
+                        if (raw[j] || !valid[j] || Dist(ok[i], ok[j]) >= 0.03) around++;
+                    }
+                flat[i] = around == 8;
+            }
+        // Grow each flat area up to its outline: pixels within 4 steps of a flat pixel of the same colour (Oklab < 0.02)
+        // belong to it, so the strip next to an outline is not left to the other model. Outline and anti-aliasing
+        // pixels differ in colour and stay out.
+        var grown = (bool[])flat.Clone();
+        Parallel.For(0, h, y =>
+        {
+            for (int x = 0; x < w; x++)
+            {
+                int i = y * w + x;
+                if (flat[i] || !valid[i]) continue;
+                for (int dy = -4; dy <= 4 && !grown[i]; dy++)
+                    for (int dx = -4; dx <= 4; dx++)
+                    {
+                        int xx = x + dx, yy = y + dy;
+                        if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+                        int j = yy * w + xx;
+                        if (flat[j] && Dist(ok[i], ok[j]) < 0.02) { grown[i] = true; break; }
+                    }
+            }
+        });
+        return grown;
     }
 
     /// <summary>Gaussian blur in linear light, returned as sRGB bytes (3 per pixel).</summary>

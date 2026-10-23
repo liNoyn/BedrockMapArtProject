@@ -35,6 +35,11 @@ public enum DitherMode
     Optimized,
     /// <summary>Discrete multiscale optimization in linear light, with perceptual detail and edge preservation.</summary>
     Perceptual,
+    /// <summary>
+    /// Both at once: flat colour areas keep the calm Optimized result (one block where one block is close), and
+    /// everything else (gradients, photos, shading) is refined with the Perceptual model around them.
+    /// </summary>
+    Hybrid,
 }
 
 /// <summary>How heights are used for shading (MapartCraft's "3D" setting).</summary>
@@ -160,7 +165,12 @@ public static partial class ColorQuantizer
         if (options.Dither == DitherMode.Perceptual && options.DitherStrength <= 0 && options.Refine is null)
             options = options with { Dither = DitherMode.None };
 
-        var result = QuantizeWith(image, profile, entries, options, ct);
+        // Hybrid: the calm Optimized result first, then the Perceptual model everywhere except flat colour areas.
+        QuantizeResult Run(List<PaletteEntry> e) => options.Dither == DitherMode.Hybrid
+            ? QuantizeWith(image, profile, e, options with { Dither = DitherMode.Perceptual }, ct,
+                QuantizeWith(image, profile, e, options with { Dither = DitherMode.Optimized }, ct))
+            : QuantizeWith(image, profile, e, options, ct);
+        var result = Run(entries);
         // Survival limit: drop the least used blocks until the number of block types fits (design 6.8).
         if (selection.MaxBlockTypes > 0)
         {
@@ -173,7 +183,7 @@ public static partial class ColorQuantizer
                 int keepCount = Math.Max(selection.MaxBlockTypes, used - Math.Max(1, (used - selection.MaxBlockTypes) / 2));
                 entries = Enumerable.Range(0, entries.Count).Where(i => counts[i] > 0)
                     .OrderByDescending(i => counts[i]).Take(keepCount).OrderBy(i => i).Select(i => entries[i]).ToList();
-                result = QuantizeWith(image, profile, entries, options, ct);
+                result = Run(entries);
             }
         }
         return Distribute(result, selection.Mixing);
@@ -240,8 +250,9 @@ public static partial class ColorQuantizer
         };
     }
 
+    /// <param name="keepFlat">Hybrid: a result whose pixels in flat colour areas are kept (and not refined).</param>
     private static QuantizeResult QuantizeWith(RgbaImage image, ColorProfile profile, List<PaletteEntry> entries,
-        QuantizeOptions options, CancellationToken ct)
+        QuantizeOptions options, CancellationToken ct, QuantizeResult? keepFlat = null)
     {
         // The height limit counts blocks, the run limit counts light / dark steps: with a measured rule that needs a
         // difference of 2 per step, a limit of 8 blocks allows runs of 4. A limit below one step means flat.
@@ -367,7 +378,27 @@ public static partial class ColorQuantizer
             // The optimiser works towards a denoised copy; the start (and so, under a height limit, every shade) stays
             // that of the diffusion on the image itself, which the height planner relies on.
             var target = denoised ?? (refine.Denoise > 0 ? Denoise(image, refine.Denoise) : image);
-            Refine(target, w, h, candidates, chosen, options.HeightLimited || options.ShadePenalty > 0, refine, ct);
+            bool sameShade = options.HeightLimited || options.ShadePenalty > 0;
+            bool[]? frozen = null;
+            if (keepFlat is not null)
+            {
+                // Hybrid: flat colour areas take the calm result and stay as they are; the rest is refined around them,
+                // so the borders between the two still blend. Under a height limit only same-shade pixels are taken
+                // (the staircase must stay as planned).
+                frozen = new bool[n];
+                var flat = FlatAreas(image, options.AlphaThreshold);
+                var byKey = new Dictionary<(int, Shade), int>();
+                for (int c = 0; c < candidates.Count; c++) byKey.TryAdd((candidates[c].Entry, candidates[c].Shade), c);
+                for (int i = 0; i < n; i++)
+                {
+                    if (!flat[i] || chosen[i] < 0 || keepFlat.EntryIndex[i] < 0) continue;
+                    if (!byKey.TryGetValue((keepFlat.EntryIndex[i], keepFlat.Shades[i]), out int c)) continue;
+                    if (sameShade && candidates[c].Shade != candidates[chosen[i]].Shade) continue;
+                    chosen[i] = c;
+                    frozen[i] = true;
+                }
+            }
+            Refine(target, w, h, candidates, chosen, sameShade, refine, ct, frozen);
             for (int i = 0; i < n; i++) if (chosen[i] >= 0) Assign(i, chosen[i]);
         }
 

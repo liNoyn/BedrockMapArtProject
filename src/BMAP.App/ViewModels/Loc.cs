@@ -246,6 +246,7 @@ public sealed class Loc : INotifyPropertyChanged
         ["ExportMaterials"] = ("素材リストを CSV で保存…", "Save material list as CSV…"),
 
         ["DitherKnollBayer"] = ("Knoll パターン（Bayer 8x8・規則的な模様）", "Knoll pattern (Bayer 8x8, regular pattern)"),
+        ["DitherHybrid"] = ("合体（単色の面は最適化・グラデーションと写真は高精度）", "Hybrid (flat areas calm, gradients and photos high accuracy)"),
         ["DitherPerceptual"] = ("高精度（グラデーション・写真向け、粒が出やすい）", "High accuracy (gradients and photos, grainier)"),
         ["DitherOptimized"] = ("最適化（おすすめ・単色の面が落ち着く）", "Optimised (recommended, calm flat areas)"),
         ["DitherKnollBlue"] = ("Knoll パターン（ブルーノイズ）", "Knoll pattern (blue noise)"),

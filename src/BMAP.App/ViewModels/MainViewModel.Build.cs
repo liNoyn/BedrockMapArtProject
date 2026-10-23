@@ -287,7 +287,8 @@ public sealed partial class MainViewModel
         Dithers =
         [
             new(DitherMode.None, "SuNone", L), new(DitherMode.Optimized, "DitherOptimized", L),
-            new(DitherMode.Perceptual, "DitherPerceptual", L), new(DitherMode.FloydSteinberg, "Floyd–Steinberg", L),
+            new(DitherMode.Hybrid, "DitherHybrid", L), new(DitherMode.Perceptual, "DitherPerceptual", L),
+            new(DitherMode.FloydSteinberg, "Floyd–Steinberg", L),
             new(DitherMode.JarvisJudiceNinke, "Jarvis–Judice–Ninke (MinAvgErr)", L), new(DitherMode.Burkes, "Burkes", L),
             new(DitherMode.SierraLite, "Sierra Lite", L), new(DitherMode.Stucki, "Stucki", L), new(DitherMode.Atkinson, "Atkinson", L),
             new(DitherMode.KnollBayer, "DitherKnollBayer", L), new(DitherMode.KnollBlueNoise, "DitherKnollBlue", L),
