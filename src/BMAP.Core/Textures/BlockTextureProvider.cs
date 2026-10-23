@@ -22,6 +22,7 @@ public sealed class BlockTextureProvider
     };
 
     private readonly ConcurrentDictionary<string, RgbaImage?> _icons = new();
+    private readonly ConcurrentDictionary<(string Key, int Face), RgbaImage?> _faces = new();
     private JsonObject? _blocks;
     private JsonObject? _terrain;
 
@@ -54,6 +55,7 @@ public sealed class BlockTextureProvider
         _blocks = ReadJson("blocks.json");
         _terrain = ReadJson(Path.Combine("textures", "terrain_texture.json"));
         _icons.Clear();
+        _faces.Clear();
     }
 
     private JsonObject? ReadJson(string relative)
@@ -109,7 +111,8 @@ public sealed class BlockTextureProvider
         ResourcePack = null;
         LoadIndex();
 
-        var paths = blocks.Select(ResolveTexturePath).Where(p => p != null).Select(p => p!.Value.Path).Distinct().ToList();
+        var paths = blocks.SelectMany(b => Enumerable.Range(-1, 7).Select(face => ResolveTexturePath(b, face)))
+            .Where(p => p != null).Select(p => p!.Value.Path).Distinct().ToList();
         int done = 0, ok = 0;
         foreach (var path in paths)
         {
@@ -137,10 +140,18 @@ public sealed class BlockTextureProvider
     /// <summary>A square icon (normally 16x16) for the block, or null when no texture is available.</summary>
     public RgbaImage? GetIcon(BlockDefinition block) => _icons.GetOrAdd(block.Key, _ => LoadIcon(block));
 
-    private RgbaImage? LoadIcon(BlockDefinition block)
+    /// <summary>Unmasked face texture: 0 up, 1 north, 2 south, 3 west, 4 east, 5 down. Inventory icons stay separate.</summary>
+    public RgbaImage? GetFaceTexture(BlockDefinition block, int face)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(face);
+        if (face > 5) throw new ArgumentOutOfRangeException(nameof(face));
+        return _faces.GetOrAdd((block.Key, face), _ => LoadIcon(block, face));
+    }
+
+    private RgbaImage? LoadIcon(BlockDefinition block, int face = -1)
     {
         if (!IsAvailable) return null;
-        var resolved = ResolveTexturePath(block);
+        var resolved = ResolveTexturePath(block, face);
         if (resolved is not { } r) return null;
         var file = FindFile(r.Path);
         if (file is null) return null;
@@ -153,7 +164,7 @@ public sealed class BlockTextureProvider
             if (img.Height > img.Width && img.Height % img.Width == 0) img = img.Crop(0, 0, img.Width, img.Width);
             if (r.Tint is { } overlay) Overlay(img, overlay);
             else if (block.BiomeTinted || IsFoliage(block)) Tint(img, DefaultTint(block));
-            Shape(img, block);
+            if (face < 0) Shape(img, block);
             return img;
         }
         catch { return null; }
@@ -171,18 +182,21 @@ public sealed class BlockTextureProvider
     }
 
     /// <summary>blocks.json → terrain_texture.json → texture path (without extension) and optional tint.</summary>
-    public (string Path, Rgba? Tint)? ResolveTexturePath(BlockDefinition block)
+    public (string Path, Rgba? Tint)? ResolveTexturePath(BlockDefinition block) => ResolveTexturePath(block, -1);
+
+    private (string Path, Rgba? Tint)? ResolveTexturePath(BlockDefinition block, int face)
     {
         if (_blocks is null || _terrain is null) return null;
         string id = block.Name.Contains(':') ? block.Name[(block.Name.IndexOf(':') + 1)..] : block.Name;
         var entry = _blocks[id] ?? _blocks[block.Name] ?? (Aliases.TryGetValue(id, out var alias) ? _blocks[alias] : null);
         if (entry is null) return null;
         // Prefer the inventory ("carried") look, then the side face (what MapartCraft shows), then any face.
-        var tex = entry["carried_textures"] ?? entry["textures"];
+        var tex = face < 0 ? entry["carried_textures"] ?? entry["textures"] : entry["textures"];
+        string faceName = face switch { 0 => "up", 1 => "north", 2 => "south", 3 => "west", 4 => "east", 5 => "down", _ => "side" };
         string? key = tex switch
         {
             JsonValue v => v.GetValue<string>(),
-            JsonObject o => (o["side"] ?? o["south"] ?? o["north"] ?? o["up"] ?? o.Select(kv => kv.Value).FirstOrDefault())?.GetValue<string>(),
+            JsonObject o => (o[faceName] ?? o["side"] ?? o["south"] ?? o["north"] ?? o["up"] ?? o.Select(kv => kv.Value).FirstOrDefault())?.GetValue<string>(),
             _ => null,
         };
         if (key is null) return null;

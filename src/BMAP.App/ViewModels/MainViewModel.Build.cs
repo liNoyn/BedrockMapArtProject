@@ -286,7 +286,8 @@ public sealed partial class MainViewModel
         ApplyRecommendedYCommand = new RelayCommand(() => { if (_advice is { Fits: true } a) { UseOrigin = true; OriginY = a.RecommendedBaseY; } }, () => _advice is { Fits: true });
         Dithers =
         [
-            new(DitherMode.None, "SuNone", L), new(DitherMode.Optimized, "DitherOptimized", L), new(DitherMode.FloydSteinberg, "Floyd–Steinberg", L),
+            new(DitherMode.None, "SuNone", L), new(DitherMode.Optimized, "DitherOptimized", L),
+            new(DitherMode.Perceptual, "DitherPerceptual", L), new(DitherMode.FloydSteinberg, "Floyd–Steinberg", L),
             new(DitherMode.JarvisJudiceNinke, "Jarvis–Judice–Ninke (MinAvgErr)", L), new(DitherMode.Burkes, "Burkes", L),
             new(DitherMode.SierraLite, "Sierra Lite", L), new(DitherMode.Stucki, "Stucki", L), new(DitherMode.Atkinson, "Atkinson", L),
             new(DitherMode.KnollBayer, "DitherKnollBayer", L), new(DitherMode.KnollBlueNoise, "DitherKnollBlue", L),

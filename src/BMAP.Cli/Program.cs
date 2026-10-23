@@ -14,7 +14,7 @@ if (args.Length == 0)
           analyze <image> [--maps 1x1] [--dither none|fs|bayer4] [--preset n] [--bg #RRGGBB]
                                          3D マップアートの高さと画質の関係を解析
           bench <image>... [--maps 1x1]  ディザリング・色差の方式を比較（画質と速度）
-          convert <image> <out.png> [--dither Optimized] [--staircase valley|flat] [--max n] [--maps 1x1]
+          convert <image> <out.png> [--dither Perceptual|Optimized] [--staircase valley|flat] [--max n] [--maps 1x1]
                                          変換結果を元画像と並べて保存し、色差を表示
           nearest #RRGGBB... [--n 8]     一番近い地図色（陰影つき）を一覧
           score <source> <map.png>...    地図画像（128 px / 枚）と元画像の色差（ピクセル・近く・遠く）
@@ -49,19 +49,7 @@ try
             var profile = BMAP.Palette.ColorProfile.LoadBuiltIn();
             var qopt = new BMAP.BlockEngine.QuantizeOptions
             {
-                Dither = opts.GetValueOrDefault("dither", "none") switch
-                {
-                    "fs" => BMAP.BlockEngine.DitherMode.FloydSteinberg,
-                    "jjn" => BMAP.BlockEngine.DitherMode.JarvisJudiceNinke,
-                    "burkes" => BMAP.BlockEngine.DitherMode.Burkes,
-                    "sierra" => BMAP.BlockEngine.DitherMode.SierraLite,
-                    "stucki" => BMAP.BlockEngine.DitherMode.Stucki,
-                    "atkinson" => BMAP.BlockEngine.DitherMode.Atkinson,
-                    "bayer2" => BMAP.BlockEngine.DitherMode.Bayer2,
-                    "bayer4" => BMAP.BlockEngine.DitherMode.Bayer4,
-                    "ordered3" => BMAP.BlockEngine.DitherMode.Ordered3,
-                    _ => BMAP.BlockEngine.DitherMode.None,
-                },
+                Dither = ParseDither(opts.GetValueOrDefault("dither", "none")),
                 Mode = opts.GetValueOrDefault("staircase", "flat") switch
                 {
                     "classic" => BMAP.BlockEngine.StaircaseMode.Classic,
@@ -117,12 +105,7 @@ try
             var img = ImagePipeline.Process(ImageCodec.Load(args[1]), new ImageSettings { MapsX = mx, MapsY = my, BackgroundColor = opts.GetValueOrDefault("bg", "#FFFFFF") });
             var profile = BMAP.Palette.ColorProfile.LoadBuiltIn();
             var preset = BMAP.BlockEngine.BlockPreset.BuiltIns(profile)[int.Parse(opts.GetValueOrDefault("preset", "0"))];
-            var dither = opts.GetValueOrDefault("dither", "none") switch
-            {
-                "fs" => BMAP.BlockEngine.DitherMode.FloydSteinberg,
-                "bayer4" => BMAP.BlockEngine.DitherMode.Bayer4,
-                _ => BMAP.BlockEngine.DitherMode.None,
-            };
+            var dither = ParseDither(opts.GetValueOrDefault("dither", "none"));
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var rows = BMAP.BlockEngine.HeightAdvisor.Analyze(img, profile, preset.ToSelection(),
                 new BMAP.BlockEngine.QuantizeOptions { Mode = BMAP.BlockEngine.StaircaseMode.Valley, Dither = dither },
@@ -156,7 +139,8 @@ try
             var mesh = BMAP.Preview.SceneMesh.Build(layout, BMAP.Preview.LayoutRegion.All(layout), true, null, report);
             Lap("mesh");
             var (w, h) = ParseGrid(opts.GetValueOrDefault("size", "1200x800"));
-            var cam = mesh.FitCamera(w, h, double.Parse(opts.GetValueOrDefault("yaw", "35")), double.Parse(opts.GetValueOrDefault("pitch", "40")));
+            var cam = mesh.FitCamera(w, h, double.Parse(opts.GetValueOrDefault("yaw", "35")), double.Parse(opts.GetValueOrDefault("pitch", "40")),
+                perspective: opts.ContainsKey("perspective"));
             if (double.Parse(opts.GetValueOrDefault("zoom", "0")) is > 0 and var z) cam = cam with { Zoom = z };
             var tex = opts.TryGetValue("textures", out var td) ? new BMAP.Textures.BlockTextureProvider(td) : null;
             var vmode = opts.GetValueOrDefault("mode", "texture") switch
@@ -166,7 +150,8 @@ try
             };
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var r = BMAP.Preview.Viewer3D.Render(mesh, profile, cam, w, h, tex is { IsAvailable: true } ? tex.GetIcon : null,
-                new BMAP.Preview.View3DOptions { Mode = vmode, Lighting = !opts.ContainsKey("nolight"), Grid = opts.ContainsKey("grid") });
+                new BMAP.Preview.View3DOptions { Mode = vmode, Lighting = !opts.ContainsKey("nolight"), Grid = opts.ContainsKey("grid") },
+                tex is { IsAvailable: true } ? tex.GetFaceTexture : null);
             Lap("render");
             ImageCodec.SavePng(r.Image, args[2]);
             Console.WriteLine($"faces={mesh.FaceCount} render={sw.ElapsedMilliseconds}ms maxY={report.MaxY} mismatches={report.Mismatches} exact={report.IsExact}");
@@ -187,6 +172,8 @@ try
                 var b = new BMAP.BlockEngine.QuantizeOptions { Mode = st };
                 configs.Add(($"{st} none oklab", b with { Dither = BMAP.BlockEngine.DitherMode.None }));
                 configs.Add(($"{st} none de2000", b with { Dither = BMAP.BlockEngine.DitherMode.None, Metric = BMAP.ColorEngine.ColorMetric.Ciede2000 }));
+                configs.Add(($"{st} Perceptual", b with { Dither = BMAP.BlockEngine.DitherMode.Perceptual }));
+                configs.Add(($"{st} Optimized", b with { Dither = BMAP.BlockEngine.DitherMode.Optimized }));
                 foreach (var d in new[] { BMAP.BlockEngine.DitherMode.FloydSteinberg, BMAP.BlockEngine.DitherMode.JarvisJudiceNinke, BMAP.BlockEngine.DitherMode.SierraLite })
                 {
                     configs.Add(($"{st} {d} srgb", b with { Dither = d, LinearDiffusion = false }));
@@ -555,6 +542,14 @@ static Dictionary<string, string> ParseOptions(IEnumerable<string> args)
     }
     return dict;
 }
+
+static BMAP.BlockEngine.DitherMode ParseDither(string value) => value.ToLowerInvariant() switch
+{
+    "fs" => BMAP.BlockEngine.DitherMode.FloydSteinberg,
+    "jjn" => BMAP.BlockEngine.DitherMode.JarvisJudiceNinke,
+    "sierra" => BMAP.BlockEngine.DitherMode.SierraLite,
+    _ => Enum.Parse<BMAP.BlockEngine.DitherMode>(value, true),
+};
 
 static (int, int) ParseGrid(string s)
 {

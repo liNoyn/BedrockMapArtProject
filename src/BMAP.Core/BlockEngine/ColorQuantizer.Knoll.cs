@@ -7,7 +7,7 @@ public static partial class ColorQuantizer
     /// <summary>Candidates per Knoll mix (one per threshold level of the 8x8 Bayer matrix).</summary>
     private const int KnollN = 64;
 
-    private sealed partial class NearestMatcher
+    internal sealed partial class NearestMatcher
     {
         private readonly Dictionary<int, int[]?> _plans = new();
         private double[]? _luma;
@@ -17,14 +17,20 @@ public static partial class ColorQuantizer
         /// Knoll's pattern dithering: approximates the colour by a mix of <see cref="KnollN"/> palette colours
         /// (repeats allowed), found by moving the goal by the accumulated error each time; the mix is sorted by
         /// luminance and <paramref name="threshold"/> (0..1, from the dither matrix) picks one entry.
-        /// Mixes are cached per colour bucket (6 bits per channel), computed from the bucket centre so the result
-        /// does not depend on which thread saw which pixel first.
+        /// Plans use the exact 24-bit source colour. Cache capacity only affects speed, never the target colour.
         /// </summary>
         public int KnollPick(byte r, byte g, byte b, int shadeMask, QuantizeOptions options, double threshold)
         {
-            int key = (shadeMask << 18) | (r >> 2 << 12) | (g >> 2 << 6) | (b >> 2);
+            int closest = Find(r, g, b, shadeMask, options.ShadePenalty);
+            if (closest < 0) return -1;
+            var exact = _candidates[closest].Color;
+            if (options.DitherStrength <= 0 || (exact.R == r && exact.G == g && exact.B == b)) return closest;
+            int key = (shadeMask << 24) | (r << 16) | (g << 8) | b;
             if (!_plans.TryGetValue(key, out var plan))
-                _plans[key] = plan = BuildPlan((r & ~3) + 1.5, (g & ~3) + 1.5, (b & ~3) + 1.5, shadeMask, options);
+            {
+                plan = BuildPlan(r, g, b, shadeMask, options);
+                if (_plans.Count < 4096) _plans[key] = plan;
+            }
             if (plan is null) return -1;
             return plan[Math.Clamp((int)(threshold * plan.Length), 0, plan.Length - 1)];
         }

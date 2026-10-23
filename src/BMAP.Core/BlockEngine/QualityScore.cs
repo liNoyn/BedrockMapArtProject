@@ -19,6 +19,8 @@ public readonly record struct QualityScore(double Pixel, double Near, double Far
 
     public static QualityScore Measure(RgbaImage source, RgbaImage map)
     {
+        if (source.Width != map.Width || source.Height != map.Height)
+            throw new ArgumentException("Source and map dimensions must match.", nameof(map));
         int w = source.Width, h = source.Height;
         var a = ToLinear(source);
         var b = ToLinear(map);
@@ -52,31 +54,7 @@ public readonly record struct QualityScore(double Pixel, double Near, double Far
     /// <summary>Separable Gaussian blur of linear values; transparent pixels do not contribute.</summary>
     private static double[] Blur(double[] src, RgbaImage mask, int w, int h, double sigma)
     {
-        int r = (int)Math.Ceiling(3 * sigma);
-        var k = new double[2 * r + 1];
-        for (int d = -r; d <= r; d++) k[d + r] = Math.Exp(-d * d / (2 * sigma * sigma));
-        var tmp = new double[src.Length];
-        var dst = new double[src.Length];
-        for (int pass = 0; pass < 2; pass++)
-        {
-            var from = pass == 0 ? src : tmp;
-            var to = pass == 0 ? tmp : dst;
-            for (int y = 0; y < h; y++)
-                for (int x = 0; x < w; x++)
-                {
-                    double s0 = 0, s1 = 0, s2 = 0, ws = 0;
-                    for (int d = -r; d <= r; d++)
-                    {
-                        int sx = pass == 0 ? x + d : x, sy = pass == 0 ? y : y + d;
-                        if (sx < 0 || sy < 0 || sx >= w || sy >= h || mask.Pixels[(sy * w + sx) * 4 + 3] == 0) continue;
-                        int j = (sy * w + sx) * 3;
-                        double kw = k[d + r];
-                        s0 += from[j] * kw; s1 += from[j + 1] * kw; s2 += from[j + 2] * kw; ws += kw;
-                    }
-                    int i = (y * w + x) * 3;
-                    if (ws > 0) { to[i] = s0 / ws; to[i + 1] = s1 / ws; to[i + 2] = s2 / ws; }
-                }
-        }
-        return dst;
+        var valid = Enumerable.Range(0, w * h).Select(i => mask.Pixels[i * 4 + 3] != 0).ToArray();
+        return DitherFilter.Blur(src, valid, w, h, sigma);
     }
 }

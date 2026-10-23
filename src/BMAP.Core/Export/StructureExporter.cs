@@ -53,6 +53,8 @@ public static class StructureExporter
 
     public static List<StructureTile> Split(BlockLayout layout, int mapsX, StructureExportOptions options)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(options.MaxTileHeight);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(mapsX);
         var tiles = new List<StructureTile>();
         int ts = options.TileSize;
         int order = 0;
@@ -117,10 +119,11 @@ public static class StructureExporter
 
         int part = 0;
         bool sliced = maxY - minY >= options.MaxTileHeight;
-        for (int y0 = minY; y0 <= maxY; y0 += options.MaxTileHeight, part++)
+        for (long sliceY = minY; sliceY <= maxY; sliceY += options.MaxTileHeight, part++)
         {
+            int y0 = (int)sliceY;
             // Each slice starts at its lowest block; slices without blocks are skipped.
-            int top = Math.Min(y0 + options.MaxTileHeight - 1, maxY);
+            int top = (int)Math.Min(sliceY + options.MaxTileHeight - 1, maxY);
             if (!blocks.Any(b => b.Y >= y0 && b.Y <= top)) continue;
             int h = top - y0 + 1;
             var s = new McStructure(w, h, d);

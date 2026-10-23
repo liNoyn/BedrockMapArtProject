@@ -34,6 +34,8 @@ public static partial class ColorQuantizer
     {
         int n = w * h, nc = candidates.Count;
         if (nc < 2) return;
+        if (settings.Neighbours < 1 || settings.PairNear < 1)
+            throw new ArgumentOutOfRangeException(nameof(settings), "At least one candidate is required.");
 
         // Vectors in the working space.
         float[] Vec(double r, double g, double b)
@@ -90,26 +92,10 @@ public static partial class ColorQuantizer
             sw[i] = (float)Math.Pow(Math.Max(y, 0.02) / 0.5, -settings.DarkWeight);
         }
 
-        // Combined kernel C = w0·δ + Σ ws·(Gs ⊛ Gs); Gs ⊛ Gs is a Gaussian with σ√2.
-        int R = (int)Math.Ceiling(3 * settings.Sigma2 * Math.Sqrt(2));
-        int K = 2 * R + 1;
-        var kernel = new float[K * K];
-        void AddGaussian(double sigma, double weight)
-        {
-            if (weight <= 0 || sigma <= 0) return;
-            double s2 = 2 * sigma * sigma; // variance of the autocorrelation
-            var g = new double[K * K];
-            for (int dy = -R; dy <= R; dy++)
-                for (int dx = -R; dx <= R; dx++)
-                    g[(dy + R) * K + dx + R] = Math.Exp(-(dx * dx + dy * dy) / (2 * s2));
-            // Normalise like the autocorrelation of a unit-sum Gaussian: its centre value is Σ g², i.e. ≈ 1/(4πσ²).
-            double centre = 1 / (4 * Math.PI * sigma * sigma);
-            for (int k = 0; k < g.Length; k++) kernel[k] += (float)(weight * g[k] * centre);
-        }
-        kernel[R * K + R] += (float)settings.PixelWeight;
-        AddGaussian(settings.Sigma1, settings.Weight1);
-        AddGaussian(settings.Sigma2, settings.Weight2);
-        float c0 = kernel[R * K + R];
+        var model = new DitherKernel(settings);
+        int R = model.Radius, K = model.Size;
+        var kernel = model.Values;
+        float c0 = model.Centre;
 
         // ce = C * e, with e = chosen − original. Spread is the hot loop: the kernel is stored with each value three times
         // (one per channel, as ce is interleaved) so each kernel row is one contiguous run that is added with SIMD.
@@ -162,7 +148,7 @@ public static partial class ColorQuantizer
                     foreach (var (dx, dy, kx, ky) in Sobel)
                     {
                         int xx = Math.Clamp(x + dx, 0, w - 1), yy = Math.Clamp(y + dy, 0, h - 1);
-                        var o2 = ok[yy * w + xx];
+                        var o2 = chosen[yy * w + xx] < 0 ? ok[y * w + x] : ok[yy * w + xx];
                         double v = o2.L + 0.5 * Math.Sqrt(o2.A * o2.A + o2.B * o2.B);
                         gx += kx * v; gy += ky * v;
                     }
@@ -255,6 +241,7 @@ public static partial class ColorQuantizer
                 int changes = 0;
                 for (int y = 0; y < h; y++)
                 {
+                    if ((y & 15) == 0) ct.ThrowIfCancellationRequested();
                     bool reverse = (y & 1) == 1;
                     for (int s = 0; s < w; s++)
                     {
@@ -608,36 +595,16 @@ public static partial class ColorQuantizer
     /// <summary>Gaussian blur in linear light, returned as sRGB bytes (3 per pixel).</summary>
     private static byte[] BlurLinear(RgbaImage img, double sigma)
     {
-        int w = img.Width, h = img.Height, r = (int)Math.Ceiling(3 * sigma);
-        var k = new double[2 * r + 1];
-        for (int d = -r; d <= r; d++) k[d + r] = Math.Exp(-d * d / (2 * sigma * sigma));
-        var a = new double[w * h * 3];
-        for (int i = 0; i < w * h; i++) for (int ch = 0; ch < 3; ch++) a[i * 3 + ch] = ColorMath.SrgbToLinear(img.Pixels[i * 4 + ch]);
-        var t = new double[a.Length];
-        for (int pass = 0; pass < 2; pass++)
+        int w = img.Width, h = img.Height;
+        var linear = new double[w * h * 3];
+        var valid = new bool[w * h];
+        for (int i = 0; i < w * h; i++)
         {
-            var src = pass == 0 ? a : t;
-            var dst = pass == 0 ? t : a;
-            var tmp = new double[src.Length];
-            for (int y = 0; y < h; y++)
-                for (int x = 0; x < w; x++)
-                {
-                    double s0 = 0, s1 = 0, s2 = 0, ws = 0;
-                    for (int d = -r; d <= r; d++)
-                    {
-                        int sx = pass == 0 ? x + d : x, sy = pass == 0 ? y : y + d;
-                        if (sx < 0 || sy < 0 || sx >= w || sy >= h) continue;
-                        int j = (sy * w + sx) * 3;
-                        s0 += src[j] * k[d + r]; s1 += src[j + 1] * k[d + r]; s2 += src[j + 2] * k[d + r]; ws += k[d + r];
-                    }
-                    int o = (y * w + x) * 3;
-                    tmp[o] = s0 / ws; tmp[o + 1] = s1 / ws; tmp[o + 2] = s2 / ws;
-                }
-            Array.Copy(tmp, dst, tmp.Length);
+            valid[i] = img.Pixels[i * 4 + 3] != 0;
+            for (int c = 0; c < 3; c++) linear[i * 3 + c] = ColorMath.SrgbToLinear(img.Pixels[i * 4 + c]);
         }
-        var result = new byte[w * h * 3];
-        for (int i = 0; i < result.Length; i++) result[i] = (byte)Math.Clamp(Math.Round(ColorMath.LinearToSrgb(a[i])), 0, 255);
-        return result;
+        var blurred = DitherFilter.Blur(linear, valid, w, h, sigma);
+        return Array.ConvertAll(blurred, v => (byte)Math.Clamp(Math.Round(ColorMath.LinearToSrgb(v)), 0, 255));
     }
 
     /// <summary>The <paramref name="count"/> smallest of the first <paramref name="m"/> items, into <paramref name="result"/>.</summary>

@@ -47,7 +47,11 @@ renderer are implemented in the project without further libraries.
   contrast, saturation, gamma, sharpen. Transparency: blend, dither, or keep (no block).
 - Colour distance: Oklab (default), CIELAB ΔE76, CIEDE2000, weighted RGB, RGB. Resizing in linear light.
 - **Dithering**
-  - **Optimised** (default, recommended): starts from error diffusion and changes one pixel at a time to whichever map
+  - **High accuracy / Perceptual** (option): optimizes discrete multiscale errors in linear light,
+    perceptual pixel errors and edge detail using colour replacements and neighbour swaps. It prioritizes mixed-colour
+    accuracy and can look grainier than the calm model. Strength zero disables dithering; height-limited refinement
+    keeps every pixel's shade unchanged. See [the model and validation report](docs/dithering-model.md).
+  - **Optimised** (default, recommended; calm flat areas): starts from error diffusion and changes one pixel at a time to whichever map
     colour brings the picture closest to the source (the idea of direct binary search). The difference is measured per
     pixel and blurred by 1 and 2 pixels (the colour seen from a distance). Colours the palette lacks are mixed from the
     best **pair** of map colours only — the closest blend with the least contrast (pale lavender from white and ice, not
