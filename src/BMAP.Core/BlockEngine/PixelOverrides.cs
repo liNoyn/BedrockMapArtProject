@@ -117,9 +117,11 @@ public sealed class PixelOverrides
         var o = new PixelOverrides();
         foreach (var line in lines ?? [])
         {
+            if (string.IsNullOrWhiteSpace(line)) continue;
             var p = line.Split(',');
-            if (p.Length < 4 || !int.TryParse(p[0], CultureInfo.InvariantCulture, out int x) || !int.TryParse(p[1], CultureInfo.InvariantCulture, out int y)) continue;
-            o._edits[(x, y)] = new PixelEdit(x, y, p[2] == "-" ? null : p[2], (Shade)Math.Clamp(int.Parse(p[3], CultureInfo.InvariantCulture), 0, 2));
+            if (p.Length < 4 || !int.TryParse(p[0], CultureInfo.InvariantCulture, out int x) ||
+                !int.TryParse(p[1], CultureInfo.InvariantCulture, out int y) || !int.TryParse(p[3], CultureInfo.InvariantCulture, out int shade)) continue;
+            o._edits[(x, y)] = new PixelEdit(x, y, p[2] == "-" ? null : p[2], (Shade)Math.Clamp(shade, 0, 2));
         }
         return o;
     }

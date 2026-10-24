@@ -283,7 +283,7 @@ public class BlockTests
     {
         var q = Quantize(TestHelpers.Gradient(256, 256), opt: new QuantizeOptions { Mode = StaircaseMode.Valley });
         var layout = BlockLayout.Generate(q, Cobble, supports: SupportMode.AllOptimized);
-        var tiles = StructureExporter.Split(layout, 2, new StructureExportOptions());
+        var tiles = StructureExporter.Split(layout, 2, new StructureExportOptions { Split = StructureSplit.Tiles64 });
         Assert.Empty(StructureExporter.ValidateCoverage(layout, tiles));
         foreach (var t in tiles)
         {

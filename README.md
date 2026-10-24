@@ -7,8 +7,8 @@
 
 A Windows desktop app that turns images into map art for **Minecraft Bedrock Edition**.
 It rebuilds the features and the screen layout of [MapartCraft](https://github.com/rebane2001/mapartcraft) (a web app for
-Java Edition) for Bedrock: the image is reduced to block map colours and exported as **`.mcstructure` files** (64 × 64
-pieces for structure blocks, one per map, or one file).
+Java Edition) for Bedrock: the image is reduced to block map colours and exported as **`.mcstructure` files** in
+128 × 128 pieces by default, with the northern support row in separate 128 × 1 files. 64 × 64 and whole-build export remain available.
 
 The window has MapartCraft's three columns: **block selection** on the left, the **map preview** (map, original, shading,
 difference, calibration) and the **materials** in the middle, and **map settings** with the green export buttons on the
@@ -47,13 +47,19 @@ renderer are implemented in the project without further libraries.
   contrast, saturation, gamma, sharpen. Transparency: blend, dither, or keep (no block).
 - Colour distance: Oklab (default), CIELAB ΔE76, CIEDE2000, weighted RGB, RGB. Resizing in linear light.
 - **Dithering**
-  - **Hybrid** (option): flat colour areas keep the calm Optimised result (one block where one block is close),
+  - The normal selector has four choices: **Illustrations, Balanced, Blend, No dithering**.
+    These correspond to Optimized, Hybrid, Perceptual and None internally. Use Illustrations for flat colours,
+    Balanced for flat colours with shading, Blend for mixed-colour accuracy, or No dithering for
+    nearest-colour mapping. Illustrations remains the GUI default.
+    Under a tight material budget, Illustrations and Balanced prioritise contours; Blend prioritises average colour.
+    See the [model-specific evaluation report](docs/model-priority-2026-10-24.md) for the method and tradeoffs.
+  - **Balanced / Hybrid** (option): flat colour areas keep the calm Optimised result (one block where one block is close),
     and everything else (gradients, photos, shading) is refined with the Perceptual model around them.
-  - **High accuracy / Perceptual** (option): optimizes discrete multiscale errors in linear light,
+  - **Blend / Perceptual** (option): optimizes discrete multiscale errors in linear light,
     perceptual pixel errors and edge detail using colour replacements and neighbour swaps. It prioritizes mixed-colour
     accuracy and can look grainier than the calm model. Strength zero disables dithering; height-limited refinement
     keeps every pixel's shade unchanged. See [the model and validation report](docs/dithering-model.md).
-  - **Optimised** (default, recommended; calm flat areas): starts from error diffusion and changes one pixel at a time to whichever map
+  - **Illustrations / Optimized** (default, recommended; calm flat areas): starts from error diffusion and changes one pixel at a time to whichever map
     colour brings the picture closest to the source (the idea of direct binary search). The difference is measured per
     pixel and blurred by 1 and 2 pixels (the colour seen from a distance). Colours the palette lacks are mixed from the
     best **pair** of map colours only — the closest blend with the least contrast (pale lavender from white and ice, not
@@ -62,12 +68,15 @@ renderer are implemented in the project without further libraries.
     calm up close and keep their hue. Against MapartCraft on the same
     source: colour error up close 4.89 → 2.91, from a distance 3.69 → 1.83. With a height limit only pixels of the same
     shade are swapped, so the staircase stays as planned. Lower "dither strength" mixes less and looks sharper.
-  - Error diffusion: Floyd–Steinberg, Jarvis–Judice–Ninke, Burkes, Sierra Lite, Stucki, Atkinson. The error is diffused
+  - Legacy methods remain available through the CLI and saved projects. Opening a project with a legacy method adds
+    only that method to the selector, preserving its conversion and saving behaviour.
+    Legacy error diffusion: Floyd–Steinberg, Jarvis–Judice–Ninke, Burkes, Sierra Lite, Stucki, Atkinson. The error is diffused
     **in linear light** (default), so dithered areas keep their brightness when seen from a distance; serpentine scan and
     adjustable strength.
-  - **Knoll pattern dithering** (Thomas Knoll's method used in Photoshop) with a Bayer 8 × 8 or blue-noise matrix: every
+  - Legacy **Knoll pattern dithering** (Thomas Knoll's method used in Photoshop) with a Bayer 8 × 8 or blue-noise matrix: every
     colour is approximated by a mix of map colours, laid out as a regular pattern. 35–41 % lower colour error than Bayer.
-  - Ordered: blue noise 64 × 64 (generated with void-and-cluster), Bayer 2 × 2 / 4 × 4 / 8 × 8, ordered 3 × 3.
+  - Legacy ordered: blue noise 64 × 64 (generated with void-and-cluster), Bayer 2 × 2 / 4 × 4 / 8 × 8, ordered 3 × 3.
+    CLI `convert` now defaults to Optimised too; legacy method names and aliases are still accepted.
   - All methods are compared in [docs/benchmarks.md](docs/benchmarks.md).
 - **In-game verification kit** (CLI `kit` / `verify`): one behavior pack places the colour pad and a build in each mode;
   afterwards the maps the game drew are compared with the predictions pixel by pixel ([docs/TODO.md](docs/TODO.md)).
@@ -125,9 +134,12 @@ renderer are implemented in the project without further libraries.
 - **Touch up** from above: in the enlarged map ("Touch up…") left drag paints blocks (brush size, shade), right click picks
   the block under the cursor, Ctrl+Z undoes; edits are kept when settings change and saved with the project.
 - Material list per map with stacks, alternatives, **owned and missing** counts and CSV export; build progress per map and chunk.
-- Output: only the `.mcstructure` files (64 × 64 / per map / whole), written straight into the chosen folder (one file:
+- Output: only the `.mcstructure` files (128 × 128 by default), written straight into the chosen folder (one file:
   saved under the chosen name); behavior pack (`.mcpack`) optional. `materials.csv` and the map preview PNG have their own buttons;
   `BMAP.Cli build` also writes the placement guide (`/structure load` commands, `placement.csv`) and a zip.
+  One map normally produces a 128 × 128 art file and a 128 × 1 northern support file; pieces taller than 256 are sliced vertically.
+  Saved 64 × 64 settings are preserved; choose 128 × 128 in Output to switch. CLI defaults to 128 too, with `--split 128`
+  or `--split 64` (legacy `tiles`). Legacy `map` keeps the support row attached (128 × 129 for top maps).
 
 ## Build and run
 

@@ -51,7 +51,7 @@ public static class BuildGuideGenerator
             "kind,block,id,states,count,stacks,shulker_boxes,maps,alternatives"));
         foreach (var m in materials)
             sb.AppendLine(string.Join(",",
-                m.IsSupport ? T(en, "支え", "support") : T(en, "本体", "art"), Csv(m.Block.LocalName(en)), m.Block.Name, Csv(m.Block.StatesText),
+                m.IsSupport ? T(en, "支え", "support") : T(en, "本体", "art"), Csv(m.Block.LocalName(en)), Csv(m.Block.Name), Csv(m.Block.StatesText),
                 m.Count, Csv(m.Stacks), m.ShulkerBoxes, Csv(m.MapsText), Csv(string.Join(", ", m.Alternatives.Select(a => a.LocalName(en))))));
         return sb.ToString();
     }
@@ -223,5 +223,5 @@ public static class BuildGuideGenerator
         _ => T(en, "すべて（二重・最適化）", "all (double, optimized)"),
     };
 
-    private static string Csv(string s) => s.Contains(',') || s.Contains('"') ? "\"" + s.Replace("\"", "\"\"") + "\"" : s;
+    public static string Csv(string s) => s.IndexOfAny([',', '"', '\r', '\n']) >= 0 ? "\"" + s.Replace("\"", "\"\"") + "\"" : s;
 }

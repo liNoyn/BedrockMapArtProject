@@ -14,7 +14,7 @@ public sealed class MaterialLine
 
     public int Missing => Math.Max(0, Count - Owned);
     public string Stacks => FormatStacks(Count, Block.MaxStack);
-    public string ShulkerBoxes => (Count / (27.0 * Block.MaxStack)).ToString("0.00");
+    public string ShulkerBoxes => (Count / (27.0 * Block.MaxStack)).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
     public string MapsText => string.Join(", ", MapNumbers.Select(n => $"#{n}"));
     public string AlternativesText => string.Join(", ", Alternatives.Select(a => a.DisplayName));
 

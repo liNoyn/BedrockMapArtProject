@@ -1,4 +1,5 @@
 using BMAP.Imaging;
+using BMAP.ColorEngine;
 using BMAP.Palette;
 
 namespace BMAP.BlockEngine;
@@ -6,8 +7,8 @@ namespace BMAP.BlockEngine;
 /// <summary>
 /// Makes a height limit mean what the user sees: the height of the whole build, support blocks included. The quantizer
 /// limits the number of light / dark steps in a row; how high that makes the build depends on the layout (with the
-/// parity rule many steps need only one block, supports add a block below). This searches the largest number of steps
-/// whose layout still fits the limit, so the room is used fully and never exceeded.
+/// parity rule many steps need only one block, supports add a block below). Searches feasible step budgets and,
+/// when material pruning can change the palette, retains the best model-scored feasible render encountered.
 /// </summary>
 public static class HeightPlanner
 {
@@ -26,9 +27,15 @@ public static class HeightPlanner
         // Material pruning may choose a different palette after refinement, which can change the shade plan.
         var search = usesDiffusionSeed && options.Refine is null && selection.MaxBlockTypes == 0
             ? options with { Dither = DitherMode.FloydSteinberg, DitherStrength = 1 } : options;
-        QuantizeResult Run(QuantizeOptions o, int runs) => ColorQuantizer.Quantize(image, profile, selection,
-            runs == 0 ? o with { Mode = StaircaseMode.Flat, MaxHeight = 0 } : o with { MaxHeight = runs * step }, ct);
         int Height(QuantizeResult q) => BlockLayout.Generate(q, supportBlock, 0, supports, onMapGrid: onMapGrid).MaxHeight;
+        List<QuantizeResult>? feasiblePlans=selection.MaxBlockTypes>0?[]:null;
+        QuantizeResult Run(QuantizeOptions o,int runs)
+        {
+            var q=ColorQuantizer.QuantizeForLayout(image,profile,selection,
+                runs==0?o with { Mode=StaircaseMode.Flat,MaxHeight=0 }:o with { MaxHeight=runs*step },ct,candidate=>Height(candidate)<=limit);
+            if(feasiblePlans is not null && Height(q)<=limit)feasiblePlans.Add(q);
+            return q;
+        }
 
         // Each step needs at most `step` blocks, so limit / step runs nearly always fit; supports may add one.
         int lo = limit / step;
@@ -47,6 +54,15 @@ public static class HeightPlanner
         // Verify the final model too, including any palette changes. Prefer a feasible result over an unverified limit.
         while (lo > 0 && Height(result) > limit) result = Run(options, --lo);
         if (Height(result) > limit) throw new InvalidOperationException("The requested height cannot contain the supported layout.");
+        // Changing a limited palette can improve a lower shade budget more than a higher one. Keep the best
+        // feasible render already encountered rather than assuming more permitted steps always improve quality.
+        if(feasiblePlans is not null)
+        {
+            var importance=QualityScore.PaletteWeights(image,result.Preview,options.Dither,ct);
+            foreach(var candidate in feasiblePlans)
+                if(!ReferenceEquals(candidate,result) && QualityScore.PreferCandidate(image,candidate.Preview,result.Preview,
+                    ColorMetric.Ciede2000,ct,importance))result=candidate;
+        }
         return result;
     }
 }

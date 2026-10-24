@@ -14,9 +14,10 @@ public static class ImageCodec
 
     /// <param name="frame">Frame of an animated GIF/WebP or page of a TIFF (0-based).</param>
     /// <param name="videoSeconds">Position in a video file (needs ffmpeg on PATH).</param>
-    public static RgbaImage Load(string path, int frame = 0, double videoSeconds = 0)
+    public static RgbaImage Load(string path, int frame = 0, double videoSeconds = 0, CancellationToken ct = default)
     {
-        if (IsVideo(path)) return VideoFrame.Extract(path, videoSeconds);
+        ct.ThrowIfCancellationRequested();
+        if (IsVideo(path)) return VideoFrame.Extract(path, videoSeconds, ct);
         if (IsTiff(path))
             return OperatingSystem.IsWindows() ? TiffDecoder.Load(path, frame) : throw new PlatformNotSupportedException("TIFF は Windows でのみ対応しています。");
         using var stream = File.OpenRead(path);
@@ -103,9 +104,7 @@ public static class ImageCodec
 
     public static void SavePng(RgbaImage image, string path)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
-        using var fs = File.Create(path);
-        fs.Write(EncodePng(image));
+        AtomicFile.WriteAllBytes(path, EncodePng(image));
     }
 
     public static byte[] EncodePng(RgbaImage image)

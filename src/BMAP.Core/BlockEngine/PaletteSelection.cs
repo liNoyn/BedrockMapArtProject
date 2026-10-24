@@ -145,6 +145,6 @@ public sealed class BlockPreset
     public static void SaveUser(IEnumerable<BlockPreset> presets)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(UserPresetFile)!);
-        File.WriteAllText(UserPresetFile, JsonSerializer.Serialize(presets.Where(p => !p.BuiltIn).ToList(), Options));
+        AtomicFile.WriteAllText(UserPresetFile, JsonSerializer.Serialize(presets.Where(p => !p.BuiltIn).ToList(), Options));
     }
 }

@@ -82,8 +82,10 @@ public static class VideoFrame
         return null;
     }
 
-    public static RgbaImage Extract(string path, double seconds)
+    public static RgbaImage Extract(string path, double seconds, CancellationToken ct = default)
     {
+        if (!double.IsFinite(seconds) || seconds < 0) throw new ArgumentOutOfRangeException(nameof(seconds));
+        ct.ThrowIfCancellationRequested();
         var ffmpeg = FindFfmpeg() ?? throw new FileNotFoundException(
             "動画からフレームを取り出すには ffmpeg が必要です。ffmpeg.exe を PATH に通すか BMAP と同じフォルダに置いてください。");
         string temp = Path.Combine(Path.GetTempPath(), $"bmap_frame_{Guid.NewGuid():N}.png");
@@ -96,10 +98,8 @@ public static class VideoFrame
             foreach (var a in new[] { "-hide_banner", "-loglevel", "error", "-ss", seconds.ToString(System.Globalization.CultureInfo.InvariantCulture),
                          "-i", path, "-frames:v", "1", "-y", temp })
                 psi.ArgumentList.Add(a);
-            using var p = Process.Start(psi)!;
-            string err = p.StandardError.ReadToEnd();
-            if (!p.WaitForExit(60_000)) { p.Kill(); throw new TimeoutException("ffmpeg が応答しません。"); }
-            if (p.ExitCode != 0 || !File.Exists(temp)) throw new InvalidDataException("動画のフレームを取り出せませんでした: " + err.Trim());
+            var result = ProcessRunner.RunAsync(psi, TimeSpan.FromSeconds(60), ct).GetAwaiter().GetResult();
+            if (result.ExitCode != 0 || !File.Exists(temp)) throw new InvalidDataException("動画のフレームを取り出せませんでした: " + result.Error.Trim());
             return ImageCodec.Load(temp);
         }
         finally

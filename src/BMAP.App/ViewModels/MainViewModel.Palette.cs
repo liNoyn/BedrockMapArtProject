@@ -60,9 +60,11 @@ public sealed partial class MainViewModel
     public RelayCommand SelectAllBlocksCommand { get; private set; } = null!;
     public RelayCommand ClearAllBlocksCommand { get; private set; } = null!;
 
-    public bool TexturesMissing => !Textures.IsAvailable;
+    private int _missingTextureCount;
+    private bool _textureRepairAttempted, _textureDownloadRunning;
+    public bool TexturesMissing => !Textures.IsAvailable || _missingTextureCount > 0;
 
-    public string TextureStatus => Textures.IsAvailable
+    public string TextureStatus => _missingTextureCount > 0 ? L.Format("TexturesIncomplete", _missingTextureCount) : Textures.IsAvailable
         ? L["TexturesReady"] + (Textures.ResourcePack != null ? $" ({Path.GetFileName(Textures.ResourcePack)})" : "")
         : L["NoTextures"];
 
@@ -236,16 +238,30 @@ public sealed partial class MainViewModel
             foreach (var c in choices) c.Icon = null;
             return;
         }
-        var images = await Task.Run(() => choices.Select(c => Textures.GetIcon(c.Block)).ToList());
-        if (version != _iconVersion) return;
-        for (int i = 0; i < choices.Count; i++)
-            choices[i].Icon = images[i] is { } img ? BitmapHelper.ToBitmap(img) : null;
-        UpdateBlockInfo();
+        try
+        {
+            var (images, coverage) = await Task.Run(() =>
+                (choices.Select(c => Textures.GetIcon(c.Block)).ToList(), Textures.CheckCoverage(choices.Where(c => !c.Block.IsCustom).Select(c => c.Block))));
+            if (version != _iconVersion) return;
+            _missingTextureCount = coverage.MissingBlocks.Count;
+            Raise(nameof(TexturesMissing));
+            Raise(nameof(TextureStatus));
+            for (int i = 0; i < choices.Count; i++)
+                choices[i].Icon = images[i] is { } img ? BitmapHelper.ToBitmap(img) : null;
+            UpdateBlockInfo();
+            // Reuse the user's recorded download consent; only one automatic repair attempt per session.
+            if (TexturesMissing && _settings.TexturesAccepted && !_textureRepairAttempted)
+            {
+                _textureRepairAttempted = true;
+                await DownloadTexturesAsync();
+            }
+        }
+        catch (Exception ex) { if (version == _iconVersion) Log(ex.Message); }
     }
 
     private async Task DownloadTexturesAsync()
     {
-        if (Profile is null) return;
+        if (Profile is null || _textureDownloadRunning) return;
         if (!_settings.TexturesAccepted)
         {
             string msg = L.English
@@ -260,13 +276,14 @@ public sealed partial class MainViewModel
             _settings.Save();
         }
         IsBusy = true;
+        _textureDownloadRunning = true;
         try
         {
-            int n = await Textures.DownloadAsync(Profile.Blocks, new Progress<string>(s => Status = s));
+            int n = await Textures.DownloadAsync(Profile.Blocks.Where(b => !b.IsCustom), new Progress<string>(s => Status = s));
             Log((L.English ? "Textures ready: " : "テクスチャを取得しました: ") + n);
         }
         catch (Exception ex) { Log((L.English ? "Download failed: " : "ダウンロードに失敗しました: ") + ex.Message); }
-        finally { IsBusy = false; Status = L["Ready"]; Raise(nameof(TextureStatus)); }
+        finally { _textureDownloadRunning = false; IsBusy = false; Status = L["Ready"]; Raise(nameof(TextureStatus)); }
     }
 
     private async Task UseResourcePackAsync()

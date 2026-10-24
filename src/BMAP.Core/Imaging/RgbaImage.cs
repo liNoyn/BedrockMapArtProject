@@ -10,12 +10,13 @@ public sealed class RgbaImage
         if (width <= 0 || height <= 0) throw new ArgumentOutOfRangeException(nameof(width), "Image must not be empty.");
         Width = width;
         Height = height;
-        Pixels = new byte[width * height * 4];
+        Pixels = new byte[checked(width * height * 4)];
     }
 
     public RgbaImage(int width, int height, byte[] pixels)
     {
-        if (pixels.Length != width * height * 4) throw new ArgumentException("Pixel buffer size does not match.");
+        if (width <= 0 || height <= 0) throw new ArgumentOutOfRangeException(nameof(width), "Image must not be empty.");
+        if (pixels.Length != checked(width * height * 4)) throw new ArgumentException("Pixel buffer size does not match.");
         Width = width;
         Height = height;
         Pixels = pixels;

@@ -16,6 +16,8 @@ public sealed partial class MainViewModel
 {
     public IReadOnlyList<LocOption<ColorMetric>> Metrics { get; private set; } = [];
     public IReadOnlyList<LocOption<DitherMode>> Dithers { get; private set; } = [];
+    private IReadOnlyList<LocOption<DitherMode>> _primaryDithers = [];
+    private readonly Dictionary<DitherMode, LocOption<DitherMode>> _legacyDithers = [];
     public IReadOnlyList<LocOption<StaircaseMode>> Staircases { get; private set; } = [];
     public IReadOnlyList<LocOption<SupportMode>> SupportModes { get; private set; } = [];
     public IReadOnlyList<LocOption<ProgressState>> ProgressStates { get; private set; } = [];
@@ -23,7 +25,27 @@ public sealed partial class MainViewModel
     private LocOption<ColorMetric> _metric = null!;
     public LocOption<ColorMetric> Metric { get => _metric; set { if (value != null && Set(ref _metric, value)) ScheduleUpdate(); } }
     private LocOption<DitherMode> _dither = null!;
-    public LocOption<DitherMode> Dither { get => _dither; set { if (value != null && Set(ref _dither, value)) ScheduleUpdate(); } }
+    public LocOption<DitherMode> Dither
+    {
+        get => _dither;
+        set { if (value != null && Set(ref _dither, value)) { Raise(nameof(IsLegacyDither)); ScheduleUpdate(); } }
+    }
+    public bool IsLegacyDither => Dither is not null && !_primaryDithers.Any(d => d.Value == Dither.Value);
+
+    private void RestoreDither(DitherMode mode)
+    {
+        var selected = _primaryDithers.FirstOrDefault(d => d.Value == mode);
+        if (selected is null)
+        {
+            if (!Enum.IsDefined(mode)) throw new InvalidDataException($"Unknown dither mode: {mode}");
+            if (!_legacyDithers.TryGetValue(mode, out selected))
+                _legacyDithers[mode] = selected = new(mode, mode.ToString(), L);
+        }
+        // Keep just the loaded legacy choice; never accumulate old modes across project loads.
+        Dithers = _primaryDithers.Contains(selected) ? _primaryDithers : [.. _primaryDithers, selected];
+        Raise(nameof(Dithers));
+        Dither = selected;
+    }
     private LocOption<StaircaseMode> _staircase = null!;
     public LocOption<StaircaseMode> StaircaseOption
     {
@@ -267,13 +289,14 @@ public sealed partial class MainViewModel
     private void InitBuild()
     {
         Metrics = [new(ColorMetric.Oklab, "Oklab", L), new(ColorMetric.Lab, "CIELAB ΔE76", L), new(ColorMetric.Ciede2000, "CIEDE2000", L), new(ColorMetric.WeightedRgb, "Weighted RGB", L), new(ColorMetric.Rgb, "RGB", L)];
-        Splits = [new(StructureSplit.Tiles64, "SplitTiles", L), new(StructureSplit.PerMap, "SplitPerMap", L), new(StructureSplit.Whole, "SplitWhole", L)];
+        Splits = [new(StructureSplit.Tiles128, "SplitTiles128", L), new(StructureSplit.Tiles64, "SplitTiles", L),
+            new(StructureSplit.PerMap, "SplitPerMap", L), new(StructureSplit.Whole, "SplitWhole", L)];
         _split = Splits[0];
         BrushShades = [new(Shade.Normal, "ShadeNormal", L), new(Shade.Bright, "ShadeBright", L), new(Shade.Dark, "ShadeDark", L)];
         _brushShade = BrushShades[0];
         UndoEditCommand = new RelayCommand(UndoEdit, () => _edits.CanUndo);
         ClearEditsCommand = new RelayCommand(ClearEditsAsync, () => _edits.Count > 0);
-        SavePreviewPngCommand = new RelayCommand(SavePreviewPngAsync, () => _quantized != null);
+        SavePreviewPngCommand = new RelayCommand(SavePreviewPngAsync, () => _quantized != null && !IsBusy && !IsConverting);
         ExportTestPadCommand = new RelayCommand(() => ExportPadAsync(PadKind.Shading));
         View3DCommand = new RelayCommand(RequestViewer, () => _layout != null);
         HeightLowCommand = new RelayCommand(() => MaxHeight = 8);
@@ -284,18 +307,13 @@ public sealed partial class MainViewModel
         AnalyzeHeightCommand = new RelayCommand(AnalyzeHeightAsync, () => _processed != null && !IsAnalyzing);
         FlatBackgroundCommand = new RelayCommand(UseFlatBackground);
         ApplyRecommendedYCommand = new RelayCommand(() => { if (_advice is { Fits: true } a) { UseOrigin = true; OriginY = a.RecommendedBaseY; } }, () => _advice is { Fits: true });
-        Dithers =
+        _primaryDithers =
         [
-            new(DitherMode.None, "SuNone", L), new(DitherMode.Optimized, "DitherOptimized", L),
+            new(DitherMode.Optimized, "DitherOptimized", L),
             new(DitherMode.Hybrid, "DitherHybrid", L), new(DitherMode.Perceptual, "DitherPerceptual", L),
-            new(DitherMode.FloydSteinberg, "Floyd–Steinberg", L),
-            new(DitherMode.JarvisJudiceNinke, "Jarvis–Judice–Ninke (MinAvgErr)", L), new(DitherMode.Burkes, "Burkes", L),
-            new(DitherMode.SierraLite, "Sierra Lite", L), new(DitherMode.Stucki, "Stucki", L), new(DitherMode.Atkinson, "Atkinson", L),
-            new(DitherMode.KnollBayer, "DitherKnollBayer", L), new(DitherMode.KnollBlueNoise, "DitherKnollBlue", L),
-            new(DitherMode.BlueNoise, "DitherBlueNoise", L),
-            new(DitherMode.Bayer2, "Bayer 2x2", L), new(DitherMode.Bayer4, "Bayer 4x4", L), new(DitherMode.Bayer8, "Bayer 8x8", L),
-            new(DitherMode.Ordered3, "Ordered 3x3", L),
+            new(DitherMode.None, "DitherNone", L),
         ];
+        Dithers = _primaryDithers;
         Staircases =
         [
             new(StaircaseMode.Flat, "StFlat", L), new(StaircaseMode.Classic, "StClassic", L), new(StaircaseMode.Valley, "StValley", L),
@@ -315,8 +333,8 @@ public sealed partial class MainViewModel
         _dither = Dithers.First(d => d.Value == DitherMode.Optimized);
         _staircase = Staircases[0];
         _supportMode = SupportModes[1];
-        ExportBlockCommand = new RelayCommand(ExportBlockAsync, () => _layout != null && !IsBusy);
-        ExportMaterialsCommand = new RelayCommand(ExportMaterialsAsync, () => _layout != null);
+        ExportBlockCommand = new RelayCommand(ExportBlockAsync, () => _layout != null && !IsBusy && !IsConverting);
+        ExportMaterialsCommand = new RelayCommand(ExportMaterialsAsync, () => _layout != null && !IsBusy && !IsConverting);
         RebuildProgress();
     }
 
@@ -620,8 +638,14 @@ public sealed partial class MainViewModel
         if (path is null) return;
         var sb = new StringBuilder("block,id,kind,count,stacks,owned,missing,maps\n");
         foreach (var m in Materials)
-            sb.AppendLine($"\"{m.Name}\",{m.Key},{(m.Name.Contains(L["Support"]) ? "support" : "art")},{m.Count},\"{m.Stacks}\",{m.Owned},{m.Missing},\"{m.Maps}\"");
-        await File.WriteAllTextAsync(path, sb.ToString(), new UTF8Encoding(true));
-        Log((L.English ? "Saved: " : "保存しました: ") + path);
+            sb.AppendLine(string.Join(",", BuildGuideGenerator.Csv(m.Name), BuildGuideGenerator.Csv(m.Key),
+                m.IsSupport ? "support" : "art", m.Count, BuildGuideGenerator.Csv(m.Stacks), m.Owned, m.Missing, BuildGuideGenerator.Csv(m.Maps)));
+        try
+        {
+            string csv = sb.ToString();
+            await Task.Run(() => AtomicFile.WriteAllText(path, csv, new UTF8Encoding(true)));
+            Log((L.English ? "Saved: " : "保存しました: ") + path);
+        }
+        catch (Exception ex) { Log((L.English ? "Save failed: " : "保存に失敗しました: ") + ex.Message); }
     }
 }

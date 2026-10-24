@@ -30,11 +30,13 @@ public enum StructureSplit
     PerMap,
     /// <summary>Everything in one piece (for /structure load from packs or editors such as Amulet).</summary>
     Whole,
+    /// <summary>128x128 art pieces, with the northern support row in separate 128x1 pieces.</summary>
+    Tiles128,
 }
 
 public sealed record StructureExportOptions
 {
-    public StructureSplit Split { get; init; } = StructureSplit.Tiles64;
+    public StructureSplit Split { get; init; } = StructureSplit.Tiles128;
     /// <summary>Horizontal tile size for <see cref="StructureSplit.Tiles64"/> (max 64, the structure block limit).</summary>
     public int TileSize { get; init; } = 64;
     /// <summary>Vertical limit per piece; taller builds are split vertically.</summary>
@@ -59,7 +61,7 @@ public static class StructureExporter
         int ts = options.TileSize;
         int order = 0;
 
-        if (options.Split != StructureSplit.Tiles64)
+        if (options.Split is not (StructureSplit.Tiles64 or StructureSplit.Tiles128))
         {
             // Per map: the support row joins the top maps. Whole: one bucket.
             int size = options.Split == StructureSplit.PerMap ? 128 : int.MaxValue / 2;
@@ -82,7 +84,7 @@ public static class StructureExporter
             return tiles;
         }
 
-        ts = Math.Clamp(ts, 1, 64);
+        ts = options.Split == StructureSplit.Tiles128 ? 128 : Math.Clamp(ts, 1, 64);
         // Bucket every block (visible and support) by horizontal tile.
         var buckets = new Dictionary<(int Tx, int Tz), List<BlockPlacement>>();
         foreach (var p in layout.Placements())
@@ -92,7 +94,7 @@ public static class StructureExporter
             list.Add(p);
         }
 
-        // Support row pieces (Z = 0), 64 x 1 each, then the art pieces row by row.
+        // Support row pieces (Z = 0), one tile wide and one block deep, then the art pieces row by row.
         foreach (var key in buckets.Keys.OrderBy(k => k.Tz).ThenBy(k => k.Tx))
         {
             int x0 = key.Tx * ts;
@@ -197,7 +199,6 @@ public static class StructureExporter
             PlacementGuide(projectName, slug, tiles, origin, options), new UTF8Encoding(false));
 
         string zip = Path.Combine(outDir, $"{slug}_mcstructure.zip");
-        if (File.Exists(zip)) File.Delete(zip);
         ZipFiles(files, zip);
 
         string? mcpack = options.WriteBehaviorPack ? WriteMcpack(outDir, projectName, slug, ns, tiles, mapsX, layout, origin, keepFolder: true) : null;
@@ -236,22 +237,31 @@ public static class StructureExporter
         return tiles;
     }
 
-    /// <summary>Writes the pieces as {slug}_{id}.mcstructure, after removing this project's earlier pieces only.</summary>
+    /// <summary>Writes and validates pieces first, then removes this project's obsolete pieces only.</summary>
     private static List<string> WritePieces(string dir, string slug, List<StructureTile> tiles)
     {
         Directory.CreateDirectory(dir);
-        foreach (var old in Directory.GetFiles(dir, $"{slug}_*.mcstructure")) File.Delete(old);
-        return tiles.Select(t => WritePiece(Path.Combine(dir, FileName(slug, t) + ".mcstructure"), t)).ToList();
+        var files = tiles.Select(t => WritePiece(Path.Combine(dir, FileName(slug, t) + ".mcstructure"), t)).ToList();
+        var current = files.Select(Path.GetFullPath).ToHashSet(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        foreach (var old in Directory.GetFiles(dir, $"{slug}_*.mcstructure"))
+            if (!current.Contains(Path.GetFullPath(old))) File.Delete(old);
+        return files;
     }
 
     /// <summary>Writes one piece and reads it back to check it.</summary>
     private static string WritePiece(string path, StructureTile t)
     {
-        File.WriteAllBytes(path, t.Structure.ToBytes());
-        var back = McStructure.FromBytes(File.ReadAllBytes(path));
-        var errs = back.Validate();
-        if (errs.Count > 0 || back.CountBlocks() != t.BlockCount)
-            throw new InvalidDataException($"{Path.GetFileName(path)}: re-read check failed {string.Join(", ", errs)}");
+        AtomicFile.Write(path, stream =>
+        {
+            stream.Write(t.Structure.ToBytes());
+            stream.Position = 0;
+            using var readback = new MemoryStream();
+            stream.CopyTo(readback);
+            var back = McStructure.FromBytes(readback.ToArray());
+            var errs = back.Validate();
+            if (errs.Count > 0 || back.CountBlocks() != t.BlockCount)
+                throw new InvalidDataException($"{Path.GetFileName(path)}: re-read check failed {string.Join(", ", errs)}");
+        });
         return path;
     }
 
@@ -269,7 +279,6 @@ public static class StructureExporter
             WriteManifest(packDir, projectName);
             WriteFunctions(packDir, slug, ns, tiles, mapsX, layout, origin);
             string mcpack = Path.Combine(outDir, $"BMAP_{slug}.mcpack");
-            if (File.Exists(mcpack)) File.Delete(mcpack);
             ZipDirectory(packDir, mcpack);
             return mcpack;
         }
@@ -390,18 +399,29 @@ public static class StructureExporter
     /// <summary>Zips the given files flat (only this export's pieces, not other files in the folder).</summary>
     public static void ZipFiles(IEnumerable<string> files, string zipPath)
     {
-        using var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create);
-        foreach (var file in files) zip.CreateEntryFromFile(file, Path.GetFileName(file), CompressionLevel.Optimal);
+        var sources = files.ToArray();
+        AtomicFile.Write(zipPath, stream =>
+        {
+            using var zip = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
+            foreach (var file in sources) zip.CreateEntryFromFile(file, Path.GetFileName(file), CompressionLevel.Optimal);
+        });
     }
 
     public static void ZipDirectory(string dir, string zipPath)
     {
-        using var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create);
-        foreach (var file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
+        string destination = Path.GetFullPath(zipPath);
+        var sources = Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories)
+            .Where(file => !string.Equals(Path.GetFullPath(file), destination,
+                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)).ToArray();
+        AtomicFile.Write(zipPath, stream =>
         {
-            string entry = Path.GetRelativePath(dir, file).Replace('\\', '/');
-            zip.CreateEntryFromFile(file, entry, CompressionLevel.Optimal);
-        }
+            using var zip = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
+            foreach (var file in sources)
+            {
+                string entry = Path.GetRelativePath(dir, file).Replace('\\', '/');
+                zip.CreateEntryFromFile(file, entry, CompressionLevel.Optimal);
+            }
+        });
     }
 }
 
