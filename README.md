@@ -10,12 +10,12 @@ It rebuilds the features and the screen layout of [MapartCraft](https://github.c
 Java Edition) for Bedrock: the image is reduced to block map colours and exported as **`.mcstructure` files** in
 128 × 128 pieces by default, with the northern support row in separate 128 × 1 files. 64 × 64 and whole-build export remain available.
 
-The window has MapartCraft's three columns: **block selection** on the left, the **map preview** (map, original, shading,
-difference, calibration) and the **materials** in the middle, and **map settings** with the green export buttons on the
+The window has MapartCraft's three columns: **block selection** on the left, the **map preview** (map, original,
+difference) and the **materials** in the middle, and **map settings** with the green export buttons on the
 right, one "label: control" per line with foldable sections. The preview grows with its column (drag the splitters);
 "Enlarge" or a double-click shows it large in its own window (wheel to zoom, drag to pan, block position and map
 number under the cursor). 3D, the placement plan and the height map open in a
-separate window with "View in 3D" (MapartCraft's "View online"). The UI is in English and Japanese (switch at the top right).
+separate window with "View in 3D" (MapartCraft's "View online"). The UI is in English and Japanese (switch in the header).
 
 Built with C# / .NET 8 / Avalonia 11 and SkiaSharp. Little-endian NBT, `.mcstructure`, all dithering and the 3D software
 renderer are implemented in the project without further libraries.
@@ -89,14 +89,7 @@ renderer are implemented in the project without further libraries.
   a slider, a number or the presets low 8 / medium 16 / high 32 / no limit; it is the height of the whole build,
   support blocks included, and the height the build really needs (with its Y range) is shown below. With a height limit, the real layout height is
   measured so the limit is used fully.
-- **Shading rule analysis** (details in [docs/shading-rules.md](docs/shading-rules.md), Japanese)
-  - Map simulator: redraws the map from the block positions alone and compares it pixel by pixel with the planned
-    colours (tested to match in every staircase, support and dithering mode).
-  - Shading & build check: pixels that differ from the plan, pixels whose shade depends on the terrain (empty column to
-    the north), blocks that would fall or break, dark / normal / light counts, the tallest column, steps and drops; the
-    shading analysis view shows where they are.
-  - Shading test pad: a one-map structure with steps of different sizes, stairs, zigzags and east/west height differences,
-    plus the predicted map. Build it, make a map and compare to check Bedrock's rule without reading any world data.
+- Shading rules and build correctness are validated by development tests ([shading rules](docs/shading-rules.md)); the GUI no longer runs or displays the separate check.
 - **Height optimisation**
   - With a maximum height (Valley), the best shading within that height is computed (per-column dynamic programming,
     optimal without dithering, with ordered or Knoll dithering; a per-pixel limit with error diffusion).
@@ -109,24 +102,11 @@ renderer are implemented in the project without further libraries.
 - Manual pixel painting in the 2D build view (undo, back to automatic, saved in the project).
 - Bedrock specifics: grass and some leaves change map colour with the biome and are off by default.
 
-**In-game calibration (read only)** — details in [docs/calibration.md](docs/calibration.md) (Japanese)
-- Exports a shading test pad (steps −4 … +4 with full blocks, carpets and slabs, east/west steps, empty north column,
-  biome tints) and a colour test pad with all 443 blocks; `pad.json` records every sample position.
-- After the game has drawn a map of the pad, BMAP reads the map (`map_<ID>`, `colors`) from a **temporary copy** of the
-  world database and compares it with the prediction. Worlds are never written. Map orientation, offsets and unexplored
-  pixels are handled.
-- From the brightness per step it derives the **smallest step that changes the shade**, the multipliers and whether
-  shading is graded; the colour pad gives the real colour of each block. Results are saved as a colour profile marked
-  "verified" and used by quantizing, height limits, layout and the 3D view.
-- Every colour has a status: verified / API-derived / third-party / estimated / unknown. Estimates are never shown as verified.
-- `mapcheck` checks that every pixel of any drawn map is "base colour × multiplier". This confirmed the multipliers
-  180 / 220 / 255, the rounding (floor from the base colour) and 13 base colours on maps drawn by Bedrock.
-- Measurements are scored against candidate models from other implementations (Java, step 2, gd-codes rounding, parity,
-  PowerNukkitX). `refcompare` downloads gd-codes' 82 colour categories and compares them with BMAP. Findings:
-  [docs/bedrock-research.md](docs/bedrock-research.md) (Japanese).
+The in-game calibration and shading/build-check panels have been removed from the GUI.
+Shading calculations needed for builds remain; engineering CLI tools are documented in [docs/calibration.md](docs/calibration.md).
 
 **Previews and guides**
-- Predicted map colours, original, difference, shading analysis, 2D build view (textures, heights, chunk borders,
+- Predicted map colours, original, difference, 2D build view (textures, heights, chunk borders,
   coordinates), height map.
 - **3D build view**: free orbit / pan / zoom, perspective (perspective-correct textures); texture / map colour / shade /
   height colouring; ambient occlusion and sun shadows; chunk and map lines; a height slice for building layer by layer;

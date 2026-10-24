@@ -1,7 +1,6 @@
 using Avalonia.Media.Imaging;
 using BMAP.BlockEngine;
 using BMAP.Preview;
-using BMAP.Shading;
 using BMAP.Textures;
 
 namespace BMAP.App.ViewModels;
@@ -10,12 +9,11 @@ namespace BMAP.App.ViewModels;
 public sealed partial class MainViewModel
 {
     private SceneMesh? _mesh;
-    private (BlockLayout? Layout, LayoutRegion Region, bool Supports, int Layer, ShadingReport? Report) _meshKey;
+    private (BlockLayout? Layout, LayoutRegion Region, bool Supports, int Layer) _meshKey;
     private Camera3D _camera = new();
     private bool _cameraFitted;
     private RenderResult3D? _last3D;
     private SceneMesh? _lastMesh3D;
-    private ShadingReport? _lastReport3D;
     private long _revision3D;
     private int _vpW = 900, _vpH = 600;
     private bool _rendering3D, _dirty3D, _dirtyFast, _dragging3D;
@@ -157,13 +155,7 @@ public sealed partial class MainViewModel
         }
         var b = shownMesh.Blocks[id];
         string world = Origin is { } o ? $"  {(L.English ? "world" : "ワールド")} X {o.X + b.X}, Y {o.Y + b.Y}, Z {o.Z + b.Z}" : "";
-        string shade = "";
-        if (_lastReport3D is { } rep && b.X < rep.Map.Width && b.Z >= 1 && b.Z - 1 < rep.Map.Height && rep.Map.TopY[rep.Map.Index(b.X, b.Z - 1)] == b.Y)
-        {
-            var s = rep.Map.Shades[rep.Map.Index(b.X, b.Z - 1)];
-            shade = "  " + L[s switch { Palette.Shade.Dark => "ShadeDark", Palette.Shade.Bright => "ShadeBright", _ => "ShadeNormal" }];
-        }
-        View3DInfo = $"{b.Block.LocalName(L.English)}  ({b.Block.Name})  x {b.X}, y {b.Y}, z {b.Z}{world}{shade}" +
+        View3DInfo = $"{b.Block.LocalName(L.English)}  ({b.Block.Name})  x {b.X}, y {b.Y}, z {b.Z}{world}" +
                      (b.IsSupport && b.Z != 0 ? $"  [{L["Support"]}]" : "");
         if (id != _hover3D && !_dragging3D && ReferenceEquals(shownMesh, _mesh))
         {
@@ -189,19 +181,18 @@ public sealed partial class MainViewModel
         var region = RegionFor(layout);
         bool supports = ShowSupports;
         int layer = Layer3D >= layout.MaxHeight ? int.MaxValue : Layer3D;
-        var report = _report;
         _rendering3D = true;
         try
         {
             if (_mesh is null || !ReferenceEquals(_meshKey.Layout, layout) || _meshKey.Region != region || _meshKey.Supports != supports
-                || _meshKey.Layer != layer || !ReferenceEquals(_meshKey.Report, report))
+                || _meshKey.Layer != layer)
             {
                 bool regionChanged = _meshKey.Region != region || _mesh is null || !ReferenceEquals(_meshKey.Layout, layout);
                 if (!ReferenceEquals(_meshKey.Layout, layout)) { Raise(nameof(MaxLayer3D)); Raise(nameof(Layer3DText)); }
-                var built = await Task.Run(() => SceneMesh.Build(layout, region, supports, layer == int.MaxValue ? null : layer, report));
+                var built = await Task.Run(() => SceneMesh.Build(layout, region, supports, layer == int.MaxValue ? null : layer));
                 if (revision != _revision3D || !ReferenceEquals(_layout, layout) || !ViewerOpen || !IsBuild3D) return;
                 _mesh = built;
-                _meshKey = (layout, region, supports, layer, report);
+                _meshKey = (layout, region, supports, layer);
                 _hover3D = -1;
                 View3DInfo = "";
                 if (regionChanged || !_cameraFitted) FitCamera();
@@ -228,7 +219,6 @@ public sealed partial class MainViewModel
             {
                 _last3D = result;
                 _lastMesh3D = mesh;
-                _lastReport3D = report;
                 View3D = BitmapHelper.ToBitmap(result.Image);
                 ViewerInfo = L.Format("Info3D", mesh.FaceCount, sw.ElapsedMilliseconds);
             }

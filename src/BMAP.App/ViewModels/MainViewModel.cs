@@ -23,7 +23,7 @@ public interface IDialogService
     Task InfoAsync(string title, string message);
 }
 
-public enum PreviewMode { Original, BlockMap, Difference, ShadeMap, Build2D, Build3D, HeightMap, Calibration }
+public enum PreviewMode { Original = 0, BlockMap = 1, Difference = 2, Build2D = 4, Build3D = 5, HeightMap = 6 }
 
 /// <summary>Main window state. Split into partial files by area (palette, build, 3D view).</summary>
 public sealed partial class MainViewModel : ViewModelBase
@@ -41,8 +41,6 @@ public sealed partial class MainViewModel : ViewModelBase
     private QuantizeResult? _baseQuantized;
     private QuantizeResult? _quantized;
     private BlockLayout? _layout;
-    /// <summary>Shading / buildability analysis of <see cref="_layout"/> (computed in the background).</summary>
-    private ShadingReport? _report;
     private PixelOverrides _edits = new();
     private string? _projectPath;
     private bool _loadingProject;
@@ -72,8 +70,7 @@ public sealed partial class MainViewModel : ViewModelBase
         PreviewModes =
         [
             new(PreviewMode.BlockMap, "PvBlockMapShort", L), new(PreviewMode.Original, "PvOriginal", L),
-            new(PreviewMode.ShadeMap, "PvShadeMapShort", L), new(PreviewMode.Difference, "PvDifference", L),
-            new(PreviewMode.Calibration, "PvCalibrationShort", L),
+            new(PreviewMode.Difference, "PvDifference", L),
         ];
         ViewerModes =
         [
@@ -101,7 +98,6 @@ public sealed partial class MainViewModel : ViewModelBase
         InitPalette();
         InitBuild();
         Init3D();
-        InitCalibration();
         L.PropertyChanged += (_, _) => { RaiseLocalizedTexts(); RefreshPreview(); };
         Log(L.English ? "Bedrock Map Art Project started. Open an image." : "Bedrock Map Art Project を起動しました。画像を開いてください。");
         if (!Textures.IsAvailable && !_settings.TexturesAsked)
@@ -129,13 +125,13 @@ public sealed partial class MainViewModel : ViewModelBase
 
     private Task ShowAboutAsync() => _dialogs.InfoAsync(L["About"], L.English
         ? $"Bedrock Map Art Project {Version}\nhttps://github.com/liNoyn/BedrockMapArtProject\n\n" +
-          "Map art for Minecraft Bedrock Edition: .mcstructure builds, 3D staircasing with shading analysis.\n\n" +
+          "Map art for Minecraft Bedrock Edition: .mcstructure builds, 3D staircasing.\n\n" +
           "License: MIT. Layout and features inspired by MapartCraft (rebane2001, GPL-3.0; no code or images copied).\n" +
           "Block textures are © Mojang AB, downloaded to your PC from Mojang/bedrock-samples under the Minecraft EULA.\n" +
           "Minecraft is a trademark of Mojang Studios / Microsoft. This project is not affiliated with them.\n\n" +
           $"Logs: {LogDirectory}"
         : $"Bedrock Map Art Project {Version}\nhttps://github.com/liNoyn/BedrockMapArtProject\n\n" +
-          "Minecraft 統合版のマップアート作成ツール（.mcstructure 建築データ・3D 階段・陰影解析）。\n\n" +
+          "Minecraft 統合版のマップアート作成ツール（.mcstructure 建築データ・3D 階段）。\n\n" +
           "ライセンス: MIT。画面構成と機能は MapartCraft（rebane2001、GPL-3.0。コード・画像は含みません）を参考にしています。\n" +
           "ブロックのテクスチャは © Mojang AB で、Mojang/bedrock-samples から Minecraft EULA に基づいて PC にダウンロードしたものです。\n" +
           "Minecraft は Mojang Studios / Microsoft の商標です。本プロジェクトはこれらと関係ありません。\n\n" +
@@ -182,7 +178,6 @@ public sealed partial class MainViewModel : ViewModelBase
         Raise(nameof(OriginText));
         Raise(nameof(ProfileNote));
         Raise(nameof(TextureStatus));
-        UpdateShadingText();
         UpdatePlacement();
         foreach (var row in HeightRows.ToList()) { HeightRows.Remove(row); HeightRows.Add(new HeightRowViewModel(row.Option, L, ApplyHeightOption)); }
         if (_source is null) SourceInfo = L["NoImage"];
@@ -376,7 +371,6 @@ public sealed partial class MainViewModel : ViewModelBase
     [
         ReloadFrameCommand, ExportBlockCommand, SavePreviewPngCommand, ExportMaterialsCommand, DownloadTexturesCommand,
         UndoEditCommand, ClearEditsCommand, AnalyzeHeightCommand, ApplyRecommendedYCommand, View3DCommand,
-        ReadMapsCommand, SaveCalibrationCommand,
     ];
 
     private void RaiseCommands()
@@ -483,7 +477,6 @@ public sealed partial class MainViewModel : ViewModelBase
         if (_baseQuantized is null || Profile is null)
         {
             _quantized = null; _layout = null;
-            AnalyzeShading();
             Raise(nameof(HasLayout));
             return;
         }
@@ -493,32 +486,11 @@ public sealed partial class MainViewModel : ViewModelBase
         var support = SelectedSupportBlock ?? Profile.Find("cobblestone") ?? Profile.Blocks.First();
         try { _layout = BlockLayout.Generate(q, support, 0, SupportModeOption.Value, onMapGrid: UseOrigin); }
         catch (InvalidOperationException ex) { _layout = null; Log(ex.Message); }
-        AnalyzeShading();
         Raise(nameof(HasLayout));
     }
 
     /// <summary>A build layout exists (an image is converted).</summary>
     public bool HasLayout => _layout != null;
-
-    private int _analysisVersion;
-
-    /// <summary>Simulates the map from the block positions and checks it against the plan (background).</summary>
-    private async void AnalyzeShading()
-    {
-        int version = ++_analysisVersion;
-        _report = null;
-        if (_layout is not { } layout || _quantized is not { } q || Profile is not { } profile) { UpdateShadingText(); return; }
-        try
-        {
-            var report = await Task.Run(() => ShadingAnalyzer.Analyze(layout, profile, q.Preview));
-            if (version != _analysisVersion) return;
-            _report = report;
-            UpdateShadingText();
-            if (SelectedPreviewMode.Value == PreviewMode.ShadeMap) RefreshMainPreview();
-            if (ViewerOpen && IsBuild3D) Request3D(); // problem marks in the shade view
-        }
-        catch (Exception ex) { Log(ex.Message); }
-    }
 
     private static double MeanDeltaE(RgbaImage a, RgbaImage b)
     {
@@ -614,7 +586,7 @@ public sealed partial class MainViewModel : ViewModelBase
         }
     }
 
-    /// <summary>The picture in the main window: predicted map, original, shading, difference or calibration.</summary>
+    /// <summary>The picture in the main window: predicted map, original or difference.</summary>
     private void RefreshMainPreview()
     {
         ++_previewVersion;
@@ -623,8 +595,6 @@ public sealed partial class MainViewModel : ViewModelBase
         {
             PreviewMode.Original => _sourceThumb,
             PreviewMode.BlockMap => _quantized?.Preview,
-            PreviewMode.ShadeMap => _report is null ? null : ShadingAnalyzer.RenderShadeMap(_report),
-            PreviewMode.Calibration => _calImage,
             PreviewMode.Difference => _processed is null || _quantized is null ? null : Difference(_processed, _quantized.Preview),
             _ => null,
         };
@@ -657,7 +627,7 @@ public sealed partial class MainViewModel : ViewModelBase
                 }
             }
         }
-        if (mode is not (PreviewMode.Original or PreviewMode.Calibration))
+        if (mode != PreviewMode.Original)
         {
             int factor = Math.Max(1, 1024 / Math.Max(image.Width, image.Height));
             image = factor > 1 ? image.ScaleNearest(Math.Min(factor, 6)) : image.Clone();
@@ -668,8 +638,6 @@ public sealed partial class MainViewModel : ViewModelBase
         {
             PreviewMode.Original => L.Format("InfoOriginal", _source!.Width, _source.Height),
             PreviewMode.BlockMap => L["InfoBlockMap"],
-            PreviewMode.ShadeMap => L["InfoShadeMap"],
-            PreviewMode.Calibration => L["InfoCalibration"],
             _ => L["InfoDifference"],
         };
     }
@@ -806,14 +774,11 @@ public sealed partial class MainViewModel : ViewModelBase
         _debounce?.Stop();
         ++_conversionVersion;
         IsConverting = false;
-        ++_analysisVersion;
         ++_viewerVersion;
         ++_revision3D;
         _source = _sourceThumb = _processed = null;
         _quantized = _baseQuantized = null;
         _layout = null;
-        _report = null;
-        UpdateShadingText();
         _edits = new PixelOverrides();
         _sourcePath = null;
         _frame = 0;
