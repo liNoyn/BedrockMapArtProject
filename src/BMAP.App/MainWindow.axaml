@@ -3,26 +3,65 @@
         xmlns:vm="using:BMAP.App.ViewModels"
         xmlns:pal="using:BMAP.Palette"
         xmlns:pb="using:BMAP.BlockEngine"
-        xmlns:world="using:BMAP.Bedrock.World"
         x:Class="BMAP.App.MainWindow"
+        Classes="mapart"
         x:DataType="vm:MainViewModel"
         Title="Bedrock Map Art Project"
         Icon="/Assets/bmap.ico"
         Width="1600" Height="980" MinWidth="480" MinHeight="360"
         DragDrop.AllowDrop="True">
 
+  <!-- Fluent uses separate brushes for focused/hovered text and its template background.
+       Override them together so light input fields stay readable within this dark window,
+       including the TextBox nested inside NumericUpDown. -->
+  <Window.Resources>
+    <SolidColorBrush x:Key="TextControlBackground" Color="#F4F4F4" />
+    <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#E0E0E0" />
+    <SolidColorBrush x:Key="TextControlForeground" Color="#222222" />
+    <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#222222" />
+    <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#222222" />
+    <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#777777" />
+    <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#666666" />
+    <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#666666" />
+    <SolidColorBrush x:Key="TextControlPlaceholderForegroundDisabled" Color="#777777" />
+    <SolidColorBrush x:Key="TextControlBorderBrush" Color="#B0B0B0" />
+    <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#688E6B" />
+    <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#688E6B" />
+    <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="#B0B0B0" />
+    <SolidColorBrush x:Key="TextControlSelectionHighlightColor" Color="#B8D4BA" />
+    <SolidColorBrush x:Key="RepeatButtonBackgroundPointerOver" Color="#E2EDE3" />
+    <SolidColorBrush x:Key="RepeatButtonBackgroundPressed" Color="#C8DDCA" />
+    <SolidColorBrush x:Key="RepeatButtonBackgroundDisabled" Color="#E0E0E0" />
+    <SolidColorBrush x:Key="RepeatButtonForegroundDisabled" Color="#777777" />
+    <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#E2EDE3" />
+    <SolidColorBrush x:Key="ComboBoxBackgroundUnfocused" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="ComboBoxBackgroundDisabled" Color="#E0E0E0" />
+    <SolidColorBrush x:Key="ComboBoxForegroundFocused" Color="#222222" />
+    <SolidColorBrush x:Key="ComboBoxForegroundFocusedPressed" Color="#222222" />
+    <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="#777777" />
+    <SolidColorBrush x:Key="ComboBoxDropDownGlyphForegroundFocused" Color="#222222" />
+    <SolidColorBrush x:Key="ComboBoxDropDownGlyphForegroundFocusedPressed" Color="#222222" />
+    <SolidColorBrush x:Key="ComboBoxDropDownGlyphForegroundDisabled" Color="#777777" />
+    <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#F4F4F4" />
+    <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#688E6B" />
+    <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="#688E6B" />
+    <SolidColorBrush x:Key="ComboBoxBackgroundBorderBrushFocused" Color="#688E6B" />
+    <SolidColorBrush x:Key="ComboBoxBackgroundBorderBrushUnfocused" Color="#B0B0B0" />
+  </Window.Resources>
+
   <!-- MapartCraft layout: block selection | map preview + materials | settings + green buttons. -->
   <DockPanel>
 
-    <!-- Header -->
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,2*" Margin="12,6,12,2">
-      <!-- Title and project name shorten with "…" when the window is narrow. -->
-      <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Left">
-        <TextBlock Classes="h1" Text="Bedrock Map Art Project" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-        <TextBlock Grid.Column="1" Text="{Binding ProjectName}" Opacity="0.55" VerticalAlignment="Bottom" Margin="10,0,0,3" MaxWidth="320"
-                   TextTrimming="CharacterEllipsis" />
+    <!-- MapartCraft-style title, link toolbar and short introduction. -->
+    <StackPanel DockPanel.Dock="Top" Margin="16,12,16,12" Spacing="3">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Classes="h1" Text="Bedrock Map Art Project" TextTrimming="CharacterEllipsis" />
+        <TextBlock Grid.Column="1" Text="{Binding ProjectName}" Classes="note" VerticalAlignment="Center" Margin="12,0,0,0" MaxWidth="320" TextTrimming="CharacterEllipsis" />
       </Grid>
-      <WrapPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0,0,0">
+      <WrapPanel VerticalAlignment="Center" Margin="-6,1,0,0">
         <Button Classes="link" Content="{Binding L[OpenImage]}" Command="{Binding OpenImageCommand}" />
         <Button Classes="link" Content="{Binding L[NewProject]}" Command="{Binding NewProjectCommand}" />
         <Button Classes="link" Content="{Binding L[OpenProject]}" Command="{Binding OpenProjectCommand}" />
@@ -34,7 +73,8 @@
         <TextBlock Text="|" Opacity="0.4" VerticalAlignment="Center" Margin="2,0" />
         <Button Classes="link" Content="{Binding L[About]}" Command="{Binding AboutCommand}" />
       </WrapPanel>
-    </Grid>
+      <TextBlock Classes="note" Text="{Binding L[AppIntro]}" Margin="0,2,0,0" />
+    </StackPanel>
 
     <!-- Status bar + log -->
     <Border DockPanel.Dock="Bottom" Background="#2A2A2A" BorderBrush="#7BAE7F" BorderThickness="0,1,0,0">
@@ -51,19 +91,19 @@
       </DockPanel>
     </Border>
 
-    <!-- Columns share the width in proportion (about 660 / 600 / 330 px at 1600 px) and every splitter can make them
-         as narrow as 100 px, so the window can be shrunk freely. -->
-    <Grid>
+    <!-- Preserve the three-column workspace; small windows can scroll horizontally without clipping settings. -->
+    <ScrollViewer x:Name="WorkspaceViewport" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+    <Grid x:Name="WorkspaceGrid" Width="{Binding #WorkspaceViewport.Bounds.Width}" MinWidth="1000">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="6.6*" MinWidth="100" />
-        <ColumnDefinition Width="4" />
-        <ColumnDefinition Width="6*" MinWidth="100" />
-        <ColumnDefinition Width="4" />
-        <ColumnDefinition Width="3.3*" MinWidth="100" />
+        <ColumnDefinition Width="6.1*" MinWidth="260" />
+        <ColumnDefinition Width="8" />
+        <ColumnDefinition Width="5.2*" MinWidth="260" />
+        <ColumnDefinition Width="16" />
+        <ColumnDefinition Width="360" />
       </Grid.ColumnDefinitions>
 
       <!-- ===================== Block selection ===================== -->
-      <DockPanel Margin="10,4,6,6">
+      <DockPanel Margin="16,0,4,12">
         <StackPanel DockPanel.Dock="Top" Spacing="3">
           <TextBlock Classes="h2" Text="{Binding L[SecBlocks]}" />
           <WrapPanel Classes="tools">
@@ -142,7 +182,7 @@
                     <TextBlock Text="{Binding CountBadge}" Foreground="#A6D8AA" FontSize="9" HorizontalAlignment="Center" />
                   </StackPanel>
                   <ToggleButton Grid.Column="1" Classes="blk" IsChecked="{Binding IsNone}" VerticalAlignment="Top" ToolTip.Tip="{Binding Loc[NoneBlock]}">
-                    <Panel Width="24" Height="24">
+                    <Panel Width="28" Height="28">
                       <Ellipse Width="18" Height="18" Stroke="#E03030" StrokeThickness="2.5" />
                       <Line StartPoint="6,18" EndPoint="18,6" Stroke="#E03030" StrokeThickness="2.5" />
                     </Panel>
@@ -156,7 +196,7 @@
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:BlockChoiceViewModel">
                         <ToggleButton Classes="blk" IsChecked="{Binding IsSelected}" ToolTip.Tip="{Binding Tooltip}">
-                          <Panel Width="24" Height="24">
+                          <Panel Width="28" Height="28">
                             <Border Background="{Binding Swatch}" IsVisible="{Binding !HasIcon}" />
                             <Image Source="{Binding Icon}" IsVisible="{Binding HasIcon}" RenderOptions.BitmapInterpolationMode="None" />
                           </Panel>
@@ -171,26 +211,26 @@
         </ScrollViewer>
       </DockPanel>
 
-      <GridSplitter Grid.Column="1" Background="#2A2A2A" ResizeDirection="Columns" />
+      <GridSplitter Grid.Column="1" Background="Transparent" ResizeDirection="Columns" />
 
       <!-- ===================== Map preview + materials ===================== -->
       <ScrollViewer x:Name="PreviewColumn" Grid.Column="2">
-        <StackPanel Margin="8,4,8,8" Spacing="3">
+        <StackPanel Margin="4,0,4,12" Spacing="3">
           <TextBlock Classes="h2" Text="{Binding L[SecPreview]}" />
           <!-- Square preview as wide as the column (drag the splitters to resize); click it to choose an image
                (MapartCraft "PICK IMAGE"), double-click to enlarge. -->
-          <Border x:Name="PreviewBox" Width="580" Height="580" Background="#7BAE7F" HorizontalAlignment="Left">
+          <Border x:Name="PreviewBox" Width="580" Height="580" Background="#688E6B" HorizontalAlignment="Left">
             <Grid>
               <Image x:Name="PreviewImage" Source="{Binding Preview}" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="None"
                      Cursor="Cross" />
               <Canvas x:Name="CropOverlay" IsHitTestVisible="False">
                 <Rectangle x:Name="CropRect" Stroke="#FF4040" StrokeThickness="2" StrokeDashArray="4,3" IsVisible="False" />
               </Canvas>
-              <Button Command="{Binding OpenImageCommand}" IsVisible="{Binding !HasPreview}" Background="Transparent" BorderThickness="0"
+              <Button Command="{Binding OpenImageCommand}" ToolTip.Tip="{Binding L[PickImage]}" IsVisible="{Binding !HasPreview}" Background="Transparent" BorderThickness="0"
                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
                 <StackPanel Spacing="8">
-                  <Path Data="M 0,60 L 60,0 L 120,60 L 85,60 L 85,120 L 35,120 L 35,60 Z" Fill="#333333" HorizontalAlignment="Center" />
-                  <TextBlock Text="{Binding L[PickImage]}" FontSize="30" FontWeight="Bold" Foreground="#333333" HorizontalAlignment="Center" />
+                  <Path Data="M 0,80 L 80,0 L 160,80 L 112,80 L 112,160 L 48,160 L 48,80 Z" Width="192" Height="192" Stretch="Uniform" Fill="#333333" HorizontalAlignment="Center" />
+                  <TextBlock Text="PICK IMAGE" FontSize="34" FontWeight="Bold" Foreground="#333333" HorizontalAlignment="Center" />
                 </StackPanel>
               </Button>
             </Grid>
@@ -237,17 +277,15 @@
             <Button Classes="small" Content="CSV" Command="{Binding ExportMaterialsCommand}" ToolTip.Tip="{Binding L[ExportMaterials]}" />
           </WrapPanel>
           <Border BorderBrush="#808080" BorderThickness="0,0,0,1" Margin="0,4,0,1">
-            <Grid ColumnDefinitions="28,*,90,66,70">
+            <Grid ColumnDefinitions="28,*,90">
               <TextBlock Grid.Column="1" Text="{Binding L[Block]}" FontWeight="Bold" />
               <TextBlock Grid.Column="2" Text="{Binding L[Amount]}" FontWeight="Bold" HorizontalAlignment="Right" />
-              <TextBlock Grid.Column="3" Text="{Binding L[Owned]}" FontWeight="Bold" HorizontalAlignment="Center" />
-              <TextBlock Grid.Column="4" Text="{Binding L[Missing]}" FontWeight="Bold" HorizontalAlignment="Right" />
             </Grid>
           </Border>
           <ItemsControl ItemsSource="{Binding Materials}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:MaterialViewModel">
-                <Grid ColumnDefinitions="28,*,90,66,70" Margin="0,1">
+                <Grid ColumnDefinitions="28,*,90" Margin="0,1">
                   <Panel Width="22" Height="22" VerticalAlignment="Top" HorizontalAlignment="Left">
                     <Border Background="{Binding Swatch}" IsVisible="{Binding !HasIcon}" />
                     <Image Source="{Binding Icon}" IsVisible="{Binding HasIcon}" RenderOptions.BitmapInterpolationMode="None" />
@@ -260,13 +298,30 @@
                     <TextBlock Text="{Binding Count, StringFormat='{}{0:N0}'}" HorizontalAlignment="Right" FontWeight="Bold" FontSize="12" />
                     <TextBlock Classes="note" Text="{Binding Stacks}" HorizontalAlignment="Right" FontSize="10" />
                   </StackPanel>
-                  <NumericUpDown Grid.Column="3" Value="{Binding Owned}" Minimum="0" Maximum="10000000" FormatString="0"
-                                 ShowButtonSpinner="False" Margin="4,0" VerticalAlignment="Top" />
-                  <TextBlock Grid.Column="4" Text="{Binding MissingText}" HorizontalAlignment="Right" FontSize="12" />
                 </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
+          <Expander Header="{Binding L[Inventory]}" Margin="0,6,0,0">
+            <StackPanel>
+              <Grid ColumnDefinitions="*,80,80" Margin="0,0,0,4">
+                <TextBlock Text="{Binding L[Block]}" FontWeight="Bold" />
+                <TextBlock Grid.Column="1" Text="{Binding L[Owned]}" HorizontalAlignment="Center" />
+                <TextBlock Grid.Column="2" Text="{Binding L[Missing]}" HorizontalAlignment="Right" />
+              </Grid>
+              <ItemsControl ItemsSource="{Binding Materials}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:MaterialViewModel">
+                    <Grid ColumnDefinitions="*,80,80" Margin="0,2">
+                      <TextBlock Text="{Binding Name}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding Owned}" Minimum="0" Maximum="10000000" FormatString="0" ShowButtonSpinner="False" Margin="4,0" />
+                      <TextBlock Grid.Column="2" Text="{Binding MissingText}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Expander>
           <Expander Header="{Binding L[Progress]}" Margin="0,6,0,0">
             <ItemsControl ItemsSource="{Binding MapProgress}">
               <ItemsControl.ItemTemplate>
@@ -283,11 +338,11 @@
         </StackPanel>
       </ScrollViewer>
 
-      <GridSplitter Grid.Column="3" Background="#2A2A2A" ResizeDirection="Columns" />
+      <GridSplitter Grid.Column="3" Background="Transparent" ResizeDirection="Columns" />
 
       <!-- ===================== Settings ===================== -->
       <ScrollViewer Grid.Column="4">
-        <StackPanel Margin="6,4,12,10" Spacing="1" Grid.IsSharedSizeScope="True">
+        <StackPanel Margin="0,0,16,12" Spacing="1" Grid.IsSharedSizeScope="True">
           <TextBlock Classes="h2" Text="{Binding L[SecSettings]}" />
 
           <Grid Classes="row">
@@ -357,7 +412,8 @@
                 </Grid>
                 <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HeightLimited}">
                   <Slider Minimum="1" Maximum="96" Value="{Binding HeightSlider}" IsSnapToTickEnabled="True" TickFrequency="1" />
-                  <NumericUpDown Grid.Column="1" Value="{Binding MaxHeight}" Minimum="1" Maximum="383" FormatString="0" Width="92" Margin="6,0,0,0" />
+                <NumericUpDown x:Name="HeightInput" Grid.Column="1" Value="{Binding MaxHeight}" Minimum="1" Maximum="383" FormatString="0"
+                               Width="112" MinWidth="112" ShowButtonSpinner="False" TextAlignment="Right" Padding="8,2" Margin="6,0,0,0" />
                 </Grid>
                 <UniformGrid Columns="4" ToolTip.Tip="{Binding L[HeightPresetHint]}">
                   <Button Classes="small" Content="{Binding L[HeightLow]}" Command="{Binding HeightLowCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,0,3,0" />
@@ -449,27 +505,6 @@
               <TextBlock Classes="note" Text="{Binding OriginText}" />
               <SelectableTextBlock Text="{Binding PlacementText}" TextWrapping="Wrap" FontSize="11" Opacity="0.8" />
               <Button Classes="small" Content="{Binding L[ApplyRecommendedY]}" Command="{Binding ApplyRecommendedYCommand}" HorizontalAlignment="Left" />
-            </StackPanel>
-          </Expander>
-
-          <!-- Green buttons (MapartCraft: View online / Download) -->
-          <StackPanel Margin="0,6,0,0">
-            <Button Classes="green" Content="{Binding L[BtnView3D]}" Command="{Binding View3DCommand}" />
-            <Button Classes="green large" Content="{Binding L[BtnExport]}" Command="{Binding ExportBlockCommand}" />
-            <Button Classes="green" Content="{Binding L[BtnSavePng]}" Command="{Binding SavePreviewPngCommand}" />
-          </StackPanel>
-
-          <!-- Check result, always visible in one line; details folded -->
-          <TextBlock Text="{Binding ShadingVerdict}" Classes="ok" IsVisible="{Binding ShadingOk}" FontSize="12" Margin="0,4,0,0" />
-          <TextBlock Text="{Binding ShadingVerdict}" Classes="bad" IsVisible="{Binding ShadingProblem}" FontSize="12" Margin="0,4,0,0" />
-          <Expander Header="{Binding L[SecAnalysis]}">
-            <StackPanel Spacing="3">
-              <TextBlock Text="{Binding ShadingText}" TextWrapping="Wrap" FontSize="12" />
-              <TextBlock Text="{Binding BlockSummary}" TextWrapping="Wrap" FontSize="12" />
-              <TextBlock Classes="note" Text="{Binding ProfileNote}" />
-              <Button Classes="small" Content="{Binding L[PvShadeMap]}" Command="{Binding ShowShadeMapCommand}" HorizontalAlignment="Left" />
-            </StackPanel>
-          </Expander>
           <Expander Header="{Binding L[SecHeight]}" IsVisible="{Binding IsStaircase}">
             <StackPanel Spacing="3">
               <TextBlock Classes="note" Text="{Binding L[HeightAnalysisHint]}" />
@@ -493,38 +528,21 @@
               </ItemsControl>
             </StackPanel>
           </Expander>
-          <Expander Header="{Binding L[SecCalibration]}" IsExpanded="{Binding CalExpanded}">
-            <StackPanel Spacing="3">
-              <TextBlock Classes="note" Text="{Binding L[CalIntro]}" />
-              <Button Classes="green" Content="{Binding L[BtnTestPad]}" Command="{Binding ExportTestPadCommand}" />
-              <Grid ColumnDefinitions="*,Auto,Auto">
-                <Button Classes="green" Content="{Binding L[CalColourPad]}" Command="{Binding ExportColourPadCommand}" />
-                <TextBlock Grid.Column="1" Text="{Binding L[CalStep]}" VerticalAlignment="Center" Margin="6,0,4,0" FontSize="12" />
-                <NumericUpDown Grid.Column="2" Value="{Binding ColourPadStep}" Minimum="1" Maximum="8" FormatString="0" Width="90" />
-              </Grid>
-              <Grid ColumnDefinitions="Auto,*">
-                <TextBlock Classes="lbl" Text="{Binding L[CalWorld]}" />
-                <ComboBox Grid.Column="1" ItemsSource="{Binding CalWorlds}" SelectedItem="{Binding CalWorld}" HorizontalAlignment="Stretch">
-                  <ComboBox.ItemTemplate>
-                    <DataTemplate x:DataType="world:WorldInfo">
-                      <TextBlock Text="{Binding Display}" TextTrimming="CharacterEllipsis" />
-                    </DataTemplate>
-                  </ComboBox.ItemTemplate>
-                </ComboBox>
-              </Grid>
-              <WrapPanel>
-                <Button Classes="small" Content="{Binding L[CalRefresh]}" Command="{Binding RefreshCalWorldsCommand}" Margin="0,0,4,4" />
-                <Button Classes="small" Content="{Binding L[CalBrowse]}" Command="{Binding BrowseCalWorldCommand}" Margin="0,0,4,4" />
-                <Button Classes="small" Content="{Binding L[CalLoadPad]}" Command="{Binding LoadPadCommand}" Margin="0,0,4,4" />
-              </WrapPanel>
-              <TextBlock Classes="note" Text="{Binding PadText}" />
-              <Button Classes="green" Content="{Binding L[CalRead]}" Command="{Binding ReadMapsCommand}" />
-              <SelectableTextBlock Text="{Binding CalibrationReport}" TextWrapping="Wrap" FontSize="11" FontFamily="Consolas, Yu Gothic UI" />
-              <Button Classes="small" Content="{Binding L[CalSave]}" Command="{Binding SaveCalibrationCommand}" HorizontalAlignment="Left" />
             </StackPanel>
           </Expander>
+
+          <!-- Green buttons (MapartCraft: View online / Download) -->
+          <StackPanel Margin="0,6,0,0">
+            <Button Classes="green" Content="{Binding L[BtnView3D]}" Command="{Binding View3DCommand}" />
+            <Button Classes="green large" Content="{Binding L[BtnExport]}" Command="{Binding ExportBlockCommand}" />
+            <Button Classes="green" Content="{Binding L[BtnSavePng]}" Command="{Binding SavePreviewPngCommand}" />
+          </StackPanel>
+
+
+
         </StackPanel>
       </ScrollViewer>
     </Grid>
+    </ScrollViewer>
   </DockPanel>
 </Window>

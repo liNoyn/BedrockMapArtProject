@@ -204,29 +204,7 @@ public sealed partial class MainViewModel
     public RelayCommand UndoEditCommand { get; private set; } = null!;
     public RelayCommand ClearEditsCommand { get; private set; } = null!;
     public RelayCommand SavePreviewPngCommand { get; private set; } = null!;
-    public RelayCommand ExportTestPadCommand { get; private set; } = null!;
     public RelayCommand View3DCommand { get; private set; } = null!;
-    public RelayCommand ShowShadeMapCommand { get; private set; } = null!;
-
-    // ---- shading & build check ----
-    private string _shadingText = "";
-    public string ShadingText { get => _shadingText; set => Set(ref _shadingText, value); }
-    private string _shadingVerdict = "";
-    public string ShadingVerdict { get => _shadingVerdict; set => Set(ref _shadingVerdict, value); }
-    private bool _shadingOk = true;
-    public bool ShadingOk { get => _shadingOk; set { if (Set(ref _shadingOk, value)) Raise(nameof(ShadingProblem)); } }
-    public bool ShadingProblem => !ShadingOk;
-
-    private void UpdateShadingText()
-    {
-        if (_report is not { } r) { ShadingText = ""; ShadingVerdict = ""; ShadingOk = true; return; }
-        var notes = new List<string> { r.Mismatches == 0 ? L["ExactYes"] : L.Format("ExactNo", r.Mismatches) };
-        if (r.DependsOnTerrain > 0) notes.Add(L.Format("TerrainNote", r.DependsOnTerrain));
-        if (r.WillFall + r.WillBreak > 0) notes.Add(L.Format("FallNote", r.WillFall + r.WillBreak));
-        ShadingVerdict = string.Join("\n", notes);
-        ShadingOk = r.Mismatches == 0 && r.WillFall + r.WillBreak == 0;
-        ShadingText = L.Format("ShadingSummary", r.Dark, r.Normal, r.Bright, r.MaxY, r.TallestX, r.TallestZ, r.MeanHeight, r.Steps, r.Drops);
-    }
 
     /// <summary>Saves the predicted map (block map colours) as PNG: the whole picture and one file per map.</summary>
     private async Task SavePreviewPngAsync()
@@ -297,13 +275,11 @@ public sealed partial class MainViewModel
         UndoEditCommand = new RelayCommand(UndoEdit, () => _edits.CanUndo);
         ClearEditsCommand = new RelayCommand(ClearEditsAsync, () => _edits.Count > 0);
         SavePreviewPngCommand = new RelayCommand(SavePreviewPngAsync, () => _quantized != null && !IsBusy && !IsConverting);
-        ExportTestPadCommand = new RelayCommand(() => ExportPadAsync(PadKind.Shading));
         View3DCommand = new RelayCommand(RequestViewer, () => _layout != null);
         HeightLowCommand = new RelayCommand(() => MaxHeight = 8);
         HeightMediumCommand = new RelayCommand(() => MaxHeight = 16);
         HeightHighCommand = new RelayCommand(() => MaxHeight = 32);
         HeightNoLimitCommand = new RelayCommand(() => MaxHeight = 0);
-        ShowShadeMapCommand = new RelayCommand(() => SelectedPreviewMode = PreviewModes.First(p => p.Value == PreviewMode.ShadeMap));
         AnalyzeHeightCommand = new RelayCommand(AnalyzeHeightAsync, () => _processed != null && !IsAnalyzing);
         FlatBackgroundCommand = new RelayCommand(UseFlatBackground);
         ApplyRecommendedYCommand = new RelayCommand(() => { if (_advice is { Fits: true } a) { UseOrigin = true; OriginY = a.RecommendedBaseY; } }, () => _advice is { Fits: true });

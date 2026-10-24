@@ -40,6 +40,36 @@ public sealed class ProjectLifecycleTests : IDisposable
     public ProjectLifecycleTests() => Directory.CreateDirectory(_directory);
 
     [AvaloniaFact]
+    public async Task ConvertedArtwork_CanRenderIn3DWithoutTheRemovedAnalysisPipeline()
+    {
+        var model=Create();
+        SetImage(model);
+        await Convert(model);
+        model.SelectedPreviewMode=model.PreviewModes.First(p=>p.Value==PreviewMode.BlockMap);
+        Assert.True(model.HasPreview);
+        Assert.NotEmpty(model.Materials);
+        var rendered=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        model.PropertyChanged+=(_,e)=>
+        {
+            if(e.PropertyName==nameof(MainViewModel.View3D) && model.HasView3D)rendered.TrySetResult();
+        };
+        model.SetViewport3D(320,240);
+        model.ViewerOpen=true;
+        try
+        {
+            await rendered.Task.WaitAsync(TimeSpan.FromSeconds(15));
+            Assert.Equal(320,model.View3D!.PixelSize.Width);
+            Assert.Equal(240,model.View3D.PixelSize.Height);
+            Assert.True(model.ExportBlockCommand.CanExecute(null));
+        }
+        finally
+        {
+            model.ViewerOpen=false;
+            model.NewProjectCommand.Execute(null);
+        }
+    }
+
+    [AvaloniaFact]
     public async Task NewProject_CannotBeRepopulatedByOldConversion()
     {
         var model = Create();

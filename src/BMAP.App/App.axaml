@@ -230,5 +230,81 @@
       <Setter Property="HorizontalAlignment" Value="Stretch" />
       <Setter Property="Margin" Value="0,3" />
     </Style>
+    <!-- Native controls retain the reference page's compact, light form fields on a charcoal canvas. -->
+    <Style Selector="Window.mapart">
+      <Setter Property="FontSize" Value="15" />
+    </Style>
+    <Style Selector="Window.mapart TextBlock.h1">
+      <Setter Property="FontSize" Value="32" />
+    </Style>
+    <Style Selector="Window.mapart TextBlock.h2">
+      <Setter Property="FontSize" Value="23" />
+      <Setter Property="Margin" Value="0,0,0,6" />
+    </Style>
+    <Style Selector="Window.mapart TextBlock.lbl">
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+    <Style Selector="Window.mapart ComboBox">
+      <Setter Property="Background" Value="#F4F4F4" />
+      <Setter Property="Foreground" Value="#222222" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="MinHeight" Value="24" />
+      <Setter Property="Padding" Value="5,0" />
+    </Style>
+    <Style Selector="Window.mapart ComboBoxItem">
+      <Setter Property="Foreground" Value="#222222" />
+      <Setter Property="Background" Value="#F4F4F4" />
+      <Setter Property="Padding" Value="6,3" />
+    </Style>
+    <Style Selector="Window.mapart ComboBox /template/ PathIcon">
+      <Setter Property="Foreground" Value="#222222" />
+    </Style>
+    <Style Selector="Window.mapart TextBox, Window.mapart NumericUpDown">
+      <Setter Property="Background" Value="#F4F4F4" />
+      <Setter Property="Foreground" Value="#222222" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="MinHeight" Value="24" />
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style Selector="Window.mapart TextBox">
+      <Setter Property="Padding" Value="5,2" />
+      <Setter Property="CaretBrush" Value="#222222" />
+      <Setter Property="SelectionForegroundBrush" Value="#222222" />
+    </Style>
+    <Style Selector="Window.mapart Button.small">
+      <Setter Property="Background" Value="#EEEEEE" />
+      <Setter Property="Foreground" Value="#222222" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="MinHeight" Value="24" />
+    </Style>
+    <Style Selector="Window.mapart Button.link">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+    <Style Selector="Window.mapart Button.green">
+      <Setter Property="Background" Value="#688E6B" />
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="MinHeight" Value="32" />
+      <Setter Property="Margin" Value="0,1" />
+    </Style>
+    <Style Selector="Window.mapart Button.green.large">
+      <Setter Property="FontSize" Value="23" />
+      <Setter Property="MinHeight" Value="50" />
+    </Style>
+    <Style Selector="Window.mapart Expander">
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="FontSize" Value="15" />
+    </Style>
+    <Style Selector="Window.mapart Expander /template/ ToggleButton#ExpanderHeader">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="Padding" Value="0,2" />
+    </Style>
+    <Style Selector="Window.mapart ToggleButton.blk">
+      <Setter Property="Margin" Value="1,2" />
+    </Style>
   </Application.Styles>
 </Application>
