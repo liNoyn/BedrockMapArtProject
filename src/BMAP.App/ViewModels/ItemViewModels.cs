@@ -46,7 +46,11 @@ public sealed class BlockChoiceViewModel : ViewModelBase
     public BlockDefinition Block { get; }
     public Loc Loc { get; }
     public IBrush Swatch => _row.NormalBrush;
-    public Bitmap? Icon { get => _icon; set { if (Set(ref _icon, value)) Raise(nameof(HasIcon)); } }
+    public Bitmap? Icon
+    {
+        get => _icon;
+        set { var old = _icon; if (Set(ref _icon, value)) { Raise(nameof(HasIcon)); old?.Dispose(); } }
+    }
     public bool HasIcon => _icon != null;
 
     /// <summary>Selected for generation. Any number of blocks per row can be selected.</summary>
@@ -183,6 +187,7 @@ public sealed class MaterialViewModel : ViewModelBase
 
     public Loc Loc { get; }
     public string Key => _line.Block.Key;
+    public bool IsSupport => _line.IsSupport;
     public string Name => _line.Block.LocalName(Loc.English) + (_line.IsSupport ? $" ({Loc["Support"]})" : "");
     public Bitmap? Icon { get; }
     public bool HasIcon => Icon != null;

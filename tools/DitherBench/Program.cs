@@ -7,14 +7,22 @@ using BMAP.Imaging;
 using BMAP.Palette;
 using BMAP.Shading;
 
-// DitherBench <output> [size=96] [repeats=3] [optional image directory] [speed|height]
+// DitherBench <output> [size=96] [repeats=3] [image directory] [mode] [maximum block types=0]
 // CoreProject may point to a source snapshot for before/after comparisons with exactly the same harness.
+if(args.Length>0 && args[0]=="compare-policy")
+{
+    if(args.Length!=4)throw new ArgumentException("compare-policy <before directory> <after directory> <output.json>");
+    PolicyComparison.Run(args[1],args[2],args[3]);
+    return;
+}
 int size = args.Length > 1 ? int.Parse(args[1]) : 96;
 int repeats = args.Length > 2 ? int.Parse(args[2]) : 3;
 if (size < 8 || repeats < 1) throw new ArgumentOutOfRangeException(nameof(args));
 string output = Path.GetFullPath(args[0]); Directory.CreateDirectory(output);
 var profile = ColorProfile.LoadBuiltIn();
-var selection = BlockPreset.BuiltIns(profile)[0].ToSelection();
+int paletteLimit = args.Length > 5 ? int.Parse(args[5]) : 0;
+if (paletteLimit < 0) throw new ArgumentOutOfRangeException(nameof(paletteLimit));
+var selection = BlockPreset.BuiltIns(profile)[0].ToSelection() with { MaxBlockTypes=paletteLimit };
 var support = profile.Find("cobblestone")!;
 var images = new List<(string Name, RgbaImage Image)>();
 foreach (string name in new[] { "gradient", "sky", "illustration", "mixed", "skin", "texture", "alpha", "flat" })
@@ -40,6 +48,8 @@ foreach (string name in new[] { "gradient", "sky", "illustration", "mixed", "ski
     }
     images.Add((name,image));
 }
+images.Add(("outline", ReviewScenes.Outline(size, antialias: false)));
+images.Add(("outline-aa", ReviewScenes.Outline(size, antialias: true)));
 if(args.Length>3)
     foreach(string path in Directory.EnumerateFiles(args[3]).Where(p=>new[]{".png",".jpg",".jpeg"}.Contains(Path.GetExtension(p).ToLowerInvariant())).Order())
     {
@@ -47,17 +57,37 @@ if(args.Length>3)
         // The same linear-light resampler is used by every model; benchmark dimensions are independent of map size.
         images.Add((Path.GetFileNameWithoutExtension(path),Resampler.Resample(input,0,0,input.Width,input.Height,size,size,Interpolation.Lanczos3,linearLight:true)));
     }
-if(args.Length>4 && args[4]=="height")
+bool allModels = args.Length > 4 && args[4].StartsWith("all", StringComparison.Ordinal);
+bool limitedPalette = args.Length > 4 && args[4] is "limited" or "all-limited";
+if (limitedPalette)
 {
-    HeightChecks.Run(images.Where(i=>i.Name is "mixed" or "astronaut" or "coffee").ToList(),profile,selection,output);
+    images.Add(("rare-outline",ReviewScenes.RareOutline(size,profile,selection)));
+    images=images.Where(i=>i.Name is "gradient" or "mixed" or "illustration" or "outline-aa" or "coffee" or "rare-outline").ToList();
+}
+var models = allModels ? Enum.GetValues<DitherMode>() : new[]{DitherMode.Optimized,DitherMode.Perceptual,DitherMode.Hybrid};
+if(args.Length>4 && args[4] is "height" or "all-height")
+{
+    HeightChecks.Run(images.Where(i=>i.Name is "mixed" or "astronaut" or "coffee" or "outline" or "outline-aa").ToList(),profile,selection,output,models);
+    return;
+}
+if(args.Length>4 && args[4]=="detect")
+{
+    ReviewScenes.CheckDetection(output);
+    return;
+}
+if(args.Length>4 && args[4]=="precision")
+{
+    PrecisionChecks.Run(profile,selection,output);
     return;
 }
 bool speedOnly = args.Length > 4 && args[4] == "speed";
-if(speedOnly) images = images.Where(i=>i.Name is "gradient" or "illustration" or "astronaut" or "coffee").ToList();
-var conditions = speedOnly ? new[]{(StaircaseMode.Valley,0),(StaircaseMode.Valley,4)}
+bool skyOnly = args.Length > 4 && args[4] == "sky";
+if(speedOnly) images = images.Where(i=>i.Name is "gradient" or "sky" or "illustration" or "outline" or "outline-aa" or "astronaut" or "coffee").ToList();
+if(skyOnly) images = images.Where(i=>i.Name == "sky").ToList();
+var conditions = limitedPalette ? new[]{(StaircaseMode.Flat,0),(StaircaseMode.Valley,4)}
+    : speedOnly || skyOnly ? new[]{(StaircaseMode.Valley,0),(StaircaseMode.Valley,4)}
     : new[]{(StaircaseMode.Flat,0),(StaircaseMode.Classic,0),(StaircaseMode.Valley,0),(StaircaseMode.Valley,4)};
 var rows = new List<Row>();
-var models = new[]{DitherMode.Optimized,DitherMode.Perceptual,DitherMode.Hybrid};
 // Warm JIT and parallel workers, without timing these runs.
 foreach(var model in models) ColorQuantizer.Quantize(images[0].Image,profile,selection,new QuantizeOptions{Dither=model,Mode=StaircaseMode.Valley});
 foreach(var (name,image) in images)
@@ -81,14 +111,14 @@ foreach(var (name,image) in images)
             var report=ShadingAnalyzer.Analyze(layout,profile,result!.Preview);
             var score=QualityScore.Measure(image,result.Preview);
             var row=new Row(name,mode.ToString(),limit,model.ToString(),size,times[times.Count/2],score.Pixel,score.Near,score.Far,score.Overall,
-                Roughness(image,result.Preview),flat,layout.MaxHeight,report.Mismatches,report.DependsOnTerrain,report.WillFall+report.WillBreak);
+                Roughness(image,result.Preview),flat,layout.MaxHeight,report.Mismatches,report.DependsOnTerrain,report.WillFall+report.WillBreak,paletteLimit,result.EntryIndex.Where(e=>e>=0).Distinct().Count());
             rows.Add(row);Console.WriteLine(JsonSerializer.Serialize(row));
             ImageCodec.SavePng(result.Preview,Path.Combine(output,$"{name}-{mode}-{limit}-{model}.png"));
         }
 }
 File.WriteAllText(Path.Combine(output,"metrics.json"),JsonSerializer.Serialize(rows,new JsonSerializerOptions{WriteIndented=true}));
-File.WriteAllText(Path.Combine(output,"environment.json"),JsonSerializer.Serialize(new{Runtime=Environment.Version.ToString(),OS=Environment.OSVersion.ToString(),Environment.ProcessorCount,Size=size,Repeats=repeats,Support="Important",OnMapGrid=true}));
-File.WriteAllLines(Path.Combine(output,"metrics.csv"),new[]{"Scene,Mode,Limit,Model,Size,MedianMs,Pixel,Near,Far,Overall,Roughness,FlatFraction,MaxY,Mismatches,Terrain,Unstable"}.Concat(rows.Select(r=>string.Join(",",r.Scene,r.Mode,r.Limit,r.Model,r.Size,F(r.MedianMs),F(r.Pixel),F(r.Near),F(r.Far),F(r.Overall),F(r.Roughness),F(r.FlatFraction),r.MaxY,r.Mismatches,r.Terrain,r.Unstable))));
+File.WriteAllText(Path.Combine(output,"environment.json"),JsonSerializer.Serialize(new{Runtime=Environment.Version.ToString(),OS=Environment.OSVersion.ToString(),Environment.ProcessorCount,Size=size,Repeats=repeats,PaletteLimit=paletteLimit,Support="Important",OnMapGrid=true}));
+File.WriteAllLines(Path.Combine(output,"metrics.csv"),new[]{"Scene,Mode,Limit,Model,Size,MedianMs,Pixel,Near,Far,Overall,Roughness,FlatFraction,MaxY,Mismatches,Terrain,Unstable,PaletteLimit,UsedEntries"}.Concat(rows.Select(r=>string.Join(",",r.Scene,r.Mode,r.Limit,r.Model,r.Size,F(r.MedianMs),F(r.Pixel),F(r.Near),F(r.Far),F(r.Overall),F(r.Roughness),F(r.FlatFraction),r.MaxY,r.Mismatches,r.Terrain,r.Unstable,r.PaletteLimit,r.UsedEntries))));
 static string F(double v)=>v.ToString("G9",CultureInfo.InvariantCulture);
 static double Roughness(RgbaImage source,RgbaImage map)
 {
@@ -107,4 +137,4 @@ static double Roughness(RgbaImage source,RgbaImage map)
     }
     return n==0?0:100*Math.Sqrt(sum/n);
 }
-record Row(string Scene,string Mode,int Limit,string Model,int Size,double MedianMs,double Pixel,double Near,double Far,double Overall,double Roughness,double FlatFraction,int MaxY,int Mismatches,int Terrain,int Unstable);
+record Row(string Scene,string Mode,int Limit,string Model,int Size,double MedianMs,double Pixel,double Near,double Far,double Overall,double Roughness,double FlatFraction,int MaxY,int Mismatches,int Terrain,int Unstable,int PaletteLimit,int UsedEntries);

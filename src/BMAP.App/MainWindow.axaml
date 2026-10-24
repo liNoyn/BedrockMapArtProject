@@ -402,6 +402,7 @@
             <TextBlock Classes="lbl" Text="{Binding L[Dither]}" />
             <ComboBox Grid.Column="1" ItemsSource="{Binding Dithers}" SelectedItem="{Binding Dither}" HorizontalAlignment="Stretch" />
           </Grid>
+          <TextBlock Text="{Binding L[DitherLegacyNotice]}" IsVisible="{Binding IsLegacyDither}" TextWrapping="Wrap" Opacity="0.7" FontSize="12" Margin="0,2,0,6" />
           <Grid Classes="row">
             <Grid.ColumnDefinitions><ColumnDefinition SharedSizeGroup="L" Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
             <TextBlock Classes="lbl" Text="{Binding L[Background]}" />

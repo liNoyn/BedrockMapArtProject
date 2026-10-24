@@ -31,7 +31,7 @@ public static class CustomBlockStore
     public static void Save(IEnumerable<CustomBlock> blocks)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        File.WriteAllText(FilePath, JsonSerializer.Serialize(blocks.ToList(), Options));
+        AtomicFile.WriteAllText(FilePath, JsonSerializer.Serialize(blocks.ToList(), Options));
     }
 
     /// <summary>

@@ -158,10 +158,19 @@ public static partial class ColorQuantizer
 
     public static QuantizeResult Quantize(RgbaImage image, ColorProfile profile, PaletteSelection selection,
         QuantizeOptions options, CancellationToken ct = default)
+        => QuantizeCore(image,profile,selection,options,ct,null);
+
+    internal static QuantizeResult QuantizeForLayout(RgbaImage image,ColorProfile profile,PaletteSelection selection,
+        QuantizeOptions options,CancellationToken ct,Func<QuantizeResult,bool> feasible)
+        => QuantizeCore(image,profile,selection,options,ct,feasible);
+
+    private static QuantizeResult QuantizeCore(RgbaImage image,ColorProfile profile,PaletteSelection selection,
+        QuantizeOptions options,CancellationToken ct,Func<QuantizeResult,bool>? feasible)
     {
         var entries = selection.Resolve(profile);
         if (entries.Count == 0) throw new InvalidOperationException("使用できるブロックがありません。パレットでブロックを選んでください。");
         ct.ThrowIfCancellationRequested();
+        var requestedModel=options.Dither;
         if (options.Dither is DitherMode.Perceptual or DitherMode.Hybrid && options.DitherStrength <= 0 && options.Refine is null)
             options = options with { Dither = DitherMode.None };
 
@@ -179,19 +188,88 @@ public static partial class ColorQuantizer
             return QuantizeWith(image, profile, e, options with { Dither = DitherMode.Perceptual }, ct, calm, flat);
         }
         var result = Run(entries);
-        // Survival limit: drop the least used blocks until the number of block types fits (design 6.8).
-        if (selection.MaxBlockTypes > 0)
+        // Survival limit: retain the model's colours with the least replacement error, including rare outlines.
+        if (selection.MaxBlockTypes > 0 && result.EntryIndex.Where(e=>e>=0).Distinct().Count() > selection.MaxBlockTypes)
         {
+            var feasibility=new Dictionary<QuantizeResult,bool>(ReferenceEqualityComparer.Instance);
+            bool Fits(QuantizeResult q)
+            {
+                if(feasibility.TryGetValue(q,out bool fits))return fits;
+                fits=feasible!(Distribute(q,selection.Mixing));feasibility.Add(q,fits);return fits;
+            }
+            bool Prefer(QuantizeResult proposed,QuantizeResult baseline,double[]? weights=null)
+            {
+                // A lower image error must not replace a build that fits with one requiring a lower shade budget.
+                if(feasible is not null)
+                {
+                    bool proposedFits=Fits(proposed),baselineFits=Fits(baseline);
+                    if(proposedFits!=baselineFits)return proposedFits;
+                }
+                return QualityScore.PreferCandidate(image,proposed.Preview,baseline.Preview,options.Metric,ct,weights);
+            }
+            var importance=QualityScore.PaletteWeights(image,result.Preview,requestedModel,ct);
+            var proposal = PaletteReducer.Select(profile,entries,result,selection.MaxBlockTypes,options,ct);
+            var candidate = Run(proposal);
+            var rendered=new List<(List<PaletteEntry> Palette,QuantizeResult Result)> { (proposal,candidate) };
+            var unconstrained = result;
+            static bool SamePalette(List<PaletteEntry> a,List<PaletteEntry> b) =>
+                a.Count == b.Count && a.Zip(b).All(p=>ReferenceEquals(p.First,p.Second));
+            // Colour-distribution error is a planning proxy: dithering can mix a different subset more faithfully.
+            // Keep the former pruning path as a rendered baseline and accept a proposal only after comparison.
+            var legacyEntries = entries;
+            var legacy = result;
             while (true)
             {
-                var counts = new int[entries.Count];
-                foreach (int e in result.EntryIndex) if (e >= 0) counts[e]++;
-                int used = counts.Count(c => c > 0);
+                ct.ThrowIfCancellationRequested();
+                var counts = new int[legacyEntries.Count];
+                foreach (int e in legacy.EntryIndex) if (e >= 0) counts[e]++;
+                int used = counts.Count(c=>c>0);
                 if (used <= selection.MaxBlockTypes) break;
-                int keepCount = Math.Max(selection.MaxBlockTypes, used - Math.Max(1, (used - selection.MaxBlockTypes) / 2));
-                entries = Enumerable.Range(0, entries.Count).Where(i => counts[i] > 0)
-                    .OrderByDescending(i => counts[i]).Take(keepCount).OrderBy(i => i).Select(i => entries[i]).ToList();
-                result = Run(entries);
+                int keep = Math.Max(selection.MaxBlockTypes,used-Math.Max(1,(used-selection.MaxBlockTypes)/2));
+                legacyEntries = Enumerable.Range(0,legacyEntries.Count).Where(i=>counts[i]>0)
+                    .OrderByDescending(i=>counts[i]).Take(keep).OrderBy(i=>i).Select(i=>legacyEntries[i]).ToList();
+                legacy = SamePalette(legacyEntries,proposal) ? candidate : Run(legacyEntries);
+            }
+            rendered.Add((legacyEntries,legacy));
+            if (ReferenceEquals(legacy,candidate)) result = candidate;
+            else
+            {
+                ct.ThrowIfCancellationRequested();
+                result = Prefer(candidate,legacy) ? candidate : legacy;
+            }
+            // Squared matcher distance and perceptual ΔE can suggest different palettes. Render the second plan
+            // with the original matcher, then require the same two-distance improvement over the current winner.
+            if (options.Metric != ColorMetric.Ciede2000)
+            {
+                var perceptualProposal = PaletteReducer.Select(profile,entries,unconstrained,selection.MaxBlockTypes,
+                    options with { Metric=ColorMetric.Ciede2000 },ct);
+                if (!SamePalette(perceptualProposal,proposal) && !SamePalette(perceptualProposal,legacyEntries))
+                {
+                    var perceptualCandidate = Run(perceptualProposal);
+                    rendered.Add((perceptualProposal,perceptualCandidate));
+                    if (Prefer(perceptualCandidate,result))
+                        result = perceptualCandidate;
+                }
+            }
+            // Retain the ordinary plans too: weighting changes the planning proxy, not just the final judgement.
+            // A feature-aware plan must earn its place against the already rendered ordinary alternatives.
+            if(importance is not null)
+            {
+                // Begin with the average-colour winner, preserving its feature score among equally feasible
+                // layouts. Reconsider ordinary renders under the new priorities before adding plans.
+                foreach(var alternative in rendered)
+                    if(!ReferenceEquals(alternative.Result,result) && Prefer(alternative.Result,result,importance))result=alternative.Result;
+                var tried=rendered.Select(r=>r.Palette).ToList();
+                foreach(var planningMetric in new[]{options.Metric,ColorMetric.Ciede2000}.Distinct())
+                {
+                    var featureProposal=PaletteReducer.Select(profile,entries,unconstrained,selection.MaxBlockTypes,
+                        options with { Metric=planningMetric },ct,importance);
+                    if(tried.Any(p=>SamePalette(p,featureProposal)))continue;
+                    var featureCandidate=Run(featureProposal);
+                    tried.Add(featureProposal);
+                    if(Prefer(featureCandidate,result,importance))
+                        result=featureCandidate;
+                }
             }
         }
         return Distribute(result, selection.Mixing);
@@ -320,7 +398,7 @@ public static partial class ColorQuantizer
                 {
                     PixelWeight = 0.02 + calm * 0.38, PerceptualWeight = 0.08 + calm * 0.12, PairLambda = 0.1 + calm * 0.3, Neighbours = 24,
                     TriplePool = 16, PlanHue = 0.3 + calm, PlanChroma = 1, PlanPixel = calm * 0.5, PairQuad = 0.25 + calm * 2.75, HueTolerance = 0.03,
-                    Sigma1 = 1, Sigma2 = 3, Weight2 = 2, DarkWeight = 0.3, ChromaWeight = 12, Denoise = 4, SwapPasses = 2,
+                    Sigma1 = 1, Sigma2 = 3, Weight2 = 2, DarkWeight = 0.3, ChromaWeight = 12, Denoise = 4, SwapPasses = 2, Rounds = 2,
                     // A single colour that is close except for lightness, or that is a stronger colour of the same hue,
                     // stays solid instead of a two-shade texture or a mix with white.
                     PlanLightness = 0.5, MixCost = 0.01, PlanChromaExcess = 0.1,
@@ -334,14 +412,15 @@ public static partial class ColorQuantizer
             image = denoised = Denoise(image, dn0.Denoise, ct);
         var ordered = OrderedMatrix(options.Dither);
         var knoll = KnollMatrix(options.Dither);
+        var matcherTemplate = new NearestMatcher(candidates, options.Metric);
         if (options.HeightLimited && (options.Dither == DitherMode.None || ordered != null || knoll != null))
         {
-            HeightLimitedOptimal(image, w, h, options, candidates, ordered, IsEmpty, idx, shades, Assign, ct, knoll);
+            HeightLimitedOptimal(image, w, h, options, matcherTemplate, ordered, IsEmpty, idx, shades, Assign, ct, knoll);
         }
         else if (knoll != null)
         {
             int size = (int)Math.Sqrt(knoll.Length);
-            Parallel.For(0, h, new ParallelOptions { CancellationToken = ct }, () => new NearestMatcher(candidates, options.Metric), (y, _, local) =>
+            Parallel.For(0, h, new ParallelOptions { CancellationToken = ct }, matcherTemplate.Fork, (y, _, local) =>
             {
                 for (int x = 0; x < w; x++)
                 {
@@ -357,14 +436,14 @@ public static partial class ColorQuantizer
         {
             int size = ordered is null ? 1 : (int)Math.Sqrt(ordered.Length);
             const double spread = 32; // roughly the typical distance between neighbouring palette colours
-            Parallel.For(0, h, new ParallelOptions { CancellationToken = ct }, () => new NearestMatcher(candidates, options.Metric), (y, _, local) =>
+            Parallel.For(0, h, new ParallelOptions { CancellationToken = ct }, matcherTemplate.Fork, (y, _, local) =>
             {
                 for (int x = 0; x < w; x++)
                 {
                     int i = y * w + x;
                     if (IsEmpty(i)) { idx[i] = -1; shades[i] = Shade.Normal; continue; }
                     double r = image.Pixels[i * 4], g = image.Pixels[i * 4 + 1], b = image.Pixels[i * 4 + 2];
-                    if (ordered != null)
+                    if (ordered != null && !local.IsExact(r, g, b, AllShades, options.ShadePenalty))
                     {
                         double t = (ordered[(y % size) * size + x % size] + 0.5) / ordered.Length - 0.5;
                         double k = t * spread * options.DitherStrength;
@@ -377,7 +456,7 @@ public static partial class ColorQuantizer
         }
         else
         {
-            ErrorDiffuse(image, w, h, options, new NearestMatcher(candidates, options.Metric), candidates, IsEmpty, idx, shades, Assign, ct);
+            ErrorDiffuse(image, w, h, options, matcherTemplate, candidates, IsEmpty, idx, shades, Assign, ct);
         }
 
         if (options.Refine is { } refine)
@@ -435,14 +514,14 @@ public static partial class ColorQuantizer
     /// a run of H darker (or H lighter) steps, normal steps not breaking the run, so the state is the current run:
     /// k = H is "no run", k &lt; H a dark run of H-k, k &gt; H a light run of k-H.
     /// </summary>
-    private static void HeightLimitedOptimal(RgbaImage image, int w, int h, QuantizeOptions options, List<Candidate> candidates,
+    private static void HeightLimitedOptimal(RgbaImage image, int w, int h, QuantizeOptions options, NearestMatcher matcherTemplate,
         int[]? ordered, Func<int, bool> isEmpty, int[] idx, Shade[] shades, Action<int, int> assign, CancellationToken ct,
         int[]? knoll = null)
     {
         int H = options.MaxHeight, S = 2 * H + 1;
         int size = ordered is null ? 1 : (int)Math.Sqrt(ordered.Length);
         int ksize = knoll is null ? 1 : (int)Math.Sqrt(knoll.Length);
-        Parallel.For(0, w, new ParallelOptions { CancellationToken = ct }, () => new NearestMatcher(candidates, options.Metric), (x, _, matcher) =>
+        Parallel.For(0, w, new ParallelOptions { CancellationToken = ct }, matcherTemplate.Fork, (x, _, matcher) =>
         {
             // Per row: best candidate and cost for each shade.
             var bestCand = new int[h * 3];
@@ -452,7 +531,7 @@ public static partial class ColorQuantizer
                 int i = y * w + x;
                 if (isEmpty(i)) { for (int s = 0; s < 3; s++) { bestCand[y * 3 + s] = -1; bestCost[y * 3 + s] = 0; } continue; }
                 double r = image.Pixels[i * 4], g = image.Pixels[i * 4 + 1], b = image.Pixels[i * 4 + 2];
-                if (ordered != null)
+                if (ordered != null && !matcher.IsExact(r, g, b, AllShades, options.ShadePenalty))
                 {
                     double t = (ordered[(y % size) * size + x % size] + 0.5) / ordered.Length - 0.5;
                     double k = t * 32 * options.DitherStrength;
@@ -477,6 +556,9 @@ public static partial class ColorQuantizer
 
             var cost = new double[S];
             var next = new double[S];
+            // Lexicographic secondary cost: scatter truly equal solutions without changing colour optimality.
+            var tie = new double[S];
+            var nextTie = new double[S];
             var from = new int[h * S];
             var choice = new byte[h * S];
             Array.Fill(cost, double.PositiveInfinity);
@@ -484,36 +566,40 @@ public static partial class ColorQuantizer
             for (int y = 0; y < h; y++)
             {
                 Array.Fill(next, double.PositiveInfinity);
+                Array.Fill(nextTie, double.PositiveInfinity);
                 bool empty = bestCand[y * 3 + 1] < 0;
                 for (int k = 0; k < S; k++)
                 {
                     double c0 = cost[k];
                     if (double.IsPositiveInfinity(c0)) continue;
                     // Normal (or an empty pixel): the run continues unchanged.
-                    Relax(k, c0 + (empty ? 0 : bestCost[y * 3 + (int)Shade.Normal]), k, (byte)Shade.Normal);
+                    Relax(k, c0 + (empty ? 0 : bestCost[y * 3 + (int)Shade.Normal]), tie[k], k, (byte)Shade.Normal);
                     if (empty) continue;
-                    // Dark: extends a dark run or starts a new one. A tiny per-pixel jitter breaks exact ties so that
+                    // Dark: extends a dark run or starts a new one. A secondary per-pixel jitter breaks exact ties so that
                     // columns in flat areas drop back at different rows (scattered, like dithering) instead of all
                     // at the same row, which would show as a dark horizontal line.
                     int kd = k <= H ? k - 1 : H - 1;
-                    if (kd >= 0) Relax(kd, c0 + bestCost[y * 3 + (int)Shade.Dark] + matcher.TieBreak * Jitter(x, y), k, (byte)Shade.Dark);
+                    if (kd >= 0) Relax(kd, c0 + bestCost[y * 3 + (int)Shade.Dark], tie[k] + Jitter(x, y), k, (byte)Shade.Dark);
                     // Light: extends a light run or starts a new one.
                     int kb = k >= H ? k + 1 : H + 1;
-                    if (kb < S) Relax(kb, c0 + bestCost[y * 3 + (int)Shade.Bright], k, (byte)Shade.Bright);
+                    if (kb < S) Relax(kb, c0 + bestCost[y * 3 + (int)Shade.Bright], tie[k], k, (byte)Shade.Bright);
                 }
                 (cost, next) = (next, cost);
+                (tie, nextTie) = (nextTie, tie);
 
-                void Relax(int to, double value, int fromState, byte shade)
+                void Relax(int to, double value, double tieValue, int fromState, byte shade)
                 {
-                    if (value >= next[to]) return;
+                    if (value > next[to] || value == next[to] && tieValue >= nextTie[to]) return;
                     next[to] = value;
+                    nextTie[to] = tieValue;
                     from[y * S + to] = fromState;
                     choice[y * S + to] = shade;
                 }
             }
 
             int state = 0;
-            for (int k = 1; k < S; k++) if (cost[k] < cost[state]) state = k;
+            for (int k = 1; k < S; k++)
+                if (cost[k] < cost[state] || cost[k] == cost[state] && tie[k] < tie[state]) state = k;
             for (int y = h - 1; y >= 0; y--)
             {
                 int i = y * w + x;
@@ -648,7 +734,7 @@ public static partial class ColorQuantizer
 
     /// <summary>
     /// Finds the nearest candidate colour, restricted to a set of shades and with an optional extra cost for the
-    /// dark/light shades. Results are cached per (quantised colour, shade mask).
+    /// dark/light shades. Only exact integer colours are cached; fractional diffusion errors remain exact.
     /// </summary>
     internal sealed partial class NearestMatcher
     {
@@ -665,11 +751,31 @@ public static partial class ColorQuantizer
                 ? ColorMath.ToOklab(c.Color.R, c.Color.G, c.Color.B)
                 : ColorMath.ToLab(c.Color.R, c.Color.G, c.Color.B)).ToArray();
             _shadeBits = candidates.Select(c => 1 << (int)c.Shade).ToArray();
+            if (metric is ColorMetric.Lab or ColorMetric.Oklab && candidates.Count >= 32)
+                _tree = new ExactColorTree(_labs, _shadeBits);
         }
+
+        private NearestMatcher(NearestMatcher source)
+        {
+            _candidates = source._candidates; _metric = source._metric;
+            _labs = source._labs; _shadeBits = source._shadeBits; _tree = source._tree;
+        }
+
+        /// <summary>Shares immutable search geometry; each parallel worker retains its own result and mixing caches.</summary>
+        public NearestMatcher Fork() => new(this);
 
         private readonly int[] _shadeBits;
 
         public int Find(double r, double g, double b) => Find(r, g, b, AllShades, 0);
+
+        /// <summary>Whether the preferred candidate already represents this source exactly, including shade preference.</summary>
+        public bool IsExact(double r, double g, double b, int shadeMask, double penalty)
+        {
+            int c = Find(r, g, b, shadeMask, penalty);
+            if (c < 0) return false;
+            var colour = _candidates[c].Color;
+            return colour.R == r && colour.G == g && colour.B == b;
+        }
 
         /// <summary>Nearest candidate whose shade is in <paramref name="shadeMask"/>, or -1 if there is none.</summary>
         public int Find(double r, double g, double b, int shadeMask, double penalty)
@@ -684,7 +790,11 @@ public static partial class ColorQuantizer
             int best = -1;
             double bestD = double.MaxValue;
             var lab = LabOf(ri, gi, bi);
-            if (penalty == 0 && _metric is ColorMetric.Lab or ColorMetric.Oklab)
+            if (_tree is not null)
+            {
+                best = _tree.Find(lab, shadeMask, penalty, Floor);
+            }
+            else if (penalty == 0 && _metric is ColorMetric.Lab or ColorMetric.Oklab)
             {
                 // Fast path of the loop below for the default metric (same arithmetic as ColorMath.DeltaE76).
                 var labs = _labs;
@@ -710,6 +820,7 @@ public static partial class ColorQuantizer
         }
 
         private double _penaltyForCache = double.NaN;
+        private readonly ExactColorTree? _tree;
 
         /// <summary>The (penalised) distance of a candidate, in the same units <see cref="Find"/> minimises.</summary>
         public double Cost(double r, double g, double b, int candidate, double penalty)
@@ -739,9 +850,6 @@ public static partial class ColorQuantizer
             if (penalty > 0 && _candidates[i].Shade != Shade.Normal) d = d * (1 + penalty) + penalty * Floor;
             return d;
         }
-
-        /// <summary>A cost far below any visible difference, used only to break exact ties.</summary>
-        public double TieBreak => Floor * 0.01;
 
         private double Floor => _metric switch
         {

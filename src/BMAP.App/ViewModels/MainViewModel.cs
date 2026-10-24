@@ -29,8 +29,11 @@ public enum PreviewMode { Original, BlockMap, Difference, ShadeMap, Build2D, Bui
 public sealed partial class MainViewModel : ViewModelBase
 {
     private readonly IDialogService _dialogs;
-    private readonly AppSettings _settings = AppSettings.Load();
+    private readonly AppSettings _settings;
     private CancellationTokenSource? _updateCts;
+    private CancellationTokenSource? _imageLoadCts;
+    private int _imageLoadVersion;
+    private int _conversionVersion;
     private DispatcherTimer? _debounce;
     private RgbaImage? _source;
     private RgbaImage? _sourceThumb;
@@ -48,9 +51,12 @@ public sealed partial class MainViewModel : ViewModelBase
     public Loc L { get; } = new();
     public BlockTextureProvider Textures { get; }
 
-    public MainViewModel(IDialogService dialogs)
+    public MainViewModel(IDialogService dialogs) : this(dialogs, AppSettings.Load()) { }
+
+    internal MainViewModel(IDialogService dialogs, AppSettings settings)
     {
         _dialogs = dialogs;
+        _settings = settings;
         L.English = _settings.English;
         Textures = new BlockTextureProvider();
         if (_settings.ResourcePack is { } rp && Directory.Exists(rp))
@@ -288,7 +294,11 @@ public sealed partial class MainViewModel : ViewModelBase
     /// <summary>Set by the viewer window: build views are only rendered while it is open.</summary>
     public bool ViewerOpen { get => _viewerOpen; set { if (Set(ref _viewerOpen, value) && value) RefreshViewer(); } }
     private Bitmap? _viewerImage;
-    public Bitmap? ViewerImage { get => _viewerImage; set => Set(ref _viewerImage, value); }
+    public Bitmap? ViewerImage
+    {
+        get => _viewerImage;
+        set { var old = _viewerImage; if (Set(ref _viewerImage, value)) old?.Dispose(); }
+    }
     private string _viewerInfo = "";
     public string ViewerInfo { get => _viewerInfo; set => Set(ref _viewerInfo, value); }
     /// <summary>Raised when the "View in 3D" button is pressed; the window opens (or activates) the viewer.</summary>
@@ -298,7 +308,11 @@ public sealed partial class MainViewModel : ViewModelBase
     private bool _showGrid = true;
     public bool ShowGrid { get => _showGrid; set { if (Set(ref _showGrid, value)) RefreshPreview(); } }
     private Bitmap? _preview;
-    public Bitmap? Preview { get => _preview; set { if (Set(ref _preview, value)) Raise(nameof(HasPreview)); } }
+    public Bitmap? Preview
+    {
+        get => _preview;
+        set { var old = _preview; if (Set(ref _preview, value)) { Raise(nameof(HasPreview)); old?.Dispose(); } }
+    }
     public bool HasPreview => _preview != null;
     private string _previewInfo = "";
     public string PreviewInfo { get => _previewInfo; set => Set(ref _previewInfo, value); }
@@ -328,6 +342,8 @@ public sealed partial class MainViewModel : ViewModelBase
 
     private bool _isBusy;
     public bool IsBusy { get => _isBusy; set { if (Set(ref _isBusy, value)) RaiseCommands(); } }
+    private bool _isConverting;
+    public bool IsConverting { get => _isConverting; private set { if (Set(ref _isConverting, value)) RaiseCommands(); } }
     private string _status = "";
     public string Status { get => _status; set => Set(ref _status, value); }
     private string _logText = "";
@@ -389,6 +405,9 @@ public sealed partial class MainViewModel : ViewModelBase
     private void ScheduleUpdate()
     {
         if (_loadingProject) return;
+        ++_conversionVersion;
+        if (_source is not null) IsConverting = true;
+        _updateCts?.Cancel(); // Invalidate the previous settings immediately, not after the debounce delay.
         if (_debounce is null)
         {
             _debounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
@@ -401,19 +420,21 @@ public sealed partial class MainViewModel : ViewModelBase
     private async Task UpdateAsync()
     {
         if (_source is null || Profile is null) return;
+        int version = _conversionVersion;
         _updateCts?.Cancel();
-        var cts = _updateCts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
+        _updateCts = cts;
         var source = _source;
-        var settings = CurrentImageSettings();
-        var profile = Profile;
-        var selection = CurrentSelection();
-        var qopt = CurrentQuantizeOptions();
-        var support = SelectedSupportBlock ?? profile.Find("cobblestone") ?? profile.Blocks.First();
-        var supports = SupportModeOption.Value;
-        bool grid = UseOrigin;
-        Status = L["Converting"];
         try
         {
+            var settings = CurrentImageSettings();
+            var profile = Profile;
+            var selection = CurrentSelection();
+            var qopt = CurrentQuantizeOptions();
+            var support = SelectedSupportBlock ?? profile.Find("cobblestone") ?? profile.Blocks.First();
+            var supports = SupportModeOption.Value;
+            bool grid = UseOrigin;
+            Status = L["Converting"];
             var (processed, q, error) = await Task.Run(() =>
             {
                 var p = ImagePipeline.Process(source, settings, cts.Token);
@@ -423,7 +444,7 @@ public sealed partial class MainViewModel : ViewModelBase
                 catch (InvalidOperationException ex) { err = ex.Message; }
                 return (p, qr, err);
             }, cts.Token);
-            if (cts.IsCancellationRequested) return;
+            if (cts.IsCancellationRequested || !ReferenceEquals(_source, source)) return;
             _processed = processed;
             _baseQuantized = q;
             if (error != null) Log(error);
@@ -431,21 +452,41 @@ public sealed partial class MainViewModel : ViewModelBase
             RebuildViewAreas();
             UpdateBlockInfo();
             RefreshPreview();
-            Status = L["Ready"];
+            Status = L[error is null ? "Ready" : "Error"];
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
+            if (cts.IsCancellationRequested || !ReferenceEquals(_source, source)) return;
+            _baseQuantized = null;
+            _processed = null;
+            ApplyEditsAndLayout();
+            UpdateBlockInfo();
+            RefreshPreview();
             Status = L["Error"];
             Log((L.English ? "Conversion failed: " : "変換に失敗しました: ") + ex.Message);
         }
-        finally { RaiseCommands(); }
+        finally
+        {
+            if (ReferenceEquals(_updateCts, cts))
+            {
+                _updateCts = null;
+                if (version == _conversionVersion) IsConverting = false;
+            }
+            RaiseCommands();
+        }
     }
 
     /// <summary>Re-applies manual edits to a copy of the automatic result and rebuilds the 3D layout.</summary>
     private void ApplyEditsAndLayout()
     {
-        if (_baseQuantized is null || Profile is null) { _quantized = null; _layout = null; return; }
+        if (_baseQuantized is null || Profile is null)
+        {
+            _quantized = null; _layout = null;
+            AnalyzeShading();
+            Raise(nameof(HasLayout));
+            return;
+        }
         var q = _edits.Count == 0 ? _baseQuantized : _baseQuantized.Clone();
         _edits.ApplyTo(q, Profile);
         _quantized = q;
@@ -698,11 +739,20 @@ public sealed partial class MainViewModel : ViewModelBase
 
     public async Task LoadImageAsync(string path, int frame = 0, double seconds = 0)
     {
+        int version = ++_imageLoadVersion;
+        _imageLoadCts?.Cancel();
+        using var cts = new CancellationTokenSource();
+        _imageLoadCts = cts;
         try
         {
             IsBusy = true;
-            int frames = ImageCodec.IsVideo(path) ? 0 : await Task.Run(() => ImageCodec.FrameCount(path));
-            var img = await Task.Run(() => ImageCodec.Load(path, frame, seconds));
+            var (frames, img) = await Task.Run(() =>
+            {
+                cts.Token.ThrowIfCancellationRequested();
+                int count = ImageCodec.IsVideo(path) ? 0 : ImageCodec.FrameCount(path);
+                return (count, ImageCodec.Load(path, frame, seconds, cts.Token));
+            }, cts.Token);
+            if (cts.IsCancellationRequested || version != _imageLoadVersion) return;
             _sourcePath = path;
             IsVideo = ImageCodec.IsVideo(path);
             FrameCount = Math.Max(1, frames);
@@ -716,8 +766,16 @@ public sealed partial class MainViewModel : ViewModelBase
             Log((L.English ? "Loaded " : "読み込みました: ") + $"{Path.GetFileName(path)} ({img.Width}x{img.Height})" +
                 (FrameCount > 1 ? $" frame {Frame + 1}/{FrameCount}" : "") + (IsVideo ? $" @ {seconds:0.##}s" : ""));
         }
-        catch (Exception ex) { Log((L.English ? "Could not open the file: " : "開けませんでした: ") + ex.Message); }
-        finally { IsBusy = false; RaiseCommands(); }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            if (version == _imageLoadVersion) Log((L.English ? "Could not open the file: " : "開けませんでした: ") + ex.Message);
+        }
+        finally
+        {
+            if (ReferenceEquals(_imageLoadCts, cts)) _imageLoadCts = null;
+            if (version == _imageLoadVersion) { IsBusy = false; RaiseCommands(); }
+        }
     }
 
     private Task ReloadFrameAsync() => _sourcePath is null ? Task.CompletedTask : LoadImageAsync(_sourcePath, Frame, VideoSeconds);
@@ -734,8 +792,23 @@ public sealed partial class MainViewModel : ViewModelBase
 
     private void NewProject()
     {
+        ClearSource();
         _projectPath = null;
         ApplyProject(new BmapProject());
+        RefreshPreview();
+    }
+
+    private void ClearSource()
+    {
+        ++_imageLoadVersion;
+        if (_imageLoadCts is not null) { _imageLoadCts.Cancel(); IsBusy = false; }
+        _updateCts?.Cancel();
+        _debounce?.Stop();
+        ++_conversionVersion;
+        IsConverting = false;
+        ++_analysisVersion;
+        ++_viewerVersion;
+        ++_revision3D;
         _source = _sourceThumb = _processed = null;
         _quantized = _baseQuantized = null;
         _layout = null;
@@ -743,12 +816,26 @@ public sealed partial class MainViewModel : ViewModelBase
         UpdateShadingText();
         _edits = new PixelOverrides();
         _sourcePath = null;
+        _frame = 0;
+        _videoSeconds = 0;
+        Raise(nameof(Frame));
+        Raise(nameof(VideoSeconds));
         FrameCount = 1;
         IsVideo = false;
         SourceInfo = L["NoImage"];
         Materials.Clear();
         BlockSummary = "";
+        View3D = ViewerImage = null;
+        _last3D = null;
+        _lastMesh3D = _mesh = null;
+        _meshKey = default;
+        _cameraFitted = false;
+        _dirty3D = false;
+        Status = L["Ready"];
+        Raise(nameof(HasLayout));
+        RebuildViewAreas();
         RefreshPreview();
+        RaiseCommands();
     }
 
     private async Task OpenProjectAsync()
@@ -763,9 +850,11 @@ public sealed partial class MainViewModel : ViewModelBase
         try
         {
             var p = BmapProject.Load(path);
+            ClearSource();
             _projectPath = path;
             ApplyProject(p);
             var img = p.ResolveImagePath(path);
+            _sourcePath = img; // Preserve an unavailable image reference, including when saving under another name.
             if (img != null && File.Exists(img))
             {
                 if (p.SourceImageHash != null && BmapProject.HashFile(img) != p.SourceImageHash)
@@ -800,7 +889,7 @@ public sealed partial class MainViewModel : ViewModelBase
         var p = _project;
         p.ProjectName = ProjectName;
         p.SourceImagePath = _sourcePath;
-        p.SourceImageHash = _sourcePath != null && File.Exists(_sourcePath) ? BmapProject.HashFile(_sourcePath) : null;
+        p.SourceImageHash = _sourcePath != null && File.Exists(_sourcePath) ? BmapProject.HashFile(_sourcePath) : p.SourceImageHash;
         p.SourceFrame = Frame;
         p.SourceVideoSeconds = VideoSeconds;
         p.Image = CurrentImageSettings();
@@ -846,7 +935,7 @@ public sealed partial class MainViewModel : ViewModelBase
             BackgroundColor = s.BackgroundColor;
             Transparency = TransparencyModes.First(t => t.Value == s.Transparency);
             Metric = Metrics.First(m => m.Value == p.Metric);
-            Dither = Dithers.First(d => d.Value == p.Dither);
+            RestoreDither(p.Dither);
             DitherStrength = p.DitherStrength;
             MaxHeight = p.MaxHeight;
             ShadePenalty = p.ShadePenalty;

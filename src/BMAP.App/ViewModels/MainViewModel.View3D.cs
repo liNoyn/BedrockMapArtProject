@@ -198,7 +198,9 @@ public sealed partial class MainViewModel
             {
                 bool regionChanged = _meshKey.Region != region || _mesh is null || !ReferenceEquals(_meshKey.Layout, layout);
                 if (!ReferenceEquals(_meshKey.Layout, layout)) { Raise(nameof(MaxLayer3D)); Raise(nameof(Layer3DText)); }
-                _mesh = await Task.Run(() => SceneMesh.Build(layout, region, supports, layer == int.MaxValue ? null : layer, report));
+                var built = await Task.Run(() => SceneMesh.Build(layout, region, supports, layer == int.MaxValue ? null : layer, report));
+                if (revision != _revision3D || !ReferenceEquals(_layout, layout) || !ViewerOpen || !IsBuild3D) return;
+                _mesh = built;
                 _meshKey = (layout, region, supports, layer, report);
                 _hover3D = -1;
                 View3DInfo = "";

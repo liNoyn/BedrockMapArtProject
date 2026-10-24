@@ -7,14 +7,14 @@ if (args.Length == 0)
 {
     Console.WriteLine("""
         BMAP CLI
-          build <image> <outDir> [--maps 2x2] [--dither none|fs|jjn|burkes|sierra|stucki|atkinson|bayer2|bayer4|ordered3]
+          build <image> <outDir> [--maps 2x2] [--dither Optimized|Hybrid|Perceptual|None]
                 [--staircase flat|classic|valley|dark|bright] [--support none|important|all|double] [--preset 0-7]
-                [--origin mapX,mapZ,y] [--name n] [--max n] [--split tiles|map|whole] [--bp]
+                [--origin mapX,mapZ,y] [--name n] [--max n] [--split 128|64|map|whole] [--bp]
                                          ブロック建築データ（.mcstructure とガイド、--bp でビヘイビアパック）を出力
-          analyze <image> [--maps 1x1] [--dither none|fs|bayer4] [--preset n] [--bg #RRGGBB]
+          analyze <image> [--maps 1x1] [--dither Optimized|Hybrid|Perceptual|None] [--preset n] [--bg #RRGGBB]
                                          3D マップアートの高さと画質の関係を解析
           bench <image>... [--maps 1x1]  ディザリング・色差の方式を比較（画質と速度）
-          convert <image> <out.png> [--dither Perceptual|Optimized] [--staircase valley|flat] [--max n] [--maps 1x1]
+          convert <image> <out.png> [--dither Optimized|Hybrid|Perceptual|None] [--staircase valley|flat] [--max n] [--maps 1x1]
                                          変換結果を元画像と並べて保存し、色差を表示
           nearest #RRGGBB... [--n 8]     一番近い地図色（陰影つき）を一覧
           score <source> <map.png>...    地図画像（128 px / 枚）と元画像の色差（ピクセル・近く・遠く）
@@ -29,7 +29,7 @@ if (args.Length == 0)
           verify <world> <kitDir> [--en] ゲームが描いた地図とキットの予測をピクセル単位で比較（読み取り専用）
           calibrate <world> <pad.json> [--out dir] [--en]
                                          ゲームが描いた地図からパッドを読み取り、陰影規則と地図色を測定
-          textures [cacheDir]            ブロックテクスチャを取得
+          textures [cacheDir] [--check]  ブロックテクスチャを取得（--check: 不足を検査）
         """);
     return 0;
 }
@@ -85,11 +85,13 @@ try
             var exportOptions = new BMAP.Export.StructureExportOptions
             {
                 WriteBehaviorPack = opts.ContainsKey("bp"),
-                Split = opts.GetValueOrDefault("split", "tiles") switch
+                Split = opts.GetValueOrDefault("split", "128") switch
                 {
+                    "128" or "tiles128" => BMAP.Export.StructureSplit.Tiles128,
+                    "64" or "tiles64" or "tiles" => BMAP.Export.StructureSplit.Tiles64,
                     "map" => BMAP.Export.StructureSplit.PerMap,
                     "whole" => BMAP.Export.StructureSplit.Whole,
-                    _ => BMAP.Export.StructureSplit.Tiles64,
+                    _ => throw new ArgumentException("--split は 128 / 64 / map / whole を指定してください。"),
                 },
             };
             var result = BMAP.Export.StructureExporter.Export(args[2], name, layout, mx, exportOptions, origin);
@@ -229,7 +231,7 @@ try
             var sel = BMAP.BlockEngine.BlockPreset.BuiltIns(profile)[int.Parse(opts.GetValueOrDefault("preset", "0"))].ToSelection();
             var qopt = new BMAP.BlockEngine.QuantizeOptions
             {
-                Dither = Enum.Parse<BMAP.BlockEngine.DitherMode>(opts.GetValueOrDefault("dither", "KnollBayer"), true),
+                Dither = ParseDither(opts.GetValueOrDefault("dither", "Optimized")),
                 Mode = opts.GetValueOrDefault("staircase", "valley") == "flat" ? BMAP.BlockEngine.StaircaseMode.Flat : BMAP.BlockEngine.StaircaseMode.Valley,
                 Metric = Enum.Parse<BMAP.ColorEngine.ColorMetric>(opts.GetValueOrDefault("metric", "oklab"), true),
                 MaxHeight = int.Parse(opts.GetValueOrDefault("max", "0")),
@@ -511,13 +513,14 @@ try
         case "textures":
         {
             // textures [cacheDir]: downloads block textures from Mojang's bedrock-samples (Minecraft EULA applies).
-            Console.WriteLine("Downloading block textures from github.com/Mojang/bedrock-samples (© Mojang AB, Minecraft EULA applies).");
-            var provider = new BMAP.Textures.BlockTextureProvider(args.Length > 1 ? args[1] : null);
-            int n = await provider.DownloadAsync(BMAP.Palette.ColorProfile.LoadBuiltIn().Blocks, new Progress<string>(Console.WriteLine));
-            var missing = BMAP.Palette.ColorProfile.LoadBuiltIn().Blocks.Where(b => provider.GetIcon(b) is null).Select(b => b.Key).ToList();
-            Console.WriteLine($"textures={n} cache={provider.CacheDirectory} missing={missing.Count} {string.Join(",", missing)}");
-            if (missing.Count == 0) File.WriteAllText(Path.Combine(provider.CacheDirectory, ".complete"), DateTime.UtcNow.ToString("O"));
-            else return 3;
+              var provider = new BMAP.Textures.BlockTextureProvider(args.Length > 1 && !args[1].StartsWith("--") ? args[1] : null);
+              var blocks = BMAP.Palette.ColorProfile.LoadBuiltIn().Blocks.ToList();
+              bool check = args.Contains("--check");
+              if (!check) Console.WriteLine("Downloading block textures from github.com/Mojang/bedrock-samples (© Mojang AB, Minecraft EULA applies).");
+              int n = check ? 0 : await provider.DownloadAsync(blocks, new Progress<string>(Console.WriteLine));
+              var coverage = provider.CheckCoverage(blocks);
+              Console.WriteLine($"textures={n} cache={provider.CacheDirectory} missingIcons={coverage.MissingIcons} missingFaces={coverage.MissingFaces} {string.Join(",", coverage.MissingBlocks)}");
+              if (!coverage.IsComplete) return 3;
             break;
         }
 

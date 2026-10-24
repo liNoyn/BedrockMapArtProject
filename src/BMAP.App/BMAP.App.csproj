@@ -20,6 +20,8 @@
     <PackageReference Include="Avalonia" Version="11.2.5" />
     <PackageReference Include="Avalonia.Desktop" Version="11.2.5" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.5" />
+    <!-- Patched compatible DBus branch; Avalonia.FreeDesktop otherwise resolves vulnerable 0.20.0. -->
+    <PackageReference Include="Tmds.DBus.Protocol" Version="0.21.3" />
   </ItemGroup>
 
   <ItemGroup>
@@ -27,6 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="BMAP.App.Tests" />
     <ProjectReference Include="..\BMAP.Core\BMAP.Core.csproj" />
     <!-- Built first so its "textures" command can fetch the block textures below. -->
     <ProjectReference Include="..\BMAP.Cli\BMAP.Cli.csproj" ReferenceOutputAssembly="false" />
@@ -45,21 +48,30 @@
   </PropertyGroup>
 
   <Target Name="FetchBlockTextures" AfterTargets="Build" Condition="'$(BundleTextures)' == 'true'">
-    <Exec Condition="!Exists('$(TextureCacheDir)\.complete')" Command="dotnet &quot;$(BmapCliDll)&quot; textures &quot;$(TextureCacheDir)&quot;"
+    <Exec Command="dotnet &quot;$(BmapCliDll)&quot; textures &quot;$(TextureCacheDir)&quot; --check" IgnoreExitCode="true" StandardOutputImportance="Low" StandardErrorImportance="Low">
+      <Output TaskParameter="ExitCode" PropertyName="_TextureCheckExitCode" />
+    </Exec>
+    <Exec Condition="'$(_TextureCheckExitCode)' != '0'" Command="dotnet &quot;$(BmapCliDll)&quot; textures &quot;$(TextureCacheDir)&quot;"
           ContinueOnError="true" />
+    <Exec Condition="'$(_TextureCheckExitCode)' != '0'" Command="dotnet &quot;$(BmapCliDll)&quot; textures &quot;$(TextureCacheDir)&quot; --check" IgnoreExitCode="true" StandardOutputImportance="Low" StandardErrorImportance="Low">
+      <Output TaskParameter="ExitCode" PropertyName="_TextureCheckExitCode" />
+    </Exec>
     <ItemGroup>
       <_BmapTexture Include="$(TextureCacheDir)\**\*" Exclude="$(TextureCacheDir)\.complete" />
     </ItemGroup>
     <Copy SourceFiles="@(_BmapTexture)" DestinationFiles="@(_BmapTexture->'$(OutDir)textures\vanilla\%(RecursiveDir)%(Filename)%(Extension)')"
-          SkipUnchangedFiles="true" Condition="Exists('$(TextureCacheDir)\.complete')" />
+          SkipUnchangedFiles="true" Condition="'$(_TextureCheckExitCode)' == '0'" />
   </Target>
 
-  <Target Name="PublishBlockTextures" AfterTargets="Publish" Condition="'$(BundleTextures)' == 'true' And Exists('$(TextureCacheDir)\.complete')">
+  <Target Name="PublishBlockTextures" AfterTargets="Publish" Condition="'$(BundleTextures)' == 'true'">
+    <Exec Command="dotnet &quot;$(BmapCliDll)&quot; textures &quot;$(TextureCacheDir)&quot; --check" IgnoreExitCode="true" StandardOutputImportance="Low" StandardErrorImportance="Low">
+      <Output TaskParameter="ExitCode" PropertyName="_PublishTextureCheckExitCode" />
+    </Exec>
     <ItemGroup>
       <_BmapTexturePub Include="$(TextureCacheDir)\**\*" Exclude="$(TextureCacheDir)\.complete" />
     </ItemGroup>
     <Copy SourceFiles="@(_BmapTexturePub)" DestinationFiles="@(_BmapTexturePub->'$(PublishDir)textures\vanilla\%(RecursiveDir)%(Filename)%(Extension)')"
-          SkipUnchangedFiles="true" />
+          SkipUnchangedFiles="true" Condition="'$(_PublishTextureCheckExitCode)' == '0'" />
   </Target>
 
 </Project>

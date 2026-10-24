@@ -140,23 +140,7 @@ public static partial class ColorQuantizer
         double ph = settings.PixelHue;
         // Edges (line art, contours) get a higher per-pixel weight: dithering them frays the line, while flat areas
         // can mix. Edge strength = Sobel gradient of Oklab (L, a, b) at the pixel, 0..1 (0.15 per pixel = full edge).
-        var edgeBoost = new float[n];
-        if (settings.EdgeWeight > 0)
-            for (int y = 0; y < h; y++)
-                for (int x = 0; x < w; x++)
-                {
-                    double gx = 0, gy = 0;
-                    foreach (var (dx, dy, kx, ky) in Sobel)
-                    {
-                        int xx = Math.Clamp(x + dx, 0, w - 1), yy = Math.Clamp(y + dy, 0, h - 1);
-                        var o2 = chosen[yy * w + xx] < 0 ? ok[y * w + x] : ok[yy * w + xx];
-                        double v = o2.L + 0.5 * Math.Sqrt(o2.A * o2.A + o2.B * o2.B);
-                        gx += kx * v; gy += ky * v;
-                    }
-                    double g = Math.Sqrt(gx * gx + gy * gy) / 4;
-                    edgeBoost[y * w + x] = (float)(1 + settings.EdgeWeight * Math.Min(1, g / 0.15));
-                }
-        else Array.Fill(edgeBoost, 1f);
+        var edgeBoost = EdgeWeights(ok, chosen, w, h, settings.EdgeWeight);
         float PixelCost(int i, int c)
         {
             double dl = ck[c].L - ok[i].L, da = ck[c].A - ok[i].A, db = ck[c].B - ok[i].B;
@@ -270,7 +254,7 @@ public static partial class ColorQuantizer
                         changes++;
                     }
                 }
-                if (changes <= n / 1000) break;
+                if (changes == 0) break;
             }
 
             for (int pass = 0; pass < settings.SwapPasses; pass++)
@@ -304,9 +288,32 @@ public static partial class ColorQuantizer
                             swaps++;
                         }
                     }
-                if (swaps <= n / 2000) break;
+                if (swaps == 0) break;
             }
         }
+    }
+
+    /// <summary>Sobel magnitude of the complete Oklab vector, retaining edges between equal-lightness hues.</summary>
+    internal static float[] EdgeWeights(Lab[] source, int[] chosen, int w, int h, double weight)
+    {
+        var result = new float[w * h];
+        Array.Fill(result, 1f);
+        if (weight <= 0) return result;
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                double lx = 0, ax = 0, bx = 0, ly = 0, ay = 0, by = 0;
+                foreach (var (dx, dy, kx, ky) in Sobel)
+                {
+                    int xx = Math.Clamp(x + dx, 0, w - 1), yy = Math.Clamp(y + dy, 0, h - 1);
+                    var v = chosen[yy * w + xx] < 0 ? source[y * w + x] : source[yy * w + xx];
+                    lx += kx * v.L; ax += kx * v.A; bx += kx * v.B;
+                    ly += ky * v.L; ay += ky * v.A; by += ky * v.B;
+                }
+                double gradient = Math.Sqrt(lx * lx + ax * ax + bx * bx + ly * ly + ay * ay + by * by) / 4;
+                result[y * w + x] = (float)(1 + weight * Math.Min(1, gradient / 0.15));
+            }
+        return result;
     }
 
     /// <summary>
@@ -332,13 +339,12 @@ public static partial class ColorQuantizer
         // Contrast inside a mix: differences in hue and vividness (a, b) weighted by ChromaSpread against lightness.
         double kc = settings.ChromaSpread;
         double S(Lab a, Lab b) => Math.Sqrt((a.L - b.L) * (a.L - b.L) + kc * ((a.A - b.A) * (a.A - b.A) + (a.B - b.B) * (a.B - b.B)));
-        double lambda = settings.PairLambda, mu = settings.PairQuad, tol = settings.HueTolerance;
+        double lambda = settings.PairLambda, mu = settings.PairQuad;
         // Penalty for the contrast inside a mix: linear in the whole contrast, plus a quadratic part in the contrast
         // ACROSS the target's hue (cross = spread of the signed off-hue distances). Red with yellow for a salmon orange
         // lies on both sides of its hue and loses; white with pink for a pale pink lies along it and is not touched,
         // so near-ties between "grey alone" and "white + pink" no longer flip whole areas (patches).
         double Spread(double s, double cross) => lambda * s + mu * cross * cross;
-        int pool = Math.Min(settings.PairPool, nc);
 
         // Plans per colour bucket (5 bits per channel) and shade group, from the bucket centre: deterministic. (Finer
         // buckets were tried: more plan boundaries inside smooth areas, more grey islands in pale pinks.)
@@ -356,25 +362,21 @@ public static partial class ColorQuantizer
                 var allowed = Enumerable.Range(0, nc).Where(c => shadeFilter < 0 || (int)candidates[c].Shade == shadeFilter).ToArray();
                 var close = allowed.OrderBy(c => D(ck[c], target)).ThenBy(c => c).Take(Math.Min(settings.PairNear, allowed.Length)).ToArray();
                 int nearest = close[0];
-                // Triples: among the closest in linear light (where mixing happens) and the closest perceptually.
-                var ids = close.Concat(allowed.OrderBy(c => Sq(lin[c * 3] - tr) + Sq(lin[c * 3 + 1] - tg) + Sq(lin[c * 3 + 2] - tb)).ThenBy(c => c).Take(pool))
-                    .Distinct().ToArray();
                 // Expected per-pixel distance of a mix (PlanPixel): mixing extreme colours to reach a colour the palette
                 // lacks (pure red and yellow for a salmon orange) gets the average right, but every pixel is far off.
                 double beta = settings.PlanPixel, gamma = settings.PlanHue;
                 // Off-hue part of a colour: its distance (in the a/b plane) from the line through the target's hue.
                 // White and pink for a pale pink, or white and ice for a pale lavender, lie on that line; red and yellow
                 // for a salmon orange lie on either side of it and show as loud dots.
-                double tA = target.A, tB = target.B, tC = Math.Sqrt(tA * tA + tB * tB);
+                var preference = new MixTarget(target, settings);
                 // Signed distance from the target's hue line (neutral targets: chroma), and the penalised part beyond a
                 // small tolerance (a pink wool slightly off a pale pink's hue is fine).
-                double OffS(int c) => tC > 0.02 ? (ck[c].A * tB - ck[c].B * tA) / tC : Math.Sqrt(ck[c].A * ck[c].A + ck[c].B * ck[c].B);
-                double Off(int c) => Math.Max(0, Math.Abs(OffS(c)) - tol);
+                double OffS(int c) => preference.OffSigned(ck[c]);
+                double Off(int c) => preference.Off(ck[c]);
                 // Chroma lost along the target's hue by the mixed colour, beyond half of the target's chroma. Distance alone
                 // let plain grey win over white + pink for pale pinks (#EED0D4): same lightness, ΔE small, colour gone,
                 // because the mix pays for its contrast and the grey pays nothing for turning the hair grey.
-                double kappa = settings.PlanChroma;
-                double Fade(Lab mix) => kappa > 0 && tC > 0.02 ? kappa * Math.Max(0, tC - (mix.A * tA + mix.B * tB) / tC - 0.5 * tC) : 0;
+                double Fade(Lab mix) => preference.Fade(mix);
                 // Distance of a plan's colour to the target with lightness weighted by PlanLightness. Below 1 a single colour
                 // that only differs in lightness (a flat purple drawn as plain ice, slightly lighter) beats a mix of two
                 // shades that is closer on average but shows as texture up close; colour (a, b) errors keep full weight.
@@ -383,23 +385,8 @@ public static partial class ColorQuantizer
                 // L ≥ 0.75) more chroma than the target counts PlanChromaExcess times: the palette has no light pinks, and
                 // a stronger pink of the same hue reads as "pink" where pink + white reads as dots. Darker colours keep the
                 // plain distance (otherwise photos turn garish).
-                double we = target.L >= 0.75 ? settings.PlanChromaExcess : 1;
-                double Dw(Lab a)
-                {
-                    if (wl == 1 && we == 1) return D(a, target);
-                    double dl = a.L - target.L, da = a.A - target.A, db = a.B - target.B, ab2 = da * da + db * db;
-                    if (we != 1 && tC > 0.02)
-                    {
-                        double ca = Math.Sqrt(a.A * a.A + a.B * a.B), dc = ca - tC;
-                        double dh2 = Math.Max(0, ab2 - dc * dc);
-                        // Only a moderately stronger colour is tolerated (up to 60 % more chroma: pink wool for a light pink
-                        // cushion), not a much stronger one (orange for a peach skin, hot pink for a pale pink hair).
-                        if (dc > 0) dc = Math.Min(dc, 0.6 * tC) * we + Math.Max(0, dc - 0.6 * tC);
-                        ab2 = dh2 + dc * dc;
-                    }
-                    return Math.Sqrt(wl * wl * dl * dl + ab2);
-                }
-                double SingleCost(int c) => Dw(ck[c]) + beta * D(ck[c], target) + gamma * Off(c) + Fade(ck[c]);
+                double Dw(Lab a) => preference.Distance(a);
+                double SingleCost(int c) => preference.Single(ck[c]);
                 if (wl != 1)
                     foreach (int c in close)
                         if (SingleCost(c) < SingleCost(nearest)) nearest = c;
@@ -443,7 +430,7 @@ public static partial class ColorQuantizer
                 int t1 = -1, t2 = -1, t3 = -1;
                 // Triples also consider the best pair partners (pink wool for a pale pink lies far from it).
                 var good = partners.OrderBy(p => p.Cost).Select(p => p.Id).Distinct().Take(4).ToArray();
-                ids = [.. close.Take(Math.Max(0, settings.TriplePool - good.Length)), .. good];
+                int[] ids = [.. close.Take(Math.Max(0, settings.TriplePool - good.Length)), .. good];
                 ids = ids.Distinct().ToArray();
                 int tri = Math.Min(settings.TriplePool, ids.Length);
                 for (int i = 0; i < tri; i++)
@@ -491,7 +478,8 @@ public static partial class ColorQuantizer
         // (8x8 JPEG blocks) that flipped neighbouring blocks between plans and showed as square patches. Each pixel
         // gets its own plan's colours (sharp edges) and the smoothed one's (smooth transitions).
         var smooth = settings.PlanBlur > 0 ? BlurLinear(image, settings.PlanBlur) : null;
-        Parallel.For(0, h, new ParallelOptions { CancellationToken = ct }, y =>
+        var nearestTemplate = new NearestMatcher(candidates, ColorMetric.Oklab);
+        Parallel.For(0, h, new ParallelOptions { CancellationToken = ct }, nearestTemplate.Fork, (y, _, matcher) =>
         {
             for (int x = 0; x < w; x++)
             {
@@ -525,11 +513,89 @@ public static partial class ColorQuantizer
                 }
                 int count = Math.Min(plan.Length, take);
                 for (int t = 0; t < count; t++) { near[i * take + t] = plan[t]; nearCost[i * take + t] = pixelCost(i, plan[t]); }
+                // Keep the bucket's calm palette, but allow a better fallback evaluated at the actual source colour.
+                // Use the same hue/chroma preference as the plan: plain nearest-colour distance alone added white
+                // speckle to pastels. An exactly reachable colour has zero preference cost and is always retained.
+                int exactNearest = matcher.Find(image.Pixels[i * 4], image.Pixels[i * 4 + 1], image.Pixels[i * 4 + 2],
+                    sameShade ? Bit(candidates[cur].Shade) : AllShades, 0);
+                var ownPreference = new MixTarget(ok[i], settings);
+                double ownCost = ownPreference.Single(ck[exactNearest]);
+                bool betterFallback = true;
+                for (int t = 0; t < count; t++)
+                    if (ownPreference.Single(ck[near[i * take + t]]) <= ownCost) betterFallback = false;
+                bool hasNearest = false;
+                for (int t = 0; t < count; t++) if (near[i * take + t] == exactNearest) hasNearest = true;
+                var nearestColour = candidates[exactNearest].Color;
+                bool exactSource = nearestColour.R == image.Pixels[i * 4] && nearestColour.G == image.Pixels[i * 4 + 1]
+                    && nearestColour.B == image.Pixels[i * 4 + 2];
+                // A one-colour plan deliberately stays solid. Expanding it for an approximate match reintroduces
+                // background speckle; only an exact source colour may override that decision.
+                if (!hasNearest && (exactSource || count > 1 && betterFallback))
+                {
+                    int slot = count < take ? count++ : count - 1;
+                    near[i * take + slot] = exactNearest;
+                    nearCost[i * take + slot] = pixelCost(i, exactNearest);
+                }
                 counts[i] = count;
-                if (Array.IndexOf(plan, cur) < 0)
-                    chosen[i] = plan.OrderBy(c => Sq(lin[c * 3] - lin[cur * 3]) + Sq(lin[c * 3 + 1] - lin[cur * 3 + 1]) + Sq(lin[c * 3 + 2] - lin[cur * 3 + 2])).First();
+                bool allowedCurrent = false;
+                for (int t = 0; t < count; t++) if (near[i * take + t] == cur) allowedCurrent = true;
+                if (!allowedCurrent)
+                {
+                    int best = near[i * take]; double distance = double.PositiveInfinity;
+                    for (int t = 0; t < count; t++)
+                    {
+                        int c = near[i * take + t];
+                        double d = Sq(lin[c * 3] - lin[cur * 3]) + Sq(lin[c * 3 + 1] - lin[cur * 3 + 1]) + Sq(lin[c * 3 + 2] - lin[cur * 3 + 2]);
+                        if (d < distance) { distance = d; best = c; }
+                    }
+                    chosen[i] = best;
+                }
             }
-        });
+            return matcher;
+        }, _ => { });
+    }
+
+    /// <summary>The same source-relative hue/chroma preferences for bucket plans and exact-pixel fallbacks.</summary>
+    private readonly struct MixTarget
+    {
+        private readonly Lab _target;
+        private readonly RefineSettings _settings;
+        private readonly double _chroma, _excessWeight;
+
+        public MixTarget(Lab target, RefineSettings settings)
+        {
+            _target = target; _settings = settings;
+            _chroma = Math.Sqrt(target.A * target.A + target.B * target.B);
+            _excessWeight = target.L >= .75 ? settings.PlanChromaExcess : 1;
+        }
+
+        public double OffSigned(Lab a) => _chroma > .02 ? (a.A * _target.B - a.B * _target.A) / _chroma
+            : Math.Sqrt(a.A * a.A + a.B * a.B);
+        public double Off(Lab a) => Math.Max(0, Math.Abs(OffSigned(a)) - _settings.HueTolerance);
+        public double Fade(Lab a) => _settings.PlanChroma > 0 && _chroma > .02
+            ? _settings.PlanChroma * Math.Max(0, _chroma - (a.A * _target.A + a.B * _target.B) / _chroma - .5 * _chroma) : 0;
+
+        public double Distance(Lab a)
+        {
+            double dl = a.L - _target.L, da = a.A - _target.A, db = a.B - _target.B, ab2 = da * da + db * db;
+            if (_settings.PlanLightness == 1 && _excessWeight == 1) return Math.Sqrt(dl * dl + da * da + db * db);
+            if (_excessWeight != 1 && _chroma > .02)
+            {
+                double dc = Math.Sqrt(a.A * a.A + a.B * a.B) - _chroma;
+                double dh2 = Math.Max(0, ab2 - dc * dc);
+                // Tolerate only moderately stronger colours (up to 60% more chroma).
+                if (dc > 0) dc = Math.Min(dc, .6 * _chroma) * _excessWeight + Math.Max(0, dc - .6 * _chroma);
+                ab2 = dh2 + dc * dc;
+            }
+            return Math.Sqrt(_settings.PlanLightness * _settings.PlanLightness * dl * dl + ab2);
+        }
+
+        public double Single(Lab a)
+        {
+            double dl = a.L - _target.L, da = a.A - _target.A, db = a.B - _target.B;
+            return Distance(a) + _settings.PlanPixel * Math.Sqrt(dl * dl + da * da + db * db)
+                + _settings.PlanHue * Off(a) + Fade(a);
+        }
     }
 
     private static double Sq(double v) => v * v;
@@ -599,7 +665,8 @@ public static partial class ColorQuantizer
     /// Pixels inside flat colour areas (Hybrid). Local slope uses Oklab differences two/four steps away, with an
     /// additional directional trend check at eight/sixteen steps, on a denoised copy, counting only
     /// neighbours of the same area (difference below 0.06: an outline next to a flat area does not make it uneven).
-    /// Flat = slope below <paramref name="slope"/> per pixel and all 8 neighbours agreeing (neighbours in
+    /// Flat = slope below <paramref name="slope"/> per pixel at the 96px reference resolution (scaled down for larger
+    /// images), with all 8 neighbours agreeing (neighbours in
     /// another area count as agreeing, so pixels along an outline stay flat).
     /// A smooth gradient across a map (Oklab 0.2 over 128 pixels) is about 0.0016 per pixel: not flat. Connected flat patches
     /// smaller than <paramref name="minArea"/> pixels are dropped.
@@ -623,6 +690,10 @@ public static partial class ColorQuantizer
             ok[i] = ColorMath.ToOklab(den.Pixels[i * 4], den.Pixels[i * 4 + 1], den.Pixels[i * 4 + 2]);
         }
         static double Dist(Lab a, Lab b) => Math.Sqrt((a.L - b.L) * (a.L - b.L) + (a.A - b.A) * (a.A - b.A) + (a.B - b.B) * (a.B - b.B));
+        // Preserve the 96px calibration for small images. On larger builds the same sky changes more slowly per
+        // pixel; scale both the slope threshold and the trend's reach, otherwise it becomes a flat area at 2x2 maps.
+        double resolutionScale = Math.Max(1, Math.Max(w, h) / 96.0);
+        double pixelSlope = slope / resolutionScale;
         // Two and four steps away: the wider step sees a slow gradient over its 8-bit steps.
         (int Dx, int Dy)[] dirs = [(-2, -2), (0, -2), (2, -2), (-2, 0), (2, 0), (-2, 2), (0, 2), (2, 2),
             (-4, -4), (0, -4), (4, -4), (-4, 0), (4, 0), (-4, 4), (0, 4), (4, 4)];
@@ -646,7 +717,7 @@ public static partial class ColorQuantizer
                     sum += d;
                     count++;
                 }
-                raw[i] = count >= 6 && sum / count < slope;
+                raw[i] = count >= 6 && sum / count < pixelSlope;
             }
         });
         // Averaging directions dilutes a one-axis gradient with its zero-slope perpendicular neighbours. Check the
@@ -664,7 +735,9 @@ public static partial class ColorQuantizer
                 for (int direction = 0; direction < 8 && raw[i]; direction++)
                     for (int scale = 4; scale <= 8; scale *= 2)
                     {
-                        int dx = dirs[direction].Dx * scale, dy = dirs[direction].Dy * scale;
+                        int reach = (int)Math.Round(scale * 2 * resolutionScale);
+                        int sx = dirs[direction].Dx / 2, sy = dirs[direction].Dy / 2;
+                        int dx = sx * reach, dy = sy * reach;
                         int xx = x + dx, yy = y + dy;
                         if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
                         int j = yy * w + xx;
@@ -674,9 +747,9 @@ public static partial class ColorQuantizer
                         // a quantized sky only steps by one level.
                         bool crosses = false;
                         int prev = i;
-                        for (int k = 1; k <= scale * 2 && !crosses; k++)
+                        for (int k = 1; k <= reach && !crosses; k++)
                         {
-                            int px = x + dirs[direction].Dx * k / 2, py = y + dirs[direction].Dy * k / 2;
+                            int px = x + sx * k, py = y + sy * k;
                             int m = py * w + px;
                             if (m == prev) continue;
                             if (!valid[m] || Dist(ok[prev], ok[m]) > 0.015) crosses = true;
@@ -684,7 +757,7 @@ public static partial class ColorQuantizer
                         }
                         if (crosses) continue;
                         double distance = Dist(ok[i], ok[j]);
-                        if (distance < 0.06 && distance / Math.Sqrt(dx * dx + dy * dy) >= slope)
+                        if (distance < 0.06 && distance / Math.Sqrt(dx * dx + dy * dy) >= pixelSlope)
                             raw[i] = false;
                     }
             }
@@ -814,7 +887,7 @@ public sealed record RefineSettings
     public double Radius { get; init; }
     /// <summary>Two-colour mixing: contrast penalty of a pair (0 = off, use the nearest-candidate lists).</summary>
     public double PairLambda { get; init; }
-    /// <summary>Two-colour mixing: how many candidates (closest in linear light) are paired.</summary>
+    /// <summary>Legacy setting retained for callers. Pair partners cover all allowed colours; TriplePool bounds triples.</summary>
     public int PairPool { get; init; } = 40;
     /// <summary>Pairs are formed from this many colours closest to the target (with any partner).</summary>
     public int PairNear { get; init; } = 12;

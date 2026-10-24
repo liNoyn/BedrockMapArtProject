@@ -6,9 +6,9 @@ using BMAP.Palette;
 namespace BMAP.Textures;
 
 /// <summary>
-/// Block icons from Minecraft's own textures. Textures are never shipped with BMAP: they are either downloaded on
-/// request from Mojang's official bedrock-samples repository (subject to the Minecraft EULA) into a local cache, or
-/// read from a resource pack the user points to. Without textures, callers fall back to colour swatches.
+/// Block icons from Minecraft's own textures. Assets are fetched at build time or on request from Mojang's official
+/// bedrock-samples repository (subject to the Minecraft EULA), or read from a user resource pack. They are not stored
+/// in this source repository. Without textures, callers fall back to colour swatches.
 /// </summary>
 public sealed class BlockTextureProvider
 {
@@ -23,6 +23,7 @@ public sealed class BlockTextureProvider
 
     private readonly ConcurrentDictionary<string, RgbaImage?> _icons = new();
     private readonly ConcurrentDictionary<(string Key, int Face), RgbaImage?> _faces = new();
+    private readonly ConcurrentDictionary<string, RgbaImage?> _raw = new();
     private JsonObject? _blocks;
     private JsonObject? _terrain;
 
@@ -56,25 +57,37 @@ public sealed class BlockTextureProvider
         _terrain = ReadJson(Path.Combine("textures", "terrain_texture.json"));
         _icons.Clear();
         _faces.Clear();
+        _raw.Clear();
     }
 
     private JsonObject? ReadJson(string relative)
     {
-        foreach (var root in Roots())
+        JsonObject? result = null;
+        foreach (var root in Roots().Reverse())
         {
             var path = Path.Combine(root, relative);
             if (!File.Exists(path)) continue;
-            try { return JsonNode.Parse(CustomBlockStore.StripComments(File.ReadAllText(path))) as JsonObject; }
+            try
+            {
+                if (JsonNode.Parse(CustomBlockStore.StripComments(File.ReadAllText(path))) is not JsonObject json) continue;
+                result ??= new JsonObject();
+                foreach (var (key, value) in json)
+                {
+                    if (key == "texture_data" && value is JsonObject data && result[key] is JsonObject existing)
+                        foreach (var (texture, definition) in data) existing[texture] = definition?.DeepClone();
+                    else result[key] = value?.DeepClone();
+                }
+            }
             catch { /* try the next root */ }
         }
-        return null;
+        return result;
     }
 
     private IEnumerable<string> Roots()
     {
         if (ResourcePack != null) yield return ResourcePack;
-        if (BundledDirectory != null) yield return BundledDirectory;
         yield return CacheDirectory;
+        if (BundledDirectory != null) yield return BundledDirectory;
     }
 
     /// <summary>Uses a resource pack folder (e.g. an extracted vanilla pack or a texture pack) for icons.</summary>
@@ -94,47 +107,76 @@ public sealed class BlockTextureProvider
     {
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
         http.DefaultRequestHeaders.UserAgent.ParseAdd("BMAP/0.2 (+https://github.com/liNoyn/BedrockMapArtProject)");
+        return await DownloadAsync(blocks, http, progress, ct);
+    }
+
+    internal async Task<int> DownloadAsync(IEnumerable<BlockDefinition> blocks, HttpClient http,
+        IProgress<string>? progress = null, CancellationToken ct = default)
+    {
+        var requested = blocks.ToList();
+        ct.ThrowIfCancellationRequested();
         Directory.CreateDirectory(Path.Combine(CacheDirectory, "textures", "blocks"));
+        File.Delete(Path.Combine(CacheDirectory, ".complete"));
 
         async Task Fetch(string relative)
         {
+            var target = SafePath(CacheDirectory, relative) ?? throw new InvalidDataException($"Invalid texture path: {relative}");
             var bytes = await http.GetByteArrayAsync(SamplesBase + relative.Replace('\\', '/'), ct);
-            var target = Path.Combine(CacheDirectory, relative.Replace('/', Path.DirectorySeparatorChar));
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            await File.WriteAllBytesAsync(target, bytes, ct);
+            ct.ThrowIfCancellationRequested();
+            AtomicFile.WriteAllBytes(target, bytes);
         }
 
         progress?.Report("ブロック定義を取得しています…");
         await Fetch("blocks.json");
         await Fetch("textures/terrain_texture.json");
-        var saved = ResourcePack;
-        ResourcePack = null;
-        LoadIndex();
+        // Resolve vanilla downloads independently; cancellation must not switch off the user's resource pack.
+        var vanilla = new BlockTextureProvider(CacheDirectory);
 
-        var paths = blocks.SelectMany(b => Enumerable.Range(-1, 7).Select(face => ResolveTexturePath(b, face)))
+        var paths = requested.SelectMany(b => Enumerable.Range(-1, 7).Select(face => vanilla.ResolveTexturePath(b, face)))
             .Where(p => p != null).Select(p => p!.Value.Path).Distinct().ToList();
         int done = 0, ok = 0;
         foreach (var path in paths)
         {
             ct.ThrowIfCancellationRequested();
             done++;
-            if (FindFile(path) != null) { ok++; continue; }
-            foreach (var ext in new[] { ".png", ".tga" })
+            if (vanilla.ReadTexture(path) != null) { ok++; continue; }
+            foreach (var relative in TextureFiles(path))
             {
                 try
                 {
-                    await Fetch(path + ext);
+                    await Fetch(relative);
+                    vanilla._raw.TryRemove(path, out _);
+                    if (vanilla.ReadTexture(path) is null) continue;
                     ok++;
                     break;
                 }
-                catch (HttpRequestException) { /* try the other extension */ }
+                catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound) { /* Try TGA. */ }
             }
             if (done % 10 == 0) progress?.Report($"テクスチャを取得しています… {done}/{paths.Count}");
         }
-        ResourcePack = saved;
         LoadIndex();
         Changed?.Invoke();
+        var coverage = await Task.Run(() => new BlockTextureProvider(CacheDirectory).CheckCoverage(requested), ct);
+        if (coverage.IsComplete) AtomicFile.WriteAllText(Path.Combine(CacheDirectory, ".complete"), DateTime.UtcNow.ToString("O"));
+        else progress?.Report($"テクスチャ未取得: {coverage.MissingBlocks.Count} ブロック（アイコン {coverage.MissingIcons} / 面 {coverage.MissingFaces}）");
         return ok;
+    }
+
+    /// <summary>Verifies decoded icons and all six world faces; metadata or a completion marker alone is insufficient.</summary>
+    public TextureCoverage CheckCoverage(IEnumerable<BlockDefinition> blocks)
+    {
+        int total = 0, icons = 0, faces = 0;
+        var missing = new List<string>();
+        foreach (var block in blocks)
+        {
+            total++;
+            bool iconMissing = GetIcon(block) is null;
+            int faceMissing = Enumerable.Range(0, 6).Count(face => GetFaceTexture(block, face) is null);
+            if (iconMissing) icons++;
+            faces += faceMissing;
+            if (iconMissing || faceMissing > 0) missing.Add(block.Key);
+        }
+        return new TextureCoverage(total, icons, faces, missing);
     }
 
     /// <summary>A square icon (normally 16x16) for the block, or null when no texture is available.</summary>
@@ -153,13 +195,10 @@ public sealed class BlockTextureProvider
         if (!IsAvailable) return null;
         var resolved = ResolveTexturePath(block, face);
         if (resolved is not { } r) return null;
-        var file = FindFile(r.Path);
-        if (file is null) return null;
         try
         {
-            var img = file.EndsWith(".tga", StringComparison.OrdinalIgnoreCase)
-                ? TgaDecoder.Decode(File.ReadAllBytes(file))
-                : ImageCodec.Load(file);
+            var img = ReadTexture(r.Path)?.Clone();
+            if (img is null) return null;
             // Animated textures are vertical strips of frames: keep the first square.
             if (img.Height > img.Width && img.Height % img.Width == 0) img = img.Crop(0, 0, img.Width, img.Width);
             if (r.Tint is { } overlay) Overlay(img, overlay);
@@ -170,21 +209,45 @@ public sealed class BlockTextureProvider
         catch { return null; }
     }
 
-    private string? FindFile(string relative)
+    private static IEnumerable<string> TextureFiles(string relative) =>
+        Path.GetExtension(relative).ToLowerInvariant() is ".png" or ".tga" ? [relative] : [relative + ".png", relative + ".tga"];
+
+    private static string? SafePath(string root, string relative)
+    {
+        string basePath = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        string path = Path.GetFullPath(Path.Combine(root, relative.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar)));
+        return path.StartsWith(basePath, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal) ? path : null;
+    }
+
+    private RgbaImage? ReadTexture(string relative) => _raw.GetOrAdd(relative, _ =>
     {
         foreach (var root in Roots())
-            foreach (var ext in new[] { ".png", ".tga" })
+            foreach (var name in TextureFiles(relative))
             {
-                var p = Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar) + ext);
-                if (File.Exists(p)) return p;
+                try
+                {
+                    var path = SafePath(root, name);
+                    if (path is null || !File.Exists(path)) continue;
+                    return path.EndsWith(".tga", StringComparison.OrdinalIgnoreCase)
+                        ? TgaDecoder.Decode(File.ReadAllBytes(path)) : ImageCodec.Load(path);
+                }
+                catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or UnauthorizedAccessException or OverflowException or IndexOutOfRangeException)
+                { /* A corrupt higher-priority file must not hide a valid fallback. */ }
             }
         return null;
-    }
+    });
 
     /// <summary>blocks.json → terrain_texture.json → texture path (without extension) and optional tint.</summary>
     public (string Path, Rgba? Tint)? ResolveTexturePath(BlockDefinition block) => ResolveTexturePath(block, -1);
 
     private (string Path, Rgba? Tint)? ResolveTexturePath(BlockDefinition block, int face)
+    {
+        try { return ResolveTexturePathCore(block, face); }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or NullReferenceException)
+        { return null; }
+    }
+
+    private (string Path, Rgba? Tint)? ResolveTexturePathCore(BlockDefinition block, int face)
     {
         if (_blocks is null || _terrain is null) return null;
         string id = block.Name.Contains(':') ? block.Name[(block.Name.IndexOf(':') + 1)..] : block.Name;
@@ -276,4 +339,9 @@ public sealed class BlockTextureProvider
             p[i + 2] = (byte)(b * t.B / 255);
         }
     }
+}
+
+public sealed record TextureCoverage(int TotalBlocks, int MissingIcons, int MissingFaces, IReadOnlyList<string> MissingBlocks)
+{
+    public bool IsComplete => MissingIcons == 0 && MissingFaces == 0;
 }

@@ -92,4 +92,21 @@ public class HybridReviewTests
         var perceptual=QualityScore.Measure(image,ColorQuantizer.Quantize(image,Profile,Selection,options with{Dither=DitherMode.Perceptual}).Preview);
         Assert.InRange(hybrid.Far,0,perceptual.Far*1.05);
     }
+
+    [Theory]
+    [InlineData(96)]
+    [InlineData(128)]
+    [InlineData(256)]
+    [InlineData(512)]
+    public void FlatDetection_ResizedSkyDoesNotBecomeFlat(int size)
+    {
+        var image = new RgbaImage(size, size);
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                double v = y / (size - 1.0);
+                image[x, y] = new Rgba((byte)Math.Round(130 + 30 * v), (byte)Math.Round(175 + 35 * v), (byte)Math.Round(225 + 20 * v));
+            }
+        Assert.InRange(ColorQuantizer.FlatAreas(image, 128).Count(v => v), 0, size * size / 20);
+    }
 }

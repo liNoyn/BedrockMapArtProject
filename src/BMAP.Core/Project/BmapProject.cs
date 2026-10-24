@@ -43,7 +43,7 @@ public sealed class BmapProject
     public bool Serpentine { get; set; } = true;
     /// <summary>Dither in linear light (default since v0.4.0).</summary>
     public bool LinearDiffusion { get; set; } = true;
-    public Export.StructureSplit Split { get; set; } = Export.StructureSplit.Tiles64;
+    public Export.StructureSplit Split { get; set; } = Export.StructureSplit.Tiles128;
     public bool WriteBehaviorPack { get; set; }
     /// <summary>Manual pixel edits ("x,y,blockKey,shade").</summary>
     public List<string>? Edits { get; set; }
@@ -81,18 +81,37 @@ public sealed class BmapProject
 
     public void Save(string path)
     {
-        File.WriteAllText(path, JsonSerializer.Serialize(this, Options), new System.Text.UTF8Encoding(false));
+        AtomicFile.WriteAllText(path, JsonSerializer.Serialize(this, Options), new System.Text.UTF8Encoding(false));
     }
 
-    public static BmapProject Load(string path) =>
-        JsonSerializer.Deserialize<BmapProject>(File.ReadAllText(path), Options) ?? throw new InvalidDataException("プロジェクトファイルが空です。");
+    public static BmapProject Load(string path)
+    {
+        var project = JsonSerializer.Deserialize<BmapProject>(File.ReadAllText(path), Options)
+            ?? throw new InvalidDataException("プロジェクトファイルが空です。");
+        if (project.FormatVersion is < 1 or > 2)
+            throw new InvalidDataException($"未対応のプロジェクト形式です: {project.FormatVersion}");
+        if (project.Image is not { } image || image.MapsX <= 0 || image.MapsY <= 0 ||
+            (long)image.MapsX * image.MapsY > int.MaxValue / (128 * 128 * 4) ||
+            !Enum.IsDefined(image.Fit) || !Enum.IsDefined(image.Interpolation) ||
+            !Enum.IsDefined(image.CropMode) || !Enum.IsDefined(image.Transparency) ||
+            !Enum.IsDefined(project.Dither) || !Enum.IsDefined(project.Metric) || !Enum.IsDefined(project.Staircase) ||
+            !Enum.IsDefined(project.Supports) || !Enum.IsDefined(project.Split) || !Enum.IsDefined(project.Mixing))
+            throw new InvalidDataException("プロジェクトの変換設定が不正です。");
+        project.MapProgress ??= [];
+        project.DoneChunks ??= [];
+        project.OwnedMaterials ??= [];
+        if (project.ProjectName is null || project.MapProgress.Values.Any(state => !Enum.IsDefined(state)))
+            throw new InvalidDataException("プロジェクト名または進捗設定が不正です。");
+        project.DoneChunks.RemoveWhere(string.IsNullOrWhiteSpace);
+        return project;
+    }
 
     public string? ResolveImagePath(string projectPath)
     {
         if (SourceImagePath is null) return null;
         return Path.IsPathRooted(SourceImagePath)
             ? SourceImagePath
-            : Path.GetFullPath(Path.Combine(Path.GetDirectoryName(projectPath)!, SourceImagePath));
+            : Path.GetFullPath(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(projectPath))!, SourceImagePath));
     }
 
     public static string HashFile(string path)
